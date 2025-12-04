@@ -1,78 +1,47 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { Navbar } from '../components/Layout';
+import { Button } from '../components/ui/core';
+import { Shield, Zap, Activity, Lock } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black`}
-    >
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the index.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+
+      {/* Hero */}
+      <section className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24 bg-gradient-to-b from-background to-secondary/20">
+        <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-500 mb-8">
+          v1.0 Now Available
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs/pages/getting-started?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <h1 className="text-4xl md:text-6xl font-bold tracking-tight max-w-3xl mb-6">
+          Server Monitoring for the <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">Security Conscious</span>.
+        </h1>
+        <p className="text-lg text-muted-foreground max-w-2xl mb-8">
+          A lightweight, secure, and robust telemetry system for your VPS infrastructure.
+          Monitor CPU, Docker, and Network stats in real-time.
+        </p>
+        <div className="flex gap-4">
+          <Link href="/dashboard">
+            <Button size="lg" className="h-12 px-8 text-base">Get Started</Button>
+          </Link>
+          <Button variant="outline" size="lg" className="h-12 px-8 text-base">Documentation</Button>
         </div>
-      </main>
+      </section>
+
+      {/* Features */}
+      <section className="container mx-auto px-4 py-24 grid md:grid-cols-3 gap-8">
+        {[
+          { icon: Zap, title: "Real-time Telemetry", desc: "Granular updates on CPU, RAM, and Disk I/O every 60 seconds." },
+          { icon: Lock, title: "Zero Trust Security", desc: "Agent pushes data outbound. No firewall ports to open. Secure by default." },
+          { icon: Activity, title: "Docker Native", desc: "First-class support for Docker container stats and health monitoring." },
+        ].map((f, i) => (
+          <div key={i} className="p-6 rounded-xl border bg-card/50 hover:bg-card transition-colors">
+            <f.icon className="h-10 w-10 text-emerald-500 mb-4" />
+            <h3 className="text-xl font-bold mb-2">{f.title}</h3>
+            <p className="text-muted-foreground">{f.desc}</p>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
