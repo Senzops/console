@@ -11,7 +11,7 @@ import md5 from 'md5';
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
 // Helper for Gravatar
-const getGravatar = (email: string) => `https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?d=mp`;
+const getGravatar = (email: string) => `https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?d=identicon`;
 
 export const Navbar = () => {
   const { user, login, logout } = useAuth();
