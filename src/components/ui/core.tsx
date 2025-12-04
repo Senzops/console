@@ -6,6 +6,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// --- Spinner ---
+export const Spinner = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={cn("animate-spin", className)}
+  >
+    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+  </svg>
+)
+
+// --- Card ---
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div ref={ref} className={cn("rounded-xl border bg-card text-card-foreground shadow-sm", className)} {...props} />
 ))
@@ -26,6 +45,7 @@ export const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes
 ))
 CardContent.displayName = "CardContent"
 
+// --- Button ---
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
   size?: "default" | "sm" | "lg" | "icon"
@@ -51,6 +71,25 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ classN
 })
 Button.displayName = "Button"
 
+// --- Select (Simple Implementation) ---
+export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, ...props }, ref) => (
+  <div className="relative">
+    <select
+      ref={ref}
+      className={cn(
+        "flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 appearance-none",
+        className
+      )}
+      {...props}
+    />
+    <div className="absolute right-3 top-2.5 pointer-events-none opacity-50">
+      <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m1 1 4 4 4-4" /></svg>
+    </div>
+  </div>
+))
+Select.displayName = "Select"
+
+// --- Badge ---
 export const Badge = ({ className, variant = "default", ...props }: React.HTMLAttributes<HTMLDivElement> & { variant?: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" }) => {
   const variants = {
     default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
@@ -69,15 +108,14 @@ export const Dialog = ({ open, onClose, children, title }: { open: boolean; onCl
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="w-full max-w-lg rounded-xl border bg-card text-card-foreground shadow-lg animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex flex-col space-y-1.5 p-6 pb-4">
+        <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-border/50">
           <h3 className="font-semibold leading-none tracking-tight text-lg">{title}</h3>
         </div>
-        <div className="p-6 pt-0">{children}</div>
+        <div className="p-6">{children}</div>
         <div className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground cursor-pointer" onClick={onClose}>
           ✕
         </div>
       </div>
-      {/* Backdrop click to close */}
       <div className="absolute inset-0 -z-10" onClick={onClose} />
     </div>
   )
