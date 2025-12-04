@@ -26,8 +26,8 @@ console/
 │       └── [id].tsx          # /dashboard/:id - Individual VPS Graphs & Stats
 │
 ├── public/                   # Static Assets
-│   ├── favicon.ico
-│   └── vercel.svg
+│   ├── logo.jpeg
+│   └── logo.png
 │
 ├── styles/                   # CSS
 │   └── globals.css           # Global styles, Tailwind imports, CSS Variables
