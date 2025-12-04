@@ -41,6 +41,40 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Stats Preview */}
+      <section className="container mx-auto px-4 mb-32">
+        <div className="rounded-xl border border-border bg-card/50 backdrop-blur shadow-2xl overflow-hidden max-w-5xl mx-auto">
+          <div className="border-b bg-muted/50 p-4 flex gap-2 items-center">
+            <div className="h-3 w-3 rounded-full bg-red-500/50" />
+            <div className="h-3 w-3 rounded-full bg-yellow-500/50" />
+            <div className="h-3 w-3 rounded-full bg-green-500/50" />
+          </div>
+          <div className="p-8 grid md:grid-cols-3 gap-8">
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">Real-time CPU</div>
+              <div className="text-3xl font-mono font-bold text-emerald-400">12.4%</div>
+              <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 w-[12%]" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">Memory Load</div>
+              <div className="text-3xl font-mono font-bold text-blue-400">4.2 GB</div>
+              <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 w-[45%]" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">Docker Containers</div>
+              <div className="text-3xl font-mono font-bold text-purple-400">8 Active</div>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <div key={i} className="h-2 w-2 rounded-sm bg-purple-500" />)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Grid */}
       <section className="bg-secondary/20 py-32 border-y">
         <div className="container mx-auto px-4">

@@ -148,6 +148,7 @@ export default function VpsDetail() {
       diskUsedVal: (run.metrics.disk?.used / 1e9).toFixed(1),
       netRx: (run.metrics.network?.bytesRecvSec / 1024) || 0,
       netTx: (run.metrics.network?.bytesSentSec / 1024) || 0,
+      latencyMs: run.metrics.network?.latencyMs || 0,
       procBlocked: run.metrics.processes?.blocked || 0,
       procRunning: run.metrics.processes?.running || 0,
       procSleeping: run.metrics.processes?.sleeping || 0,
@@ -199,7 +200,7 @@ export default function VpsDetail() {
         {/* 1. Stat Cards (Center Aligned Items) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard title="CPU Usage" value={`${(latest.cpu?.usagePercent || 0).toFixed(1)}%`} icon={Cpu} color="text-emerald-500" sub={`${latest.cpu?.cores} Cores`} />
-          <StatCard title="Memory" value={`${(latest.memory?.usagePercent || 0).toFixed(1)}%`} sub={`${((latest.memory?.used || 0) / 1024 ** 3).toFixed(1)}GB Used`} icon={Activity} color="text-blue-500" />
+          <StatCard title="Memory" value={`${(latest.memory?.usagePercent || 0).toFixed(1)}%`} sub={`${((latest.memory?.used || 0) / 1024 ** 3).toFixed(1)}GB / ${((latest.memory?.total || 0) / 1024 ** 3).toFixed(1)}GB Used`} icon={Activity} color="text-blue-500" />
           <StatCard title="Net Latency" value={`${latest.network?.latencyMs?.toFixed(0) || '-'}ms`} sub="Global Ping" icon={Network} color="text-yellow-500" />
           <StatCard title="Containers" value={latest.docker?.filter((c: any) => c.state === 'running').length || 0} sub={`Total: ${latest.docker?.length || 0}`} icon={Box} color="text-purple-500" />
         </div>
@@ -222,35 +223,7 @@ export default function VpsDetail() {
             </AreaChart>
           </ChartCard>
 
-          <ChartCard title={`Disk Usage (${latest.disk?.name || '/'})`}>
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorDisk" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-              <XAxis dataKey="time" hide />
-              <YAxis domain={[0, 100]} hide />
-              <Tooltip content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  const data = payload[0].payload;
-                  return (
-                    <div className="bg-popover border p-2 text-xs rounded shadow z-50">
-                      <div className="font-bold mb-1">{data.time}</div>
-                      <div className="text-yellow-500">Usage: {data.diskUsed}%</div>
-                      <div className="text-muted-foreground">Used: {data.diskUsedVal}GB / {data.diskTotalVal}GB</div>
-                    </div>
-                  )
-                }
-                return null;
-              }} />
-              <Area type="step" dataKey="diskUsed" stroke="#f59e0b" strokeWidth={2} fill="url(#colorDisk)" name="Disk" />
-            </AreaChart>
-          </ChartCard>
-
-          <ChartCard title="Memory Usage (%)">
+          {/* <ChartCard title="Memory Usage (%)">
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
@@ -264,9 +237,9 @@ export default function VpsDetail() {
               <Tooltip content={<CustomTooltip unit="%" />} />
               <Area type="monotone" stackId="1" dataKey="memUsed" stroke="#3b82f6" fill="url(#colorMem)" name="Usage" />
             </AreaChart>
-          </ChartCard>
+          </ChartCard> */}
 
-          <ChartCard title="Memory Composition (%)">
+          {/* <ChartCard title="Memory Composition (%)">
             <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="time" hide />
@@ -275,20 +248,36 @@ export default function VpsDetail() {
               <Area type="monotone" stackId="1" dataKey="memActive" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} name="Active" />
               <Area type="monotone" stackId="1" dataKey="memFree" stroke="#64748b" fill="#64748b" fillOpacity={0.3} name="Free" />
             </AreaChart>
-          </ChartCard>
+          </ChartCard> */}
 
           {/* combined Memory Composition and Usage */}
-          {/* <ChartCard title="Memory Composition (%)">
+          <ChartCard title="Memory Composition (%)">
             <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis domain={[0, 100]} hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
-              <Area type="monotone" dataKey="memUsed" stroke="#00C9A7" fill="#00C9A7" fillOpacity={0.15} name="Usage" />
-              <Area type="monotone" dataKey="memActive" stroke="#3A86FF" fill="#3A86FF" fillOpacity={0.1} name="Active" />
-              <Area type="monotone" dataKey="memFree" stroke="#BDBDBD" fill="#BDBDBD" fillOpacity={0.15} name="Free" />
+              <Area type="monotone" dataKey="memUsed" stroke="#6c28d8" fill="#6c28d8" fillOpacity={0.15} name="Usage" />
+              <Area type="monotone" dataKey="memActive" stroke="#4D6AFF" fill="#4D6AFF" fillOpacity={0.2} name="Active" />
+              <Area type="monotone" dataKey="memFree" stroke="#9a9aff" fill="#9a9aff" fillOpacity={0.25} name="Free" />
             </AreaChart>
-          </ChartCard> */}
+          </ChartCard>
+
+          <ChartCard title="Network Latency (Ms)">
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <XAxis dataKey="time" hide />
+              <YAxis hide />
+              <Tooltip content={<CustomTooltip unit=" Ms" />} />
+              <Area type="monotone" dataKey="latencyMs" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorCpu)" name="CPU" />
+            </AreaChart>
+          </ChartCard>
 
           <ChartCard title="Network Traffic (KB/s)">
             <LineChart data={chartData}>
@@ -299,6 +288,34 @@ export default function VpsDetail() {
               <Line type="monotone" dataKey="netRx" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Rx" />
               <Line type="monotone" dataKey="netTx" stroke="#ec4899" strokeWidth={2} dot={false} name="Tx" />
             </LineChart>
+          </ChartCard>
+
+          <ChartCard title={`Disk Usage (${latest.disk?.name || '/'})`}>
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="colorDisk" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#9B5DE5" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#9B5DE5" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <XAxis dataKey="time" hide />
+              <YAxis domain={[0, 100]} hide />
+              <Tooltip content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-popover border p-2 text-xs rounded shadow z-50">
+                      <div className="font-bold mb-1">{data.time}</div>
+                      <div className="text-orange-500">Usage: {data.diskUsed}%</div>
+                      <div className="text-muted-foreground">Used: {data.diskUsedVal}GB / {data.diskTotalVal}GB</div>
+                    </div>
+                  )
+                }
+                return null;
+              }} />
+              <Area type="step" dataKey="diskUsed" stroke="#9B5DE5" strokeWidth={2} fill="url(#colorDisk)" name="Disk" />
+            </AreaChart>
           </ChartCard>
 
           {/* Restored Process Graph */}
