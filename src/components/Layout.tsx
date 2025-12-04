@@ -13,6 +13,33 @@ const fetcher = (url: string) => api.get(url).then(res => res.data);
 // Helper for Gravatar
 const getGravatar = (email: string) => `https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?d=mp`;
 
+export const Navbar = () => {
+  const { user, login, logout } = useAuth();
+
+  return (
+    <nav className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
+          <ShieldCheck className="h-6 w-6 text-emerald-500" />
+          <span>SysSentinel</span>
+        </Link>
+        <div className="flex gap-4">
+          {user ? (
+            <>
+              <Link href="/dashboard">
+                <Button variant="ghost">Dashboard</Button>
+              </Link>
+              <Button onClick={logout} variant="outline">Sign Out</Button>
+            </>
+          ) : (
+            <Button onClick={login}>Sign In</Button>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+};
+
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
