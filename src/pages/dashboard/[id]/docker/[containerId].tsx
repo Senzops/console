@@ -1,11 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api } from '../../../../lib/auth';
+import { useTheme } from '../../../../lib/theme';
 import { DashboardLayout } from '../../../../components/Layout';
-import { Card, CardHeader, CardTitle, Badge, Button, CardContent } from '../../../../components/ui/core';
+import { Card, CardHeader, CardTitle, Badge, Button, CardContent, Spinner } from '../../../../components/ui/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowLeft, Box } from 'lucide-react';
+import { ArrowLeft, Box, Maximize2, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -28,21 +30,47 @@ const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
   return null;
 };
 
+const ChartCard = ({ title, children, color, isMono }: any) => {
+  const [isMaximized, setIsMaximized] = useState(false);
+  const titleColor = isMono ? 'text-muted-foreground' : undefined;
+
+  const Content = (
+    <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : 'h-[350px]'}`}>
+      <CardHeader className="pb-2 border-b border-border/50 flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm font-medium" style={{ color: !isMono ? color : undefined }}>{title}</CardTitle>
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMaximized(!isMaximized)}>
+          {isMaximized ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
+      </CardHeader>
+      <CardContent className="flex-1 min-h-0 pt-4 relative">
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <>
+      {isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}
+      {isMaximized ? createPortal(Content, document.body) : Content}
+    </>
+  );
+};
+
 export default function DockerDetail() {
   const router = useRouter();
   const { id, containerId } = router.query;
   const { data } = useSWR(id ? `/vps/${id}/stats` : null, fetcher);
+  const { isMono } = useTheme();
 
-  // 1. Destructure safely
   const { history } = data || {};
 
-  // 2. Always call useMemo (Rules of Hooks)
   const chartData = useMemo(() => {
     if (!history) return [];
-
     return history.map((run: any) => {
       const c = run.metrics.docker.find((d: any) => d.id === containerId);
-      if (!c) return null; // Container wasn't running during this tick
+      if (!c) return null;
       return {
         time: new Date(run.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         cpu: c.cpuPercent,
@@ -51,11 +79,10 @@ export default function DockerDetail() {
         memLimit: (c.memoryLimit / 1024 / 1024), // MB
         memFree: ((c.memoryLimit - c.memoryUsage) / 1024 / 1024) // MB
       };
-    }).filter(Boolean); // Remove nulls (times when container was offline)
+    }).filter(Boolean);
   }, [history, containerId]);
 
-  // 3. Conditional Return AFTER hooks
-  if (!data) return <DashboardLayout><div className="p-8">Loading Container Data...</div></DashboardLayout>;
+  if (!data) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Loading Container Data...</p></div></DashboardLayout>;
 
   const latestRun = history[history.length - 1];
   const containerCurrent = latestRun?.metrics.docker.find((c: any) => c.id === containerId);
@@ -71,6 +98,9 @@ export default function DockerDetail() {
     )
   }
 
+  const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
+  const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
+
   return (
     <DashboardLayout>
       <div className="p-8 space-y-6">
@@ -79,7 +109,7 @@ export default function DockerDetail() {
         </Button>
 
         <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded bg-purple-500/10 flex items-center justify-center text-purple-500">
+          <div className={`h-12 w-12 rounded bg-purple-500/10 flex items-center justify-center ${isMono ? 'text-muted-foreground' : 'text-purple-500'}`}>
             <Box className="h-6 w-6" />
           </div>
           <div>
@@ -96,56 +126,38 @@ export default function DockerDetail() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-          {/* CPU Chart */}
-          <ChartCard title="CPU Usage (%)" color="#8b5cf6">
+          <ChartCard title="CPU Usage (%)" color="#8b5cf6" isMono={isMono}>
             <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
-              <Area type="monotone" dataKey="cpu" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} />
+              <Area type="monotone" dataKey="cpu" stroke={getColor("#8b5cf6")} fill={getFill("#8b5cf6")} fillOpacity={0.2} />
             </AreaChart>
           </ChartCard>
 
-          {/* Memory Percent */}
-          <ChartCard title="Memory Usage (%)" color="#3b82f6">
+          <ChartCard title="Memory Usage (%)" color="#3b82f6" isMono={isMono}>
             <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
-              <Area type="monotone" dataKey="memPercent" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
+              <Area type="monotone" dataKey="memPercent" stroke={getColor("#3b82f6")} fill={getFill("#3b82f6")} fillOpacity={0.2} />
             </AreaChart>
           </ChartCard>
 
-          {/* Memory Usage vs Limit */}
-          <ChartCard title="Memory Capacity (MB)" color="#10b981">
+          <ChartCard title="Memory Capacity (MB)" color="#10b981" isMono={isMono}>
             <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit=" MB" />} />
-              <Area type="monotone" stackId="1" dataKey="memUsed" stroke="#ef4444" fill="#ef4444" name="Used" />
-              <Area type="monotone" stackId="1" dataKey="memFree" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Free" />
+              <Area type="monotone" stackId="1" dataKey="memUsed" stroke={getColor("#ef4444")} fill={getFill("#ef4444")} name="Used" />
+              <Area type="monotone" stackId="1" dataKey="memFree" stroke={getColor("#10b981")} fill={getFill("#10b981")} fillOpacity={0.2} name="Free" />
             </AreaChart>
           </ChartCard>
-
         </div>
       </div>
     </DashboardLayout>
   );
 }
-
-const ChartCard = ({ title, children, color }: any) => (
-  <Card className="h-[350px] flex flex-col">
-    <CardHeader className="pb-2 border-b border-border/50">
-      <CardTitle className="text-sm font-medium" style={{ color }}>{title}</CardTitle>
-    </CardHeader>
-    <CardContent className="flex-1 min-h-0 pt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        {children}
-      </ResponsiveContainer>
-    </CardContent>
-  </Card>
-);

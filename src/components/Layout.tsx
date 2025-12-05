@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { useAuth } from '../lib/auth';
+import { useAuth, api } from '../lib/auth';
+import { useTheme } from '../lib/theme';
 import { useRouter } from 'next/router';
 import { Button, Dialog, Avatar, Spinner } from './ui/core';
-import { Plus, Copy, LogOut, Key, Server } from 'lucide-react';
+import { Plus, Copy, LogOut, Key, Server, Settings, Palette, Monitor } from 'lucide-react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { api } from '../lib/auth';
 import md5 from 'md5';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -22,7 +22,7 @@ export const Navbar = () => {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="relative h-8 w-8 rounded-lg overflow-hidden shadow-lg border border-white/10">
+          <div className="relative h-8 w-8 rounded-lg overflow-hidden">
             <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
           </div>
           <span className="font-bold text-xl tracking-tight leading-none">SysSentinel</span>
@@ -46,14 +46,16 @@ export const Navbar = () => {
   );
 };
 
-// --- 2. Dashboard Layout (Sidebar System) ---
+// --- Dashboard Layout ---
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, logout, token } = useAuth();
+  const { theme, setTheme, appearance, setAppearance } = useTheme();
   const router = useRouter();
 
   const { data: vpsList } = useSWR(token ? '/vps/list' : null, fetcher);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [newVpsName, setNewVpsName] = useState('');
   const [newCreds, setNewCreds] = useState<{ vpsId: string, apiKey: string } | null>(null);
 
@@ -78,11 +80,9 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar */}
+    <div className="flex h-screen overflow-hidden bg-background transition-colors duration-300">
       <aside className="w-64 border-r bg-card flex flex-col hidden md:flex shrink-0 z-40">
-
-        {/* Brand & Add */}
+        {/* Brand */}
         <div className="p-6 border-b shrink-0">
           <Link href="/dashboard" className="flex items-center gap-3 font-bold text-xl mb-6 tracking-tight hover:opacity-80 transition-opacity">
             <div className="relative h-8 w-8 rounded-lg overflow-hidden border border-white/10">
@@ -110,14 +110,19 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
               <Link href={`/dashboard/${vps._id}`} key={vps._id}>
                 <Button
                   variant={isActive ? "secondary" : "ghost"}
-                  className={cn("w-full justify-start gap-2 mb-1 items-center", isActive && "bg-secondary/80 font-semibold border border-border/50")}
-                >
+                  className={cn("w-full justify-start gap-2 mb-1 items-center", isActive && "bg-secondary/80 font-semibold border border-border/50")}>
                   <div className={`h-2 w-2 rounded-full shadow-[0_0_8px] shrink-0 ${vps.status === 'online' ? 'bg-emerald-500 shadow-emerald-500/50' : 'bg-destructive shadow-destructive/50'}`} />
                   <span className="truncate">{vps.name}</span>
                 </Button>
               </Link>
             )
           })}
+          {/* Settings Button (End of List) */}
+          <div className="pt-4 mt-4 border-t border-border/40">
+            <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground" onClick={() => setIsSettingsOpen(true)}>
+              <Settings className="h-4 w-4" /> Global Settings
+            </Button>
+          </div>
         </div>
 
         {/* Profile */}
@@ -140,7 +145,30 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
         {children}
       </main>
 
-      {/* Modal */}
+      {/* --- SETTINGS MODAL --- */}
+      <Dialog open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Global Settings">
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2"><Palette className="h-4 w-4" /> Interface Theme</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="justify-start">Dark (Default)</Button>
+              <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="justify-start">Light</Button>
+              <Button variant={theme === 'nord' ? 'default' : 'outline'} onClick={() => setTheme('nord')} className="justify-start">Nord</Button>
+              <Button variant={theme === 'latte' ? 'default' : 'outline'} onClick={() => setTheme('latte')} className="justify-start">Latte</Button>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2"><Monitor className="h-4 w-4" /> Data Visualization</h4>
+            <div className="flex gap-2">
+              <Button variant={appearance === 'colorful' ? 'default' : 'outline'} onClick={() => setAppearance('colorful')} className="flex-1">Colorful</Button>
+              <Button variant={appearance === 'monochromatic' ? 'default' : 'outline'} onClick={() => setAppearance('monochromatic')} className="flex-1">Monochromatic</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Monochromatic mode forces all charts to use the theme's primary accent color for a cleaner look.</p>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* --- REGISTER MODAL (Existing) --- */}
       <Dialog open={isModalOpen} onClose={closeModal} title="Connect New Server">
         {!newCreds ? (
           <div className="space-y-4">

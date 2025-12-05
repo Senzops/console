@@ -2,8 +2,20 @@ import { Navbar } from '../components/Layout';
 import { Button, Card, Badge } from '../components/ui/core';
 import { Zap, Activity, Lock, Server, Cpu, Globe } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '../lib/auth';
+import { useRouter } from 'next/router';
 
 export default function Home() {
+  const { user, login } = useAuth();
+  const router = useRouter();
+
+  const handleCtaClick = () => {
+    if (user) {
+      router.push('/dashboard');
+    } else {
+      login();
+    }
+  };
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <Navbar />
@@ -32,11 +44,12 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/dashboard">
-              <Button size="lg" className="h-14 px-8 text-lg rounded-full shadow-emerald-500/20 shadow-lg hover:shadow-emerald-500/30 transition-all flex items-center justify-center">
-                Start Monitoring Free
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              onClick={handleCtaClick}
+              className="h-14 px-8 text-lg rounded-full shadow-emerald-500/20 shadow-lg hover:shadow-emerald-500/30 transition-all flex items-center justify-center">
+              Start Monitoring Free
+            </Button>
           </div>
         </div>
       </section>
@@ -122,7 +135,7 @@ export default function Home() {
             </div>
             SysSentinel
           </div>
-          <p>&copy; 2024 SysSentinel. Built for modern DevOps.</p>
+          <p>&copy; 2025 SysSentinel. Built for modern DevOps.</p>
         </div>
       </footer>
     </div>
