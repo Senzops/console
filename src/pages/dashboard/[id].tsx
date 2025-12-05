@@ -223,33 +223,6 @@ export default function VpsDetail() {
             </AreaChart>
           </ChartCard>
 
-          {/* <ChartCard title="Memory Usage (%)">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-              <XAxis dataKey="time" hide />
-              <YAxis domain={[0, 100]} hide />
-              <Tooltip content={<CustomTooltip unit="%" />} />
-              <Area type="monotone" stackId="1" dataKey="memUsed" stroke="#3b82f6" fill="url(#colorMem)" name="Usage" />
-            </AreaChart>
-          </ChartCard> */}
-
-          {/* <ChartCard title="Memory Composition (%)">
-            <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-              <XAxis dataKey="time" hide />
-              <YAxis domain={[0, 100]} hide />
-              <Tooltip content={<CustomTooltip unit="%" />} />
-              <Area type="monotone" stackId="1" dataKey="memActive" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} name="Active" />
-              <Area type="monotone" stackId="1" dataKey="memFree" stroke="#64748b" fill="#64748b" fillOpacity={0.3} name="Free" />
-            </AreaChart>
-          </ChartCard> */}
-
           {/* combined Memory Composition and Usage */}
           <ChartCard title="Memory Composition (%)">
             <AreaChart data={chartData}>
@@ -339,7 +312,7 @@ export default function VpsDetail() {
             {latest.docker?.length > 0 ? (
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/70">
                     <tr>
                       <th className="px-6 py-3">Container</th>
                       <th className="px-6 py-3">Image</th>
@@ -398,23 +371,31 @@ export default function VpsDetail() {
 }
 
 // Helpers
-const StatCard = ({ title, value, sub, icon: Icon, color, progressBarValue }: any) => (
-  <Card>
-    <CardContent className="p-6">
-      <div className="flex items-center justify-between space-y-0 pb-2">
-        <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</p>
-        <Icon className={`h-4 w-4 ${color}`} />
-      </div>
-      <div className="text-2xl font-bold text-foreground">{value}</div>
-      {sub && <p className="text-xs text-muted-foreground mt-1 flex items-center">{sub}</p>}
-      {
-        progressBarValue >= 0 && <div className="h-2 mt-2 w-full bg-secondary rounded-full overflow-hidden">
-          <div className={`h-full bg-${color?.replace("text-", "")}`} style={{ width: `${progressBarValue}%` }} />
+const StatCard = ({ title, value, sub, icon: Icon, color, progressBarValue }: any) => {
+  const colorMap: Record<string, string> = {
+    "text-emerald-500": "bg-emerald-500",
+    "text-blue-500": "bg-blue-500",
+    "text-yellow-500": "bg-yellow-500",
+    "text-purple-500": "bg-purple-500",
+  }
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between space-y-0 pb-2">
+          <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</p>
+          <Icon className={`h-4 w-4 ${color}`} />
         </div>
-      }
-    </CardContent>
-  </Card>
-);
+        <div className="text-2xl font-bold text-foreground">{value}</div>
+        {sub && <p className="text-xs text-muted-foreground mt-1 flex items-center">{sub}</p>}
+        {
+          progressBarValue >= 0 && <div className="h-1.5 mt-2 w-full bg-secondary rounded-full overflow-hidden">
+            <div className={`h-full ${colorMap[color]}`} style={{ width: `${progressBarValue}%` }} />
+          </div>
+        }
+      </CardContent>
+    </Card>
+  )
+};
 
 const ChartCard = ({ title, children }: any) => (
   <Card className="flex flex-col h-[300px]">
