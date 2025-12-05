@@ -199,10 +199,10 @@ export default function VpsDetail() {
 
         {/* 1. Stat Cards (Center Aligned Items) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard title="CPU Usage" value={`${(latest.cpu?.usagePercent || 0).toFixed(1)}%`} icon={Cpu} color="text-emerald-500" sub={`${latest.cpu?.cores} Cores`} />
-          <StatCard title="Memory" value={`${(latest.memory?.usagePercent || 0).toFixed(1)}%`} sub={`${((latest.memory?.used || 0) / 1024 ** 3).toFixed(1)}GB / ${((latest.memory?.total || 0) / 1024 ** 3).toFixed(1)}GB Used`} icon={Activity} color="text-blue-500" />
-          <StatCard title="Net Latency" value={`${latest.network?.latencyMs?.toFixed(0) || '-'}ms`} sub="Global Ping" icon={Network} color="text-yellow-500" />
-          <StatCard title="Containers" value={latest.docker?.filter((c: any) => c.state === 'running').length || 0} sub={`Total: ${latest.docker?.length || 0}`} icon={Box} color="text-purple-500" />
+          <StatCard title="CPU Usage" value={`${(latest.cpu?.usagePercent || 0).toFixed(1)}%`} icon={Cpu} color="text-emerald-500" sub={`${latest.cpu?.cores} Cores`} progressBarValue={(latest.cpu?.usagePercent || 0).toFixed(0)} />
+          <StatCard title="Memory" value={`${(latest.memory?.usagePercent || 0).toFixed(1)}%`} sub={`${((latest.memory?.used || 0) / 1024 ** 3).toFixed(1)}GB / ${((latest.memory?.total || 0) / 1024 ** 3).toFixed(1)}GB Used`} icon={Activity} color="text-blue-500" progressBarValue={(latest.memory?.usagePercent || 0).toFixed(0)} />
+          <StatCard title="Net Latency" value={`${latest.network?.latencyMs?.toFixed(0) || '-'}ms`} sub="Global Ping" icon={Network} color="text-yellow-500" progressBarValue={Math.min(((latest.network?.latencyMs || 0) / 200) * 100, 100)} />
+          <StatCard title="Containers" value={latest.docker?.filter((c: any) => c.state === 'running').length || 0} sub={`Total: ${latest.docker?.length || 0}`} icon={Box} color="text-purple-500" progressBarValue={(latest.docker?.filter((c: any) => c.state === 'running')?.length || 0) / (latest.docker?.length || 100) * 100} />
         </div>
 
         {/* 2. Charts Grid (Restored Memory & Processes) */}
@@ -398,7 +398,7 @@ export default function VpsDetail() {
 }
 
 // Helpers
-const StatCard = ({ title, value, sub, icon: Icon, color }: any) => (
+const StatCard = ({ title, value, sub, icon: Icon, color, progressBarValue }: any) => (
   <Card>
     <CardContent className="p-6">
       <div className="flex items-center justify-between space-y-0 pb-2">
@@ -407,6 +407,11 @@ const StatCard = ({ title, value, sub, icon: Icon, color }: any) => (
       </div>
       <div className="text-2xl font-bold text-foreground">{value}</div>
       {sub && <p className="text-xs text-muted-foreground mt-1 flex items-center">{sub}</p>}
+      {
+        progressBarValue >= 0 && <div className="h-2 mt-2 w-full bg-secondary rounded-full overflow-hidden">
+          <div className={`h-full bg-${color?.replace("text-", "")}`} style={{ width: `${progressBarValue}%` }} />
+        </div>
+      }
     </CardContent>
   </Card>
 );
