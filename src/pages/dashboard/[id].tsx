@@ -258,8 +258,8 @@ export default function VpsDetail() {
               <YAxis domain={[0, 100]} hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
               <Area type="monotone" dataKey="memUsed" stroke="#6c28d8" fill="#6c28d8" fillOpacity={0.15} name="Usage" />
-              <Area type="monotone" dataKey="memActive" stroke="#4D6AFF" fill="#4D6AFF" fillOpacity={0.2} name="Active" />
-              <Area type="monotone" dataKey="memFree" stroke="#9a9aff" fill="#9a9aff" fillOpacity={0.25} name="Free" />
+              <Area type="monotone" dataKey="memActive" stackId="1" stroke="#9a9aff" fill="#9a9aff" fillOpacity={0.15} name="Active" />
+              <Area type="monotone" dataKey="memFree" stackId="1" stroke="#4D6AFF" fill="#4D6AFF" fillOpacity={0.15} name="Free" />
             </AreaChart>
           </ChartCard>
 
