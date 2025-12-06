@@ -204,7 +204,7 @@ export default function VpsDetail() {
   // Helper to get color based on Mode
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
   // If mono, fills often need opacity or just matching stroke
-  const getFill = (defaultFill: string, opacity: number = 0.2) => isMono ? 'var(--chart-mono)' : defaultFill;
+  const getFill = (defaultFill: string, opacity: number = 0.2) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
   return (
     <DashboardLayout>
@@ -344,7 +344,7 @@ export default function VpsDetail() {
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit="" />} />
               <Bar dataKey="procRunning" stackId="a" fill={getColor("#10b981")} name="Running" />
-              <Bar dataKey="procSleeping" stackId="a" fill={isMono ? 'var(--chart-mono)' : "#334155"} name="Sleeping" opacity={isMono ? 0.5 : 1} />
+              <Bar dataKey="procSleeping" stackId="a" fill={getColor('#636165')} name="Sleeping" opacity="0.3" />
               <Bar dataKey="procBlocked" stackId="a" fill={getColor("#ef4444")} name="Blocked" />
             </BarChart>
           </ChartCard>
