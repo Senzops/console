@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import { api, useAuth } from '../../lib/auth';
-import { useTheme } from '../../lib/theme';
-import { DashboardLayout } from '../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../components/ui/core';
+import { api, useAuth } from '../../../lib/auth';
+import { useTheme } from '../../../lib/theme';
+import { DashboardLayout } from '../../../components/Layout';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../components/ui/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -36,8 +36,8 @@ const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
         <p className="font-semibold text-foreground mb-1">{label}</p>
         {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" style={{ color: entry.fill || entry.color || entry.stroke }}>
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.fill || entry.color || entry.stroke }} />
+          <div key={idx} className="flex items-center gap-2" style={{ color: entry.stroke || entry.fill || entry.color }}>
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke || entry.fill || entry.color || entry.stroke }} />
             <span className="capitalize">{entry.name}:</span>
             <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
           </div>
@@ -149,7 +149,7 @@ const UptimeStrip = ({ history, limit }: { history: any[], limit: number }) => {
   )
 }
 
-export default function VpsDetail() {
+export default function ServerDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { token } = useAuth();
@@ -196,15 +196,15 @@ export default function VpsDetail() {
     }));
   }, [history]);
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Agent...</p></div></DashboardLayout>;
+  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></DashboardLayout>;
   if (error || !vps) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></DashboardLayout>;
 
   const latest = history && history.length > 0 ? history[0].metrics : {};
 
   // Helper to get color based on Mode
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
-  // If mono, fills often need opacity or just matching stroke
-  const getFill = (defaultFill: string, opacity: number = 0.2) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
+  // If mono, fills matching stroke
+  const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
   return (
     <DashboardLayout>
@@ -326,7 +326,7 @@ export default function VpsDetail() {
                   return (
                     <div className="bg-popover border p-2 text-xs rounded shadow z-50">
                       <div className="font-bold mb-1">{data.time}</div>
-                      <div className="text-orange-500">Usage: {data.diskUsed}%</div>
+                      <div style={{ color: getColor("#9B5DE5") }}>Usage: {data.diskUsed}%</div>
                       <div className="text-muted-foreground">Used: {data.diskUsedVal}GB / {data.diskTotalVal}GB</div>
                     </div>
                   )
@@ -368,7 +368,7 @@ export default function VpsDetail() {
                   </thead>
                   <tbody>
                     {latest.docker.map((c: any) => (
-                      <tr key={c.id} className="border-b border-border hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/${id}/docker/${c.id}`)}>
+                      <tr key={c.id} className="border-b border-border hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/server/${id}/docker/${c.id}`)}>
                         <td className="px-6 py-4 font-medium text-foreground">{c.name}</td>
                         <td className="px-6 py-4 text-muted-foreground font-mono">{c.image.split(':')[0]}</td>
                         <td className="px-6 py-4"><Badge variant={c.state === 'running' ? 'success' : 'secondary'}>{c.state}</Badge></td>

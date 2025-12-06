@@ -1,5 +1,5 @@
 import { DashboardLayout } from '../../components/Layout';
-import { ShieldCheck, Server, Cpu, Activity } from 'lucide-react';
+import { ShieldCheck, Server, Cpu, Activity, Globe, ChartBar, ChartNoAxesCombined } from 'lucide-react';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import Link from 'next/link';
@@ -12,9 +12,14 @@ const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)"
 
 export default function Dashboard() {
   const { token } = useAuth();
-  const { data: vpsList } = useSWR(token ? '/vps/list' : null, fetcher);
+  const { data: serverList } = useSWR(token ? '/vps/list' : null, fetcher);
+  const { data: webList } = useSWR(token ? '/web/list' : null, fetcher);
 
-  if (!vpsList) {
+
+  const isLoading = !serverList && !webList;
+  const isEmpty = (serverList?.length || 0) === 0 && (webList?.length || 0) === 0;
+
+  if (isLoading) {
     return (
       <DashboardLayout>
         <div className="h-full flex items-center justify-center">
@@ -24,7 +29,7 @@ export default function Dashboard() {
     )
   }
 
-  if (vpsList.length === 0) {
+  if (isEmpty) {
     return (
       <DashboardLayout>
         <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
@@ -32,26 +37,32 @@ export default function Dashboard() {
             <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
           </div>
           <h2 className="text-2xl font-bold text-foreground mb-2">Welcome to Senzor</h2>
-          <p className="max-w-md text-center">Select "Connect Server" from the sidebar to start monitoring your infrastructure.</p>
+          <p className="max-w-md text-center">Add a "Server" or "Website" from the sidebar to start monitoring your infrastructure.</p>
         </div>
       </DashboardLayout>
     );
   }
 
+  // Combine lists for the Hive
+  const items = [
+    ...(serverList || []).map((s: any) => ({ ...s, type: 'server' })),
+    ...(webList || []).map((w: any) => ({ ...w, type: 'web' }))
+  ];
+
   return (
     <DashboardLayout>
       <div className="min-h-full flex flex-col items-center p-12 overflow-y-auto">
         <h1 className="text-3xl font-bold mb-16 tracking-tight flex items-center gap-3">
-          Global Infrastructure Hive
+          Global Hive
         </h1>
 
         {/* Beehive Grid Container */}
         {/* We use negative margins (-mx-3) to pull hexagons closer horizontally */}
         <div className="flex flex-wrap justify-center gap-y-4 px-8 max-w-7xl">
-          {vpsList.map((vps: any) => (
+          {items.map((item: any) => (
             <Link
-              href={`/dashboard/${vps._id}`}
-              key={vps._id}
+              href={item.type === 'server' ? `/dashboard/server/${item._id}` : `/dashboard/web/${item._id}`}
+              key={item._id}
               className="relative group transition-transform hover:z-20 duration-300 -mx-3 even:mt-16 even:z-20"
             >
               {/* Hexagon Shape - Medium Size */}
@@ -64,20 +75,37 @@ export default function Dashboard() {
                 {/* Hexagon Border Hack (Inset Shadow for depth) */}
                 <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-black/10 pointer-events-none" />
 
-                {/* Status Indicator Ring */}
-                <div className={`mb-3 p-3 rounded-full transition-colors ${vps.status === 'online' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
-                  <Server className="h-6 w-6" />
-                </div>
+                {item.type === 'server' ? (
+                  <>
+                    {/* Status Indicator Ring */}
+                    <div className={`mb-3 p-3 rounded-full transition-colors ${item.status === 'online' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
+                      <Server className="h-6 w-6" />
+                    </div>
 
-                <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">{vps.name}</h3>
+                    <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">{item.name}</h3>
 
-                <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
-                  <Cpu className="h-3 w-3" /> {vps.metadata?.os?.split(' ')[0] || 'Linux'}
-                </div>
+                    <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
+                      <Cpu className="h-3 w-3" /> {item.metadata?.os?.split(' ')[0] || 'Linux'}
+                    </div>
 
-                <Badge variant={vps.status === 'online' ? 'success' : 'destructive'} className="px-2 py-0 text-[10px]">
-                  {vps.status === 'online' ? 'ONLINE' : 'OFFLINE'}
-                </Badge>
+                    <Badge variant={item.status === 'online' ? 'success' : 'destructive'} className="px-2 py-0 text-[10px]">
+                      {item.status === 'online' ? 'ONLINE' : 'OFFLINE'}
+                    </Badge>
+                  </>
+                ) : (
+                  <>
+                    {/* Status Indicator Ring */}
+                    <div className={`mb-3 p-3 rounded-full bg-blue-500/10 text-blue-500`}>
+                      <Globe className="h-6 w-6" />
+                    </div>
+
+                    <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">{item.name}</h3>
+
+                    <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
+                      <ChartNoAxesCombined className="h-3 w-3" /> Analytics
+                    </div>
+                  </>
+                )}
 
                 {/* Hover Info (Overlay) */}
                 <div className="absolute inset-0 flex items-center justify-center bg-muted/60 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm z-10">

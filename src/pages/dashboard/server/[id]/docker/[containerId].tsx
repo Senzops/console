@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import { api } from '../../../../lib/auth';
-import { useTheme } from '../../../../lib/theme';
-import { DashboardLayout } from '../../../../components/Layout';
-import { Card, CardHeader, CardTitle, Badge, Button, CardContent, Spinner } from '../../../../components/ui/core';
+import { api } from '../../../../../lib/auth';
+import { useTheme } from '../../../../../lib/theme';
+import { DashboardLayout } from '../../../../../components/Layout';
+import { Card, CardHeader, CardTitle, Badge, Button, CardContent, Spinner } from '../../../../../components/ui/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, Box, Maximize, X } from 'lucide-react';
 import { createPortal } from 'react-dom';

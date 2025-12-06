@@ -3,7 +3,7 @@ import { useAuth, api } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { useRouter } from 'next/router';
 import { Button, Dialog, Avatar, Spinner } from './ui/core';
-import { Plus, Copy, LogOut, Key, Server, Settings, Palette, Monitor } from 'lucide-react';
+import { Plus, Copy, LogOut, Key, Server, Settings, Palette, Monitor, Globe } from 'lucide-react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import md5 from 'md5';
@@ -52,74 +52,121 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
   const { theme, setTheme, appearance, setAppearance } = useTheme();
   const router = useRouter();
 
-  const { data: vpsList } = useSWR(token ? '/vps/list' : null, fetcher);
+  // Fetch Data
+  const { data: serverList, mutate: mutateServers } = useSWR(token ? '/vps/list' : null, fetcher);
+  const { data: webList, mutate: mutateWeb } = useSWR(token ? '/web/list' : null, fetcher);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // State
+  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
+  const [isWebModalOpen, setIsWebModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [newVpsName, setNewVpsName] = useState('');
-  const [newCreds, setNewCreds] = useState<{ vpsId: string, apiKey: string } | null>(null);
+
+  // Form State
+  const [newName, setNewName] = useState('');
+  const [newDomain, setNewDomain] = useState('');
+  const [newCreds, setNewCreds] = useState<{ vpsId?: string, webId?: string, apiKey?: string } | null>(null);
 
   if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-background text-foreground gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-sm text-muted-foreground animate-pulse">Authenticating...</p></div>;
-  if (!user) {
-    router.push('/');
-    return null;
-  }
+  if (!user) { router.push('/'); return null; }
 
-  const handleRegister = async () => {
-    if (!newVpsName) return;
+  const handleRegisterServer = async () => {
+    if (!newName) return;
     try {
-      const res = await api.post('/vps/register', { name: newVpsName });
+      const res = await api.post('/vps/register', { name: newName });
       setNewCreds(res.data);
-      setNewVpsName('');
+      setNewName('');
+      mutateServers();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleRegisterWeb = async () => {
+    if (!newName || !newDomain) return;
+    try {
+      const res = await api.post('/web/register', { name: newName, domain: newDomain });
+      setNewCreds(res.data); // Returns webId
+      setNewName('');
+      setNewDomain('');
+      mutateWeb();
     } catch (e) { console.error(e); }
   };
 
   const closeModal = () => {
-    setIsModalOpen(false);
+    setIsServerModalOpen(false);
+    setIsWebModalOpen(false);
     setNewCreds(null);
+    setNewName('');
+    setNewDomain('');
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background transition-colors duration-300">
       <aside className="w-64 border-r bg-card flex flex-col hidden md:flex shrink-0 z-40">
+
         {/* Brand */}
         <div className="p-6 border-b shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl mb-6 tracking-tight hover:opacity-80 transition-opacity">
-            <div className="relative h-8 w-8 rounded-lg overflow-hidden border border-white/10">
+          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl mb-0 tracking-tight hover:opacity-80 transition-opacity">
+            <div className="relative h-8 w-8 rounded-lg overflow-hidden">
               <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
             </div>
             <span>Senzor</span>
           </Link>
-          <Button onClick={() => setIsModalOpen(true)} className="w-full justify-start gap-2 shadow-emerald-500/20 shadow-lg items-center" variant="default">
-            <Plus className="h-4 w-4" /> Connect Server
-          </Button>
         </div>
 
-        {/* List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-1">
-          <div className="text-xs font-semibold text-muted-foreground mb-2 px-2 uppercase tracking-wider flex items-center justify-between">
-            <span>Servers</span>
-            <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-foreground">{vpsList?.length || 0}</span>
+        {/* Scrollable Nav Area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+
+          {/* SERVERS SECTION */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-2 mb-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Servers</div>
+              <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setIsServerModalOpen(true)}>
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+            {!serverList && <div className="flex justify-center py-4"><Spinner className="h-4 w-4 text-muted-foreground" /></div>}
+
+            {serverList?.map((server: any) => {
+              const isActive = router.asPath.includes(`/server/${server._id}`);
+              return (
+                <Link href={`/dashboard/server/${server._id}`} key={server._id}>
+                  <Button variant={isActive ? "secondary" : "ghost"} className={cn("w-full justify-start gap-2 mb-1 h-9", isActive && "bg-secondary/80 font-semibold border border-border/50")}>
+                    <div className={`h-2 w-2 rounded-full shadow-[0_0_8px] shrink-0 ${server.status === 'online' ? 'bg-emerald-500 shadow-emerald-500/50' : 'bg-destructive shadow-destructive/50'}`} />
+                    <span className="truncate">{server.name}</span>
+                  </Button>
+                </Link>
+              )
+            })}
+            {serverList?.length === 0 && <div className="px-2 text-[10px] text-muted-foreground">No servers connected.</div>}
           </div>
 
-          {!vpsList && <div className="flex justify-center py-4"><Spinner className="h-4 w-4 text-muted-foreground" /></div>}
+          {/* WEBSITES SECTION */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-2 mb-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Websites</div>
+              <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setIsWebModalOpen(true)}>
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
 
-          {vpsList?.map((vps: any) => {
-            const isActive = router.asPath.includes(vps._id);
-            return (
-              <Link href={`/dashboard/${vps._id}`} key={vps._id}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn("w-full justify-start gap-2 mb-1 items-center", isActive && "bg-secondary/80 font-semibold border border-border/50")}>
-                  <div className={`h-2 w-2 rounded-full shadow-[0_0_8px] shrink-0 ${vps.status === 'online' ? 'bg-emerald-500 shadow-emerald-500/50' : 'bg-destructive shadow-destructive/50'}`} />
-                  <span className="truncate">{vps.name}</span>
-                </Button>
-              </Link>
-            )
-          })}
-          {/* Settings Button (End of List) */}
-          <div className="pt-4 mt-4 border-t border-border/40">
-            <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground" onClick={() => setIsSettingsOpen(true)}>
+            {!webList && <div className="flex justify-center py-4"><Spinner className="h-4 w-4 text-muted-foreground" /></div>}
+
+            {webList?.map((site: any) => {
+              const isActive = router.asPath.includes(`/web/${site._id}`);
+              return (
+                <Link href={`/dashboard/web/${site._id}`} key={site._id}>
+                  <Button variant={isActive ? "secondary" : "ghost"} className={cn("w-full justify-start gap-2 mb-1 h-9", isActive && "bg-secondary/80 font-semibold border border-border/50")}>
+                    <Globe className="h-3 w-3 text-blue-500 shrink-0" />
+                    <span className="truncate">{site.name}</span>
+                  </Button>
+                </Link>
+              )
+            })}
+            {webList?.length === 0 && <div className="px-2 text-[10px] text-muted-foreground">No websites tracked.</div>}
+          </div>
+
+          {/* Settings Button */}
+          <div className="pt-4 border-t border-border/40">
+            <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-9" onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4" /> Global Settings
             </Button>
           </div>
@@ -168,31 +215,24 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
         </div>
       </Dialog>
 
-      {/* --- REGISTER MODAL (Existing) --- */}
-      <Dialog open={isModalOpen} onClose={closeModal} title="Connect New Server">
+      {/* --- SERVER MODAL --- */}
+      <Dialog open={isServerModalOpen} onClose={closeModal} title="Connect New Server">
         {!newCreds ? (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Server Name</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="e.g. Production Database 01"
-                value={newVpsName}
-                onChange={(e) => setNewVpsName(e.target.value)}
-                autoFocus
-              />
-              <p className="text-xs text-muted-foreground">Give your server a friendly name to identify it later.</p>
+              <input className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all" placeholder="e.g. Production DB 01" value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus />
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="ghost" onClick={closeModal}>Cancel</Button>
-              <Button onClick={handleRegister}>Generate Credentials</Button>
+              <Button onClick={handleRegisterServer}>Generate Credentials</Button>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Server className="h-3 w-3" /> SERVER ID</label>
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Server className="h-3 w-3" /> Server ID</label>
                 <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all">{newCreds.vpsId}</div>
               </div>
               <div className="space-y-1.5">
@@ -216,12 +256,54 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                 </Button>
               </div>
             </div>
-
             <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs p-3 rounded-md">
               <span className="font-bold">⚠ Important:</span>{" "}
               This API Key will only be shown once. Please keep this window open until installation is complete.
             </div>
             <Button className="w-full" onClick={closeModal}>I have completed installation</Button>
+          </div>
+        )}
+      </Dialog>
+
+      {/* --- WEB MODAL --- */}
+      <Dialog open={isWebModalOpen} onClose={closeModal} title="Track New Website">
+        {!newCreds ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Website Name</label>
+              <input className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all" placeholder="e.g. My Portfolio" value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Domain</label>
+              <input className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all" placeholder="e.g. senzor.dev" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button onClick={handleRegisterWeb}>Get Snippet</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Globe className="h-3 w-3" /> Web ID</label>
+              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all">{newCreds.webId}</div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Add to your &lt;head&gt;</label>
+              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
+                <p className="text-xs font-mono text-blue-300 break-all pr-8 leading-relaxed">
+                  &lt;script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"&gt;&lt;/script&gt;<br />
+                  &lt;script&gt;window.Senzor.init(&#123; webId: "{newCreds.webId}" &#125;)&lt;/script&gt;
+                </p>
+                <Button size="icon" variant="ghost" className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => navigator.clipboard.writeText(`<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script><script>window.Senzor.init({ webId: "${newCreds.webId}" })</script>`)}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <div className="bg-blue-500/10 border border-blue-500/20 text-blue-500 text-xs p-3 rounded-md">
+              Tip: You can also use our NPM package <code>@senzops/web</code> for React/Vue apps.
+            </div>
+            <Button className="w-full" onClick={closeModal}>Done</Button>
           </div>
         )}
       </Dialog>
