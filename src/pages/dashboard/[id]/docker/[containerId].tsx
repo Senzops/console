@@ -105,7 +105,7 @@ export default function DockerDetail() {
     <DashboardLayout>
       <div className="p-8 space-y-6">
         <Button variant="ghost" onClick={() => router.back()} className="mb-2 pl-0 hover:bg-transparent hover:text-emerald-500">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Instance
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Server
         </Button>
 
         <div className="flex items-center gap-4">

@@ -98,7 +98,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
         {/* List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-1">
           <div className="text-xs font-semibold text-muted-foreground mb-2 px-2 uppercase tracking-wider flex items-center justify-between">
-            <span>Instances</span>
+            <span>Servers</span>
             <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-foreground">{vpsList?.length || 0}</span>
           </div>
 

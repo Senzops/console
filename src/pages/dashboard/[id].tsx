@@ -197,7 +197,7 @@ export default function VpsDetail() {
   }, [history]);
 
   if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Agent...</p></div></DashboardLayout>;
-  if (error || !vps) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load instance data.</div></div></DashboardLayout>;
+  if (error || !vps) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></DashboardLayout>;
 
   const latest = history && history.length > 0 ? history[0].metrics : {};
 
