@@ -39,7 +39,7 @@ export default function Home() {
           </h1>
 
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            SysSentinel provides a lightweight, secure telemetry agent that installs in seconds.
+            Senzor provides a lightweight, secure telemetry agent that installs in seconds.
             Monitor CPU, Docker, and Network performance with zero configuration.
           </p>
 
@@ -133,9 +133,9 @@ export default function Home() {
             <div className="relative h-6 w-6 rounded overflow-hidden">
               <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
             </div>
-            SysSentinel
+            Senzor
           </div>
-          <p>&copy; 2025 SysSentinel. Built for modern DevOps.</p>
+          <p>&copy; 2025 Senzor. Built for modern DevOps.</p>
         </div>
       </footer>
     </div>

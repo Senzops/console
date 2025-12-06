@@ -31,7 +31,7 @@ export default function Dashboard() {
           <div className="h-24 w-24 bg-card rounded-full flex items-center content-center justify-center mb-6 border border-border shadow-lg p-2">
             <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
           </div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Welcome to SysSentinel</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Welcome to Senzor</h2>
           <p className="max-w-md text-center">Select "Connect Server" from the sidebar to start monitoring your infrastructure.</p>
         </div>
       </DashboardLayout>

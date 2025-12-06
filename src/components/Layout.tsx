@@ -21,11 +21,11 @@ export const Navbar = () => {
     <nav className="fixed top-0 w-full z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Brand */}
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="relative h-8 w-8 rounded-lg overflow-hidden">
             <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
           </div>
-          <span className="font-bold text-xl tracking-tight leading-none">SysSentinel</span>
+          <span className="font-bold text-xl tracking-tight leading-none">Senzor</span>
         </Link>
 
         {/* Auth Buttons */}
@@ -84,11 +84,11 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       <aside className="w-64 border-r bg-card flex flex-col hidden md:flex shrink-0 z-40">
         {/* Brand */}
         <div className="p-6 border-b shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-3 font-bold text-xl mb-6 tracking-tight hover:opacity-80 transition-opacity">
+          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl mb-6 tracking-tight hover:opacity-80 transition-opacity">
             <div className="relative h-8 w-8 rounded-lg overflow-hidden border border-white/10">
               <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
             </div>
-            <span>SysSentinel</span>
+            <span>Senzor</span>
           </Link>
           <Button onClick={() => setIsModalOpen(true)} className="w-full justify-start gap-2 shadow-emerald-500/20 shadow-lg items-center" variant="default">
             <Plus className="h-4 w-4" /> Connect Server
@@ -192,7 +192,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Server className="h-3 w-3" /> VPS ID</label>
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Server className="h-3 w-3" /> SERVER ID</label>
                 <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all">{newCreds.vpsId}</div>
               </div>
               <div className="space-y-1.5">
@@ -204,13 +204,13 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
               <label className="text-sm font-medium">Installation Command</label>
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
                 <p className="text-xs font-mono text-emerald-400 break-all pr-8 leading-relaxed">
-                  export VPS_ID="{newCreds.vpsId}" && export API_KEY="{newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/SysSentinel/agent-ts/dev/install_agent.sh | sudo -E bash -
+                  export SERVER_ID="{newCreds.vpsId}" && export API_KEY="{newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/snzops/server-agent/main/install_agent.sh | sudo -E bash -
                 </p>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => navigator.clipboard.writeText(`export VPS_ID="${newCreds.vpsId}" && export API_KEY="${newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/SysSentinel/agent-ts/dev/install_agent.sh | sudo -E bash -`)}
+                  onClick={() => navigator.clipboard.writeText(`export SERVER_ID="${newCreds.vpsId}" && export API_KEY="${newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/snzops/server-agent/main/install_agent.sh | sudo -E bash -`)}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>

@@ -9,7 +9,7 @@ export default function App({ Component, pageProps }: AppProps) {
     <AuthProvider>
       <ThemeProvider>
         <Head>
-          <title>SysSentinel | Console</title>
+          <title>Senzor | Console</title>
           <meta name="description" content="Infrastructure Monitoring Without the Bloat" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <link rel="icon" href="/logo.png" />
