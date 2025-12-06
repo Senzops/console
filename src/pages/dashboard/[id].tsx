@@ -6,7 +6,7 @@ import { useTheme } from '../../lib/theme';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../components/ui/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
-import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, Maximize2, X } from 'lucide-react';
+import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -57,7 +57,7 @@ const ChartCard = ({ title, children }: any) => {
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMaximized(!isMaximized)}>
-          {isMaximized ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
         </Button>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pt-2 relative">
