@@ -6,7 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { DashboardLayout } from '../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../components/ui/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, Maximize2, X, MousePointer, RefreshCw, Search, Maximize, ChartNoAxesCombined } from 'lucide-react';
+import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, Maximize2, X, MousePointer, RefreshCw, Search, Smartphone, MapPin, Calendar, Sun, Maximize, ChartNoAxesCombined } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -54,16 +54,24 @@ const CustomTooltip = ({ active, payload, label, unit = '' }: any) => {
   return null;
 };
 
-const ChartCard = ({ title, children }: any) => {
+const ChartCard = ({ title, children, actions }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
+
+  const Header = (
+    <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+      <div className="flex items-center gap-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
+        {actions}
+      </div>
+      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMaximized(!isMaximized)}>
+        {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+      </Button>
+    </CardHeader>
+  );
+
   const Content = (
     <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : 'h-[350px]'}`}>
-      <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMaximized(!isMaximized)}>
-          {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-        </Button>
-      </CardHeader>
+      {Header}
       <CardContent className="flex-1 min-h-0 pt-2 relative">
         <ResponsiveContainer width="100%" height="100%">
           {children}
@@ -107,6 +115,8 @@ export default function WebDetail() {
 
   const [pageFilter, setPageFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [geoMode, setGeoMode] = useState<'countries' | 'cities'>('countries');
+  const [sysMode, setSysMode] = useState<'browsers' | 'os' | 'devices'>('browsers');
 
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? `/web/${id}/stats?range=${range}` : null,
@@ -130,15 +140,13 @@ export default function WebDetail() {
     return data.referrers.filter((r: any) => r._id.toLowerCase().includes(sourceFilter.toLowerCase()));
   }, [data?.referrers, sourceFilter]);
 
-  // --- Format Graph Data with Local Time ---
-  const formattedGraph = useMemo(() => {
+  const formattedGraph: any[] = useMemo(() => {
     if (!data?.graph) return [];
     return data.graph.map((point: any) => ({
       ...point,
-      // Convert UTC ISO string to Local Time String (e.g., "10:00 AM" or "Nov 12")
-      time: new Date(point.time).toLocaleString([], {
-        month: range === '24h' ? undefined : 'short',
-        day: range === '24h' ? undefined : 'numeric',
+      time: new Date(point.time).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
         hour: 'numeric',
         minute: range === '24h' ? '2-digit' : undefined
       })
@@ -148,7 +156,7 @@ export default function WebDetail() {
   if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Website...</p></div></DashboardLayout>;
   if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load analytics.</div></div></DashboardLayout>;
 
-  const { meta, overview, liveVisitors, countries, browsers, devices } = data;
+  const { meta, overview, liveVisitors, geo, system, traffic } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
@@ -185,7 +193,7 @@ export default function WebDetail() {
           </div>
         </div>
 
-        {/* Overview Stats */}
+        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard title="Total Views" value={formatNumber(overview.totalViews)} sub={`${formatNumber(overview.totalViews)} page loads`} icon={ChartNoAxesCombined} color="text-blue-500" isMono={isMono} />
           <StatCard title="Unique Visitors" value={formatNumber(overview.uniqueVisitors)} sub="Distinct users" icon={Users} color="text-purple-500" isMono={isMono} />
@@ -193,7 +201,7 @@ export default function WebDetail() {
           <StatCard title="Bounce Rate" value={`${overview.totalViews > 0 ? (100 - (overview.uniqueVisitors / overview.totalViews) * 100).toFixed(1) : 0}%`} sub="Estimated" icon={ArrowUpRight} color="text-yellow-500" isMono={isMono} />
         </div>
 
-        {/* Main Traffic Graph */}
+        {/* Traffic Graph */}
         <ChartCard title="Traffic Overview">
           <AreaChart data={formattedGraph}>
             <defs><linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#3b82f6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#3b82f6")} stopOpacity={0} /></linearGradient></defs>
@@ -206,66 +214,19 @@ export default function WebDetail() {
           </AreaChart>
         </ChartCard>
 
-        {/* Detailed Lists with Filters */}
+        {/* System & Geo Distributions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="flex flex-col h-[400px]">
-            <CardHeader className="flex flex-row items-center justify-between py-4">
-              <CardTitle>Top Pages</CardTitle>
-              <div className="relative w-32">
-                <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
-                <input
-                  className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
-                  placeholder="Filter..."
-                  value={pageFilter}
-                  onChange={(e) => setPageFilter(e.target.value)}
-                />
+          <ChartCard
+            title="System Environment"
+            actions={
+              <div className="flex bg-muted/50 rounded-lg p-0.5">
+                {['browsers', 'os', 'devices'].map((m) => (
+                  <button key={m} onClick={() => setSysMode(m as any)} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${sysMode === m ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{m}</button>
+                ))}
               </div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur"><tr><th className="px-4 py-2">Path</th><th className="px-4 py-2 text-right">Views</th></tr></thead>
-                <tbody>
-                  {filteredPages.length > 0 ? filteredPages.map((p: any, i: number) => (
-                    <tr key={i} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-4 py-2 truncate max-w-[200px]" title={p._id}>{p._id}</td>
-                      <td className="px-4 py-2 text-right font-mono">{formatNumber(p.count)}</td>
-                    </tr>
-                  )) : <tr className="text-center text-xs text-muted-foreground"><td colSpan={2} className="py-8">No matching pages</td></tr>}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-
-          <Card className="flex flex-col h-[400px]">
-            <CardHeader className="flex flex-row items-center justify-between py-4">
-              <CardTitle>Top Sources</CardTitle>
-              <div className="relative w-32">
-                <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
-                <input
-                  className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
-                  placeholder="Filter..."
-                  value={sourceFilter}
-                  onChange={(e) => setSourceFilter(e.target.value)}
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur"><tr><th className="px-4 py-2">Referrer</th><th className="px-4 py-2 text-right">Views</th></tr></thead>
-                <tbody>
-                  {filteredReferrers.length > 0 ? filteredReferrers.map((r: any, i: number) => (
-                    <tr key={i} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-4 py-2 truncate max-w-[200px]" title={r._id}>{r._id.replace('https://', '').replace('http://', '')}</td>
-                      <td className="px-4 py-2 text-right font-mono">{formatNumber(r.count)}</td>
-                    </tr>
-                  )) : <tr className="text-center text-xs text-muted-foreground"><td colSpan={2} className="py-8">No matching sources</td></tr>}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-
-          <ChartCard title="Devices & Browsers">
-            <BarChart data={browsers}>
+            }
+          >
+            <BarChart data={system[sysMode]}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="_id" tick={{ fontSize: 10 }} stroke="#666" />
               <YAxis hide />
@@ -274,13 +235,99 @@ export default function WebDetail() {
             </BarChart>
           </ChartCard>
 
-          <ChartCard title="Geographic Distribution">
-            <BarChart data={countries} layout="vertical">
+          <ChartCard
+            title="Geographic Distribution"
+            actions={
+              <div className="flex bg-muted/50 rounded-lg p-0.5">
+                {['countries', 'cities'].map((m) => (
+                  <button key={m} onClick={() => setGeoMode(m as any)} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${geoMode === m ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{m}</button>
+                ))}
+              </div>
+            }
+          >
+            <BarChart data={geo[geoMode]} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
               <XAxis type="number" hide />
-              <YAxis dataKey="_id" type="category" width={80} tick={{ fontSize: 10 }} stroke="#666" />
+              <YAxis dataKey="_id" type="category" width={90} tick={{ fontSize: 10 }} stroke="#666" />
               <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
               <Bar dataKey="count" fill={getColor("#10b981")} radius={[0, 4, 4, 0]} name="Views" barSize={20} />
+            </BarChart>
+          </ChartCard>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="flex flex-col h-[420px]">
+            <CardHeader className="flex flex-row items-center justify-between py-4 border-b border-border/40">
+              <CardTitle className="text-sm font-medium">Top Pages</CardTitle>
+              <div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={pageFilter} onChange={(e) => setPageFilter(e.target.value)} /></div>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10"><tr><th className="px-4 py-2 font-medium">Path</th><th className="px-4 py-2 text-right font-medium">Views</th></tr></thead>
+                <tbody>
+                  {filteredPages.map((p: any, i: number) => {
+                    const percent = overview.totalViews > 0 ? Math.round((p.count / overview.totalViews) * 100) : 0;
+                    return (
+                      <tr key={i} className="border-b border-border hover:bg-muted/20">
+                        <td className="px-4 py-2 truncate max-w-[200px] font-mono text-xs" title={p._id}>{p._id}</td>
+                        <td className="px-4 py-2 text-right">
+                          <span className="font-mono text-xs">{formatNumber(p.count)}</span>
+                          <span className="text-[10px] text-muted-foreground ml-2">({percent}%)</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+
+          <Card className="flex flex-col h-[420px]">
+            <CardHeader className="flex flex-row items-center justify-between py-4 border-b border-border/40">
+              <CardTitle className="text-sm font-medium">Top Sources</CardTitle>
+              <div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} /></div>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10"><tr><th className="px-4 py-2 font-medium">Referrer</th><th className="px-4 py-2 text-right font-medium">Views</th></tr></thead>
+                <tbody>
+                  {filteredReferrers.map((r: any, i: number) => {
+                    const percent = overview.totalViews > 0 ? Math.round((r.count / overview.totalViews) * 100) : 0;
+                    return (
+                      <tr key={i} className="border-b border-border hover:bg-muted/20">
+                        <td className="px-4 py-2 truncate max-w-[200px] font-mono text-xs" title={r._id}>{r._id.replace('https://', '').replace('http://', '')}</td>
+                        <td className="px-4 py-2 text-right">
+                          <span className="font-mono text-xs">{formatNumber(r.count)}</span>
+                          <span className="text-[10px] text-muted-foreground ml-2">({percent}%)</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Traffic Patterns (Split Charts) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ChartCard title="Traffic by Day of Week (UTC)">
+            <BarChart data={traffic.days}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" />
+              <YAxis hide />
+              <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
+              <Bar dataKey="count" fill={getColor("#f59e0b")} radius={[4, 4, 0, 0]} name="Hits" />
+            </BarChart>
+          </ChartCard>
+
+          <ChartCard title="Traffic by Hour of Day (UTC)">
+            <BarChart data={traffic.hours}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" interval={3} />
+              <YAxis hide />
+              <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
+              <Bar dataKey="count" fill={getColor("#8b5cf6")} radius={[2, 2, 0, 0]} name="Hits" />
             </BarChart>
           </ChartCard>
         </div>
