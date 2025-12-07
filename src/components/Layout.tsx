@@ -14,10 +14,12 @@ import {
   Monitor,
   Globe,
   Activity,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
 import md5 from "md5";
+import { extractErrorMessage } from "@/utils/axiosError";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -29,7 +31,7 @@ const getGravatar = (email: string) =>
 
 // --- Public Navbar ---
 export const Navbar = () => {
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, loading } = useAuth();
 
   return (
     <nav className="fixed top-0 w-full z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -53,14 +55,15 @@ export const Navbar = () => {
 
         {/* Auth Buttons */}
         <div className="flex items-center gap-4">
-          {user ? (
+          {loading ? (
+            // Loading State for Auth Check
+            <Button variant="ghost" disabled className="opacity-70">
+              <Spinner className="mr-2 h-4 w-4" /> Initializing...
+            </Button>
+          ) : user ? (
             <>
-              <Link href="/dashboard">
-                <Button variant="ghost">Dashboard</Button>
-              </Link>
-              <Button onClick={logout} variant="outline">
-                Sign Out
-              </Button>
+              <Link href="/dashboard"><Button variant="ghost">Dashboard</Button></Link>
+              <Button onClick={logout} variant="outline">Sign Out</Button>
             </>
           ) : (
             <Button onClick={login}>Sign In</Button>
@@ -101,6 +104,18 @@ export const DashboardLayout = ({
   const [isMonitorModalOpen, setIsMonitorModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+
+  // Loading States for Actions
+  const [isRegisteringServer, setIsRegisteringServer] = useState(false);
+  const [isRegisteringWeb, setIsRegisteringWeb] = useState(false);
+  const [isRegisteringMonitor, setIsRegisteringMonitor] = useState(false);
+
+
+  // Error States
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [webError, setWebError] = useState<string | null>(null);
+  const [monitorError, setMonitorError] = useState<string | null>(null);
+
   // Form State
   const [newName, setNewName] = useState("");
   const [newDomain, setNewDomain] = useState("");
@@ -129,18 +144,25 @@ export const DashboardLayout = ({
   // Handlers
   const handleRegisterServer = async () => {
     if (!newName) return;
+    setIsRegisteringServer(true);
+    setServerError(null);
     try {
       const res = await api.post("/vps/register", { name: newName });
       setNewCreds(res.data);
       setNewName("");
       mutateServers();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setServerError(extractErrorMessage(e, 'Failed to register server. Please try again.'));
+    } finally {
+      setIsRegisteringServer(false);
     }
   };
 
   const handleRegisterWeb = async () => {
     if (!newName || !newDomain) return;
+    setIsRegisteringWeb(true);
+    setWebError(null);
     try {
       const res = await api.post("/web/register", {
         name: newName,
@@ -150,13 +172,18 @@ export const DashboardLayout = ({
       setNewName("");
       setNewDomain("");
       mutateWeb();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setWebError(extractErrorMessage(e, 'Failed to register website. Check domain format.'));
+    } finally {
+      setIsRegisteringWeb(false);
     }
   };
 
   const handleRegisterMonitor = async () => {
     if (!newName || !newUrl) return;
+    setIsRegisteringMonitor(true);
+    setMonitorError(null);
     try {
       await api.post("/uptime/register", {
         name: newName,
@@ -167,8 +194,11 @@ export const DashboardLayout = ({
       setNewUrl("");
       setIsMonitorModalOpen(false);
       mutateMonitors();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setMonitorError(extractErrorMessage(e, 'Failed to create monitor. Ensure URL is valid.'));
+    } finally {
+      setIsRegisteringMonitor(false);
     }
   };
 
@@ -468,15 +498,20 @@ export const DashboardLayout = ({
         </div>
       </Dialog>
 
-      {/* --- SERVER MODAL (Same as before) --- */}
+      {/* --- SERVER MODAL --- */}
       <Dialog
         open={isServerModalOpen}
         onClose={closeModal}
         title="Connect New Server"
       >
-        {/* ... (Keep existing Server Modal Code) ... */}
         {!newCreds ? (
           <div className="space-y-4">
+            {serverError && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{serverError}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Server Name</label>
               <input
@@ -491,8 +526,8 @@ export const DashboardLayout = ({
               <Button variant="ghost" onClick={closeModal}>
                 Cancel
               </Button>
-              <Button onClick={handleRegisterServer}>
-                Generate Credentials
+              <Button onClick={handleRegisterServer} disabled={isRegisteringServer}>
+                {isRegisteringServer ? <><Spinner className="mr-2 h-4 w-4" /> Generating...</> : 'Generate Credentials'}
               </Button>
             </div>
           </div>
@@ -561,6 +596,12 @@ export const DashboardLayout = ({
       >
         {!newCreds ? (
           <div className="space-y-4">
+            {webError && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{webError}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Website Name</label>
               <input
@@ -584,7 +625,9 @@ export const DashboardLayout = ({
               <Button variant="ghost" onClick={closeModal}>
                 Cancel
               </Button>
-              <Button onClick={handleRegisterWeb}>Get Snippet</Button>
+              <Button onClick={handleRegisterWeb} disabled={isRegisteringWeb}>
+                {isRegisteringWeb ? <><Spinner className="mr-2 h-4 w-4" /> Creating...</> : 'Get Snippet'}
+              </Button>
             </div>
           </div>
         ) : (
@@ -640,6 +683,12 @@ export const DashboardLayout = ({
         title="Add Uptime Monitor"
       >
         <div className="space-y-4">
+          {monitorError && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{monitorError}</span>
+            </div>
+          )}
           <div className="space-y-2">
             <label className="text-sm font-medium">Monitor Name</label>
             <input
@@ -675,7 +724,9 @@ export const DashboardLayout = ({
             <Button variant="ghost" onClick={closeModal}>
               Cancel
             </Button>
-            <Button onClick={handleRegisterMonitor}>Start Monitoring</Button>
+            <Button onClick={handleRegisterMonitor} disabled={isRegisteringMonitor}>
+              {isRegisteringMonitor ? <><Spinner className="mr-2 h-4 w-4" /> Creating...</> : 'Start Monitoring'}
+            </Button>
           </div>
         </div>
       </Dialog>
