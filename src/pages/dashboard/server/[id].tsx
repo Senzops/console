@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinne
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { SmartAnimatedValue, useCounter } from '@/components/tweening';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -423,6 +424,8 @@ const StatCard = ({ title, value, sub, icon: Icon, color, progressBarValue, isMo
   const iconClass = isMono ? 'text-[hsl(var(--chart-mono))]' : color;
   const barClass = isMono ? 'bg-[hsl(var(--chart-mono))]' : colorMap[color];
 
+  const animatedWidth = useCounter(Number(progressBarValue) || 0, 1500);
+
   return (
     <Card>
       <CardContent className="p-6">
@@ -430,11 +433,14 @@ const StatCard = ({ title, value, sub, icon: Icon, color, progressBarValue, isMo
           <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</p>
           <Icon className={`h-4 w-4 ${iconClass}`} />
         </div>
-        <div className="text-2xl font-bold text-foreground">{value}</div>
-        {sub && <p className="text-xs text-muted-foreground mt-1 flex items-center">{sub}</p>}
+        <div className="text-2xl font-bold text-foreground">
+          <SmartAnimatedValue value={value} />
+        </div>
+        {sub && <p className="text-xs text-muted-foreground mt-1 flex items-center">
+          <SmartAnimatedValue value={sub} /></p>}
         {
-          progressBarValue >= 0 && <div className="h-1.5 mt-2 w-full bg-secondary rounded-full overflow-hidden">
-            <div className={`h-full ${barClass}`} style={{ width: `${progressBarValue}%` }} />
+          progressBarValue >= 0 && <div className="h-1.5 mt-2 w-full bg-secondary rounded-full overflow-hidden transition-all duration-[1.5s]">
+            <div className={`h-full ${barClass}`} style={{ width: `${animatedWidth}%` }} />
           </div>
         }
       </CardContent>

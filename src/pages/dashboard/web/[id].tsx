@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinne
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, Maximize2, X, MousePointer, RefreshCw, Search, Smartphone, MapPin, Calendar, Sun, Maximize, ChartNoAxesCombined } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { SmartAnimatedValue } from '@/components/tweening';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -96,8 +97,8 @@ const StatCard = ({ title, value, sub, icon: Icon, color, isMono }: any) => {
           <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</p>
           <Icon className={`h-4 w-4 ${iconClass}`} />
         </div>
-        <div className="text-2xl font-bold text-foreground">{value}</div>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+        <div className="text-2xl font-bold text-foreground"><SmartAnimatedValue value={value} /></div>
+        {sub && <p className="text-xs text-muted-foreground mt-1"><SmartAnimatedValue value={sub} /></p>}
       </CardContent>
     </Card>
   )
