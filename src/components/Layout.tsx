@@ -427,7 +427,7 @@ export const DashboardLayout = ({
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto relative bg-background">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-background">
         {children}
       </main>
 

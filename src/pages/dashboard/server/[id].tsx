@@ -261,7 +261,7 @@ export default function ServerDetail() {
                   <stop offset="95%" stopColor={getColor("#10b981")} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis domain={[0, 100]} hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
@@ -272,7 +272,7 @@ export default function ServerDetail() {
           {/* combined Memory Composition and Usage */}
           <ChartCard title="Memory Composition (%)">
             <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis domain={[0, 100]} hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
@@ -290,7 +290,7 @@ export default function ServerDetail() {
                   <stop offset="95%" stopColor={getColor("#f59e0b")} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit=" Ms" />} />
@@ -300,7 +300,7 @@ export default function ServerDetail() {
 
           <ChartCard title="Network Traffic (KB/s)">
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit=" KB/s" />} />
@@ -317,7 +317,7 @@ export default function ServerDetail() {
                   <stop offset="95%" stopColor={getColor("#9B5DE5")} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis domain={[0, 100]} hide />
               <Tooltip content={({ active, payload }) => {
@@ -339,7 +339,7 @@ export default function ServerDetail() {
 
           <ChartCard title="Process State">
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit="" />} />

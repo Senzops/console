@@ -205,7 +205,7 @@ export default function WebDetail() {
         <ChartCard title="Traffic Overview">
           <AreaChart data={formattedGraph}>
             <defs><linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#3b82f6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#3b82f6")} stopOpacity={0} /></linearGradient></defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
             <XAxis dataKey="time" hide />
             <YAxis hide />
             <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: "var(--radius)" }} />
@@ -227,7 +227,7 @@ export default function WebDetail() {
             }
           >
             <BarChart data={system[sysMode]}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="_id" tick={{ fontSize: 10 }} stroke="#666" />
               <YAxis hide />
               <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
@@ -246,7 +246,7 @@ export default function WebDetail() {
             }
           >
             <BarChart data={geo[geoMode]} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
               <XAxis type="number" hide />
               <YAxis dataKey="_id" type="category" width={90} tick={{ fontSize: 10 }} stroke="#666" />
               <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
@@ -313,7 +313,7 @@ export default function WebDetail() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <ChartCard title="Traffic by Day of Week (UTC)">
             <BarChart data={traffic.days}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" />
               <YAxis hide />
               <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
@@ -323,7 +323,7 @@ export default function WebDetail() {
 
           <ChartCard title="Traffic by Hour of Day (UTC)">
             <BarChart data={traffic.hours}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" interval={3} />
               <YAxis hide />
               <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />

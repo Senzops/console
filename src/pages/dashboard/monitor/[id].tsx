@@ -213,7 +213,7 @@ export default function MonitorDetail() {
         <ChartCard title="Response Time (ms)">
           <AreaChart data={chartData}>
             <defs><linearGradient id="colorLatency" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#3b82f6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#3b82f6")} stopOpacity={0} /></linearGradient></defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
             <XAxis dataKey="createdAt" hide />
             <YAxis hide />
             <Tooltip content={<CustomTooltip />} />

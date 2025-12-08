@@ -128,7 +128,7 @@ export default function DockerDetail() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <ChartCard title="CPU Usage (%)" color="#8b5cf6" isMono={isMono}>
             <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
@@ -138,7 +138,7 @@ export default function DockerDetail() {
 
           <ChartCard title="Memory Usage (%)" color="#3b82f6" isMono={isMono}>
             <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit="%" />} />
@@ -148,7 +148,7 @@ export default function DockerDetail() {
 
           <ChartCard title="Memory Capacity (MB)" color="#10b981" isMono={isMono}>
             <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit=" MB" />} />
