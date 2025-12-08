@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@senzops/web": "^1.1.0",
     "@tailwindcss/postcss": "^4.1.17",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",

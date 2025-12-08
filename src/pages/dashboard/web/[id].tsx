@@ -198,7 +198,7 @@ export default function WebDetail() {
           <StatCard title="Total Views" value={formatNumber(overview.totalViews)} sub={`${formatNumber(overview.totalViews)} page loads`} icon={ChartNoAxesCombined} color="text-blue-500" isMono={isMono} />
           <StatCard title="Unique Visitors" value={formatNumber(overview.uniqueVisitors)} sub="Distinct users" icon={Users} color="text-purple-500" isMono={isMono} />
           <StatCard title="Avg. Duration" value={`${formatTime(overview.avgDuration)}`} sub="Time on site" icon={Clock} color="text-emerald-500" isMono={isMono} />
-          <StatCard title="Bounce Rate" value={`${overview.totalViews > 0 ? (100 - (overview.uniqueVisitors / overview.totalViews) * 100).toFixed(1) : 0}%`} sub="Estimated" icon={ArrowUpRight} color="text-yellow-500" isMono={isMono} />
+          <StatCard title="Bounce Rate" value={overview?.bounceRate >= 0 ? `${(overview.bounceRate).toFixed(1)}%` : `${overview.totalViews > 0 ? (100 - (overview.uniqueVisitors / overview.totalViews) * 100).toFixed(1) : 0}%`} sub="Estimated" icon={ArrowUpRight} color="text-yellow-500" isMono={isMono} />
         </div>
 
         {/* Traffic Graph */}
