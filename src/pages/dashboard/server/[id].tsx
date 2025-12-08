@@ -6,7 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { DashboardLayout } from '../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../components/ui/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
-import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize } from 'lucide-react';
+import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -218,6 +218,7 @@ export default function ServerDetail() {
               {vps.status === 'online' ? <Badge variant="success" className="animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.3)]">Online</Badge> : <Badge variant="destructive">Offline</Badge>}
             </div>
             <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono flex-wrap">
+              <div className="flex items-center gap-1.5"><Terminal className="h-3.5 w-3.5" /> {latest.os?.hostname || 'localhost'}</div>
               <div className="flex items-center gap-1.5"><HardDrive className="h-3.5 w-3.5" /> {latest.os?.distro} {latest.os?.release}</div>
               <div className="flex items-center gap-1.5"><Cpu className="h-3.5 w-3.5" /> {latest.cpu?.cores} Cores • {latest.cpu?.brand}</div>
               <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Up: {formatUptime(latest.uptimeSeconds || 0)}</div>

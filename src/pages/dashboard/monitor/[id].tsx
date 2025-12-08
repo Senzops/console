@@ -205,7 +205,10 @@ export default function MonitorDetail() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard title={`Uptime(${range})`} value={`${stats.uptime.toFixed(2)}%`} sub={`Target: 99.9%`} icon={Activity} color="text-emerald-500" isMono={isMono} />
           <StatCard title={`Avg Latency`} value={`${Math.round(stats.avgLatency)}ms`} sub={`Global Average`} icon={Clock} color="text-blue-500" isMono={isMono} />
-          <StatCard title={`Last Check`} value={`${stats.lastStatus}`} sub={`${new Date(stats.lastCheckTime).toLocaleTimeString()}`} icon={Globe} color="text-purple-500" isMono={isMono} textColor={stats.lastStatus === 'up' ? 'text-emerald-500' : 'text-destructive'} />
+          <StatCard title={`Last Check`} value={`${stats.lastStatus}`} sub={`${new Date(stats.lastCheckTime).toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit'
+          })}`} icon={Globe} color="text-purple-500" isMono={isMono} textColor={stats.lastStatus === 'up' ? 'text-emerald-500' : 'text-destructive'} />
           <StatCard title={`Last Code`} value={`${stats.lastStatusCode || '-'}`} sub={`HTTP Status`} icon={Activity} color="text-yellow-500" isMono={isMono} />
         </div>
 
