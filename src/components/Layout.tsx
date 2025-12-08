@@ -558,7 +558,7 @@ export const DashboardLayout = ({
               </label>
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
                 <p className="text-xs font-mono text-emerald-400 break-all pr-8 leading-relaxed">
-                  export VPS_ID="{newCreds.vpsId}" && export API_KEY="
+                  export SERVER_ID="{newCreds.vpsId}" && export API_KEY="
                   {newCreds.apiKey}" && curl -sL
                   https://raw.githubusercontent.com/Senzops/agent-ts/main/install_agent.sh
                   | sudo -E bash -
@@ -569,7 +569,7 @@ export const DashboardLayout = ({
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={() =>
                     navigator.clipboard.writeText(
-                      `export VPS_ID="${newCreds.vpsId}" && export API_KEY="${newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/Senzops/agent-ts/main/install_agent.sh | sudo -E bash -`
+                      `export SERVER_ID="${newCreds.vpsId}" && export API_KEY="${newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/Senzops/agent-ts/main/install_agent.sh | sudo -E bash -`
                     )
                   }
                 >

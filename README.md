@@ -90,7 +90,7 @@ console/
 │   ├── _app.tsx            # Global Providers
 │   └── dashboard/
 │       ├── index.tsx       # "Honeycomb" Fleet View
-│       ├── [id].tsx        # VPS Detail View
+│       ├── [id].tsx        # Server Detail View
 │       └── [id]/docker/
 │           └── [containerId].tsx # Container Detail View
 ├── public/                 # Static Assets
