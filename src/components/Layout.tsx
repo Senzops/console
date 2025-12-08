@@ -560,7 +560,7 @@ export const DashboardLayout = ({
                 <p className="text-xs font-mono text-emerald-400 break-all pr-8 leading-relaxed">
                   export SERVER_ID="{newCreds.vpsId}" && export API_KEY="
                   {newCreds.apiKey}" && curl -sL
-                  https://raw.githubusercontent.com/Senzops/agent-ts/main/install_agent.sh
+                  https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh
                   | sudo -E bash -
                 </p>
                 <Button
@@ -569,7 +569,7 @@ export const DashboardLayout = ({
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={() =>
                     navigator.clipboard.writeText(
-                      `export SERVER_ID="${newCreds.vpsId}" && export API_KEY="${newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/Senzops/agent-ts/main/install_agent.sh | sudo -E bash -`
+                      `export SERVER_ID="${newCreds.vpsId}" && export API_KEY="${newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh | sudo -E bash -`
                     )
                   }
                 >
@@ -647,7 +647,7 @@ export const DashboardLayout = ({
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
                 <p className="text-xs font-mono text-blue-300 break-all pr-8 leading-relaxed">
                   &lt;script
-                  src="https://cdn.senzor.dev/agent.js"&gt;&lt;/script&gt;
+                  src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"&gt;&lt;/script&gt;
                   <br />
                   &lt;script&gt;window.Senzor.init(&#123; webId: "
                   {newCreds.webId}" &#125;)&lt;/script&gt;
@@ -658,7 +658,7 @@ export const DashboardLayout = ({
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={() =>
                     navigator.clipboard.writeText(
-                      `<script src="https://cdn.senzor.dev/agent.js"></script><script>window.Senzor.init({ webId: "${newCreds.webId}" })</script>`
+                      `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script><script>window.Senzor.init({ webId: "${newCreds.webId}" })</script>`
                     )
                   }
                 >
