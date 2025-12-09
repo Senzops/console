@@ -43,9 +43,9 @@ export const Navbar = () => {
         >
           <div className="relative h-8 w-8 rounded-lg overflow-hidden">
             <img
-              src="/logo.png"
+              src="/logo.svg"
               alt="Logo"
-              className="object-cover h-full w-full"
+              className="object-cover h-full w-full logo"
             />
           </div>
           <span className="font-bold text-xl tracking-tight leading-none">
@@ -223,9 +223,9 @@ export const DashboardLayout = ({
           >
             <div className="relative h-8 w-8 rounded-lg overflow-hidden">
               <img
-                src="/logo.png"
+                src="/logo.svg"
                 alt="Logo"
-                className="object-cover h-full w-full"
+                className="object-cover h-full w-full logo"
               />
             </div>
             <span>Senzor</span>

@@ -26,6 +26,7 @@
     --ring: 240 4.9% 83.9%;
     --radius: 0.5rem;
     --chart-mono: 240 5% 64.9%;
+    --logo-invert: 98%;
   }
 
   [data-theme="light"] {
@@ -49,6 +50,7 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --chart-mono: 240 5.9% 10%;
+    --logo-invert: 3.9%;
   }
 
   [data-theme="nord"] {
@@ -79,6 +81,7 @@
     --input: 220 16% 36%;
     --ring: 193 43% 67%;
     --chart-mono: 193 43% 67%;
+    --logo-invert: 92%;
   }
 
   [data-theme="latte"] {
@@ -107,6 +110,7 @@
     --input: 24 10% 80%;
     --ring: 24 25% 45%;
     --chart-mono: 24 25% 45%;
+    --logo-invert: 25%;
   }
 }
 
@@ -117,6 +121,10 @@
 
   body {
     @apply bg-background text-foreground transition-colors duration-300;
+  }
+
+  .logo{
+    filter: invert(var(--logo-invert));
   }
 
   /* --- Global Scrollbar Styling --- */

@@ -22,7 +22,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <title>Senzor | Console</title>
           <meta name="description" content="Infrastructure Monitoring Without the Bloat" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <link rel="icon" href="/logo.png" />
+          <link rel="icon" href="/icon.png" />
         </Head>
         <Component {...pageProps} />
       </ThemeProvider>

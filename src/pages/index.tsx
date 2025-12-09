@@ -258,7 +258,7 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center text-muted-foreground">
           <div className="flex items-center justify-center gap-2 mb-4 font-bold text-foreground">
             <div className="relative h-6 w-6 rounded overflow-hidden opacity-80">
-              <img src="/logo.png" alt="Logo" className="object-cover h-full w-full" />
+              <img src="/logo.svg" alt="Logo" className="object-cover h-full w-full logo" />
             </div>
             Senzor
           </div>
