@@ -1,32 +1,32 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 
-// --- CONFIG ---
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  // Add other firebase config vars here
 };
 
 if (!getApps().length) initializeApp(firebaseConfig);
 const auth = getAuth();
 const googleProvider = new GoogleAuthProvider();
 
-// --- API ---
+// --- API Instance ---
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
 });
 
-// --- CONTEXT ---
+// Extended User Type for Demo
+export type SenzorUser = (FirebaseUser & { isDemo?: boolean }) | { uid: string, email: string, displayName: string, isDemo: boolean };
+
 interface AuthContextType {
-  user: User | null;
+  user: SenzorUser | null;
   loading: boolean;
   login: () => Promise<void>;
+  loginAsDemo: () => void;
   logout: () => Promise<void>;
   token: string | null;
 }
@@ -34,27 +34,36 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({} as any);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SenzorUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 
+  // 1. Firebase Listener
   useEffect(() => {
+    // If we are already in demo mode, don't listen to firebase
+    if (user?.isDemo) return;
+
     const unsubscribe = onAuthStateChanged(auth, async (currUser) => {
-      setUser(currUser);
       if (currUser) {
+        setUser(currUser);
         const t = await currUser.getIdToken();
         setToken(t);
-        // Inject token into all API requests
+        // Standard Auth Header
         api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
+        delete api.defaults.headers.common['x-demo-mode'];
       } else {
-        setToken(null);
-        delete api.defaults.headers.common['Authorization'];
+        // Only reset if we aren't explicitly in demo mode (handled by loginAsDemo)
+        if (!user?.isDemo) {
+          setUser(null);
+          setToken(null);
+          delete api.defaults.headers.common['Authorization'];
+        }
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user?.isDemo]);
 
   const login = async () => {
     try {
@@ -66,12 +75,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // 2. Demo Login Logic
+  const loginAsDemo = () => {
+    setLoading(true);
+    const demoUser = {
+      uid: 'demo-user',
+      email: 'guest@senzor.dev',
+      displayName: 'Demo Guest',
+      isDemo: true
+    };
+
+    setUser(demoUser);
+    setToken('demo-token');
+
+    // Inject Demo Header
+    delete api.defaults.headers.common['Authorization'];
+    api.defaults.headers.common['x-demo-mode'] = 'true';
+
+    setLoading(false);
+    router.push('/dashboard');
+  };
+
   const logout = async () => {
-    await signOut(auth);
+    if (user?.isDemo) {
+      setUser(null);
+      setToken(null);
+      delete api.defaults.headers.common['x-demo-mode'];
+      router.push('/');
+    } else {
+      await signOut(auth);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, token }}>
+    <AuthContext.Provider value={{ user, loading, login, loginAsDemo, logout, token }}>
       {children}
     </AuthContext.Provider>
   );

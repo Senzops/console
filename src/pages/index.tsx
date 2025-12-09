@@ -50,9 +50,9 @@ export default function Home() {
               className="h-14 px-8 text-lg rounded-full shadow-emerald-500/20 shadow-lg hover:shadow-emerald-500/30 transition-all flex items-center justify-center">
               Start Monitoring
             </Button>
-            <Link href="https://github.com/Senzops" target="_blank">
-              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-border backdrop-blur bg-card/40 hover:bg-card hover:text-accent">
-                View on GitHub
+            <Link href="/demo" target="_blank">
+              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-border bg-card/50 hover:bg-card backdrop-blur hover:text-foreground">
+                View Demo
               </Button>
             </Link>
           </div>
@@ -261,6 +261,12 @@ export default function Home() {
               <img src="/logo.svg" alt="Logo" className="object-cover h-full w-full logo" />
             </div>
             Senzor
+          </div>
+          <div className="flex justify-center gap-8 mb-8 text-sm">
+            <Link href="https://github.com/Senzops/.github/blob/dev/SELF_HOSTING.md" className="hover:text-emerald-500 transition-colors">Self Hosting</Link>
+            <Link href="/demo" className="hover:text-emerald-500 transition-colors">Demo</Link>
+            <Link href="https://github.com/Senzops" target="_blank" className="hover:text-emerald-500 transition-colors">GitHub</Link>
+            <Link href="mailto:ops@senzor.dev" className="hover:text-emerald-500 transition-colors">Contact</Link>
           </div>
           <p className="text-xs opacity-50">&copy; 2025 Senzor Platforms Inc. Built for the modern web.</p>
         </div>

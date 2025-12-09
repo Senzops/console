@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useAuth, api } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { useRouter } from "next/router";
-import { Button, Dialog, Avatar, Spinner } from "./ui/core";
+import { Button, Dialog, Avatar, Spinner, Badge } from "./ui/core";
 import {
   Plus,
   Copy,
@@ -240,14 +240,14 @@ export const DashboardLayout = ({
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Servers
               </div>
-              <Button
+              {!user.isDemo && <Button
                 size="icon"
                 variant="ghost"
                 className="h-5 w-5"
                 onClick={() => setIsServerModalOpen(true)}
               >
                 <Plus className="h-3 w-3" />
-              </Button>
+              </Button>}
             </div>
             {!serverList && (
               <div className="flex justify-center py-4">
@@ -291,14 +291,14 @@ export const DashboardLayout = ({
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Websites
               </div>
-              <Button
+              {!user.isDemo && <Button
                 size="icon"
                 variant="ghost"
                 className="h-5 w-5"
                 onClick={() => setIsWebModalOpen(true)}
               >
                 <Plus className="h-3 w-3" />
-              </Button>
+              </Button>}
             </div>
 
             {!webList && (
@@ -338,14 +338,14 @@ export const DashboardLayout = ({
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Uptime
               </div>
-              <Button
+              {!user.isDemo && <Button
                 size="icon"
                 variant="ghost"
                 className="h-5 w-5"
                 onClick={() => setIsMonitorModalOpen(true)}
               >
                 <Plus className="h-3 w-3" />
-              </Button>
+              </Button>}
             </div>
 
             {!monitorList && (
@@ -405,8 +405,9 @@ export const DashboardLayout = ({
               fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
             />
             <div className="flex flex-col overflow-hidden justify-center">
-              <span className="text-sm font-medium truncate leading-tight">
+              <span className="text-sm font-medium truncate leading-tight flex items-center gap-2">
                 {user.displayName || "Administrator"}
+                {user.isDemo && <Badge variant="warning" className="text-[9px] px-1 py-0 h-4">DEMO</Badge>}
               </span>
               <span
                 className="text-xs text-muted-foreground truncate leading-tight"
