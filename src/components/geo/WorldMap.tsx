@@ -43,6 +43,7 @@ export const WorldMap = ({ data }: MapProps) => {
   });
   const [geoData, setGeoData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false); // For Animation Trigger
 
   useEffect(() => {
     const loadMapData = async () => {
@@ -58,6 +59,7 @@ export const WorldMap = ({ data }: MapProps) => {
             if (age < CACHE_EXPIRY && data) {
               setGeoData(data);
               setIsLoading(false);
+              setTimeout(() => setIsReady(true), 100);
               return;
             }
           } catch (e) {
@@ -74,6 +76,7 @@ export const WorldMap = ({ data }: MapProps) => {
         // 3. Update State & Cache
         setGeoData(data);
         setIsLoading(false);
+        setTimeout(() => setIsReady(true), 100);
 
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify({
@@ -94,19 +97,31 @@ export const WorldMap = ({ data }: MapProps) => {
   }, []);
 
   // 1. Data Mapping & Max Calculation
-  const { maxVal, countryDataMap } = useMemo(() => {
-    let max = 0;
+  const { countryDataMap, countToRank, maxRank } = useMemo(() => {
     const map = new Map<string, number>();
+    const uniqueCounts = new Set<number>();
 
+    // Pass 1: Map Data
     data.forEach((d) => {
-      // Backend returns ISO Alpha-2 (e.g., "US", "IN")
-      // We store it mapped to the Normalized Name for matching against GeoJSON
       const name = getCountryName(d._id);
       map.set(normalizeName(name), d.count);
-      if (d.count > max) max = d.count;
+      if (d.count > 0) uniqueCounts.add(d.count);
     });
 
-    return { maxVal: max, countryDataMap: map };
+    // Pass 2: Calculate Ranks
+    // Sort counts descending: [1000, 500, 100...]
+    const sortedCounts = Array.from(uniqueCounts).sort((a, b) => b - a);
+    const rankMap = new Map<number, number>();
+
+    sortedCounts.forEach((val, index) => {
+      rankMap.set(val, index); // Highest count = Rank 0
+    });
+
+    return {
+      countryDataMap: map,
+      countToRank: rankMap,
+      maxRank: Math.max(1, sortedCounts.length - 1)
+    };
   }, [data]);
   // 2. Dynamic Color Scale based on Theme
   const targetVar = isMono ? "--chart-mono" : "--foreground";
@@ -161,23 +176,30 @@ export const WorldMap = ({ data }: MapProps) => {
           <Geographies geography={geoData}>
             {({ geographies }) =>
               geographies.map((geo) => {
-                // Match Logic: Compare Normalized GeoJSON Name vs Normalized Backend Name
                 const geoName = geo.properties.name || "";
                 const normalizedGeoName = normalizeName(geoName);
                 const count = countryDataMap.get(normalizedGeoName) || 0;
 
-                // Calculate Intensity (0.1 to 1.0)
-                // We assume 0 visits = very faint/muted
-                const percentage = maxVal > 0 ? (count / maxVal) : 0;
+                // Rank Logic
+                // Rank 0 (Top) -> Intensity 1.0
+                // Rank Max (Bottom) -> Intensity 0.2
+                // No Visits -> Intensity 0 (Muted)
+                let intensity = 0;
 
-                // Fill Color: Theme-based variable with opacity
-                // If count > 0: use foreground/mono with intensity
-                // If count == 0: use muted with low opacity
-                const fillStyle = count > 0
-                  ? `hsl(var(${targetVar}) / ${Math.max(0.15, percentage)})`
-                  : `hsl(var(--muted) / 0.2)`;
+                if (count > 0 && countToRank.has(count)) {
+                  const rank = countToRank.get(count)!;
+                  // Normalize rank between 0 and 1 (0 is best)
+                  const normalizedRank = rank / maxRank;
+                  // Invert so 0 rank = 1 intensity
+                  intensity = 0.2 + (0.8 * (1 - normalizedRank));
+                }
 
-                // Stroke (Border) Color
+                const defaultFill = `hsl(var(--muted) / 0.2)`;
+                const activeFill = `hsl(var(${targetVar}) / ${intensity})`;
+
+                // Use 'isReady' to trigger the transition from default -> active
+                const currentFill = (isReady && count > 0) ? activeFill : defaultFill;
+
                 const strokeColor = "hsl(var(--border) / 0.5)";
                 const hoverStroke = isMono ? "hsl(var(--foreground))" : "hsl(var(--primary))";
 
@@ -192,22 +214,23 @@ export const WorldMap = ({ data }: MapProps) => {
 
                     style={{
                       default: {
-                        fill: fillStyle,
+                        fill: currentFill,
                         stroke: strokeColor,
                         strokeWidth: 0.5,
                         outline: "none",
-                        transition: "fill 0.3s ease, stroke 0.2s ease"
+                        // 1500ms animation for fill, fast for stroke
+                        transition: "fill 1.5s ease-out, stroke 0.2s ease"
                       },
                       hover: {
-                        fill: fillStyle, // Don't change fill on hover (Rule 6)
-                        stroke: hoverStroke, // Highlight border (Rule 6)
+                        fill: currentFill,
+                        stroke: hoverStroke,
                         strokeWidth: 1.5,
                         outline: "none",
                         cursor: "pointer",
                         zIndex: 10
                       },
                       pressed: {
-                        fill: fillStyle,
+                        fill: currentFill,
                         stroke: hoverStroke,
                         strokeWidth: 1.5,
                         outline: "none",
