@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, createContext, useContext } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
@@ -6,9 +6,10 @@ import { useTheme } from '../../../lib/theme';
 import { DashboardLayout } from '../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../components/ui/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, Maximize2, X, MousePointer, RefreshCw, Search, Smartphone, MapPin, Calendar, Sun, Maximize, ChartNoAxesCombined } from 'lucide-react';
+import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, Maximize2, X, MousePointer, RefreshCw, Search, Smartphone, MapPin, Calendar, Sun, Maximize, ChartNoAxesCombined, MapIcon } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/tweening';
+import { WorldMap } from '@/components/geo/WorldMap';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -35,6 +36,12 @@ const formatTime = (seconds: number) => {
   parts.push(`${s}s`);
 
   return parts.join(' ');
+};
+
+const getCountryName = (code: string) => {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
+  } catch { return code; }
 };
 
 const CustomTooltip = ({ active, payload, label, unit = '' }: any) => {
@@ -64,7 +71,7 @@ const ChartCard = ({ title, children, actions }: any) => {
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
         {actions}
       </div>
-      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMaximized(!isMaximized)}>
+      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={() => setIsMaximized(!isMaximized)}>
         {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
       </Button>
     </CardHeader>
@@ -86,6 +93,116 @@ const ChartCard = ({ title, children, actions }: any) => {
       {isMaximized ? createPortal(Content, document.body) : Content}
     </>
   );
+};
+
+const DistributionContext = createContext<{ isMaximized: boolean; toggle: () => void }>({
+  isMaximized: false,
+  toggle: () => { }
+});
+
+const DistributionCard = ({ title, children, actions }: any) => {
+  const [isMaximized, setIsMaximized] = useState(false);
+  const toggle = () => setIsMaximized(!isMaximized);
+
+  const Header = (
+    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
+      <div className="flex items-center gap-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
+        {actions}
+      </div>
+      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={() => setIsMaximized(!isMaximized)}>
+        {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+      </Button>
+    </CardHeader>
+  );
+
+  const Content = (
+    <DistributionContext.Provider value={{ isMaximized, toggle }}>
+      <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : 'h-[400px]'}`}>
+        {Header}
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+          {/* Container for content ensuring it fills space */}
+          <div className="w-full h-full relative">
+            {children}
+          </div>
+        </CardContent>
+      </Card>
+    </DistributionContext.Provider>
+  );
+
+  return (
+    <>
+      {isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}
+      {isMaximized ? createPortal(Content, document.body) : Content}
+    </>
+  );
+};
+
+const DistributionTable = ({ data, total, type, filter }: { data: any[], total: number, type: 'pages' | 'geo' | 'sys', filter?: string }) => {
+  const { isMaximized, toggle } = useContext(DistributionContext);
+  const filteredData = useMemo(() => {
+    if (!filter) return data;
+    return data.filter((item: any) => item._id.toLowerCase().includes(filter.toLowerCase()));
+  }, [data, filter]);
+
+  const limit = isMaximized ? filteredData.length : 6;
+  const visibleData = filteredData.slice(0, limit);
+  const hiddenCount = filteredData.length - limit;
+
+  return (
+    <div className="w-full h-full overflow-auto">
+      <table className="w-full text-sm text-left border-collapse">
+        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-20">
+          <tr>
+            <th className="px-4 py-2 font-medium w-full">Name</th>
+            <th className="px-4 py-2 text-right font-medium whitespace-nowrap">Views</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleData.map((item: any, i: number) => {
+            const percent = total > 0 ? Math.round((item.count / total) * 100) : 0;
+            const name = type === 'geo' ? getCountryName(item._id) : item._id;
+
+            return (
+              <tr key={i} className="group relative border-b border-border/40 hover:bg-muted/20 transition-colors">
+                {/* Background Bar */}
+                <td colSpan={3} className="p-0 h-full absolute inset-0 pointer-events-none">
+                  <div className="h-[calc(100%-2px)] my-[1px] bg-muted/40 transition-all duration-[1500ms] origin-left rounded-r-md" style={{ width: `${percent}%` }} />
+                </td>
+
+                {/* Content */}
+                <td className={`px-4 py-2.5 relative z-10 truncate ${isMaximized ? "max-w-[75vw]" : "max-w-[300px]"} flex items-center`}>
+                  <span className="truncate" title={name}>{name}</span>
+                </td>
+                <td className="px-4 py-2.5 relative z-10 text-right font-mono text-xs whitespace-nowrap">
+                  <span className="font-mono text-xs"><SmartAnimatedValue value={formatNumber(item.count)} />
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/70 ml-1">|</span>
+                  <span className="text-[10px] text-muted-foreground/70 ml-1"><SmartAnimatedValue value={percent} />%</span>
+                </td>
+              </tr>
+            )
+          })}
+
+          {/* Show More Row */}
+          {hiddenCount > 0 && (
+            <tr
+              className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group"
+              onClick={toggle}
+            >
+              <td colSpan={3} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                Show {hiddenCount} more...
+              </td>
+            </tr>
+          )}
+
+          {filteredData.length === 0 && (
+            <tr><td colSpan={3} className="py-8 text-center text-muted-foreground text-xs">No data found</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
 };
 
 const StatCard = ({ title, value, sub, icon: Icon, color, isMono }: any) => {
@@ -116,7 +233,7 @@ export default function WebDetail() {
 
   const [pageFilter, setPageFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-  const [geoMode, setGeoMode] = useState<'countries' | 'cities'>('countries');
+  const [geoMode, setGeoMode] = useState<'map' | 'countries' | 'cities'>('map');
   const [sysMode, setSysMode] = useState<'browsers' | 'os' | 'devices'>('browsers');
 
   const { data, error, mutate, isValidating } = useSWR(
@@ -153,6 +270,22 @@ export default function WebDetail() {
       })
     }));
   }, [data?.graph, range]);
+
+  const localTrafficHours = useMemo(() => {
+    if (!data?.traffic?.hours) return [];
+    return data.traffic.hours.map((h: any) => {
+      // Backend returns UTC hour (0-23) in h.name "0:00"
+      const utcHour = parseInt(h.name.split(':')[0]);
+      const date = new Date();
+      date.setUTCHours(utcHour, 0, 0, 0);
+
+      return {
+        ...h,
+        // Format to local string (e.g., "5 AM" or "17:00")
+        name: date.toLocaleTimeString(undefined, { hour: 'numeric', minute: "2-digit", hour12: true })
+      };
+    });
+  }, [data?.traffic?.hours]);
 
   if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Website...</p></div></DashboardLayout>;
   if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load analytics.</div></div></DashboardLayout>;
@@ -215,10 +348,29 @@ export default function WebDetail() {
           </AreaChart>
         </ChartCard>
 
-        {/* System & Geo Distributions */}
+
+        {/* Detailed Tables (Pages & Sources) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ChartCard
-            title="System Environment"
+          <DistributionCard
+            title="Top Pages"
+            actions={<div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={pageFilter} onChange={(e) => setPageFilter(e.target.value)} /></div>}
+          >
+            <DistributionTable data={data.pages} total={overview.totalViews} type="pages" filter={pageFilter} />
+          </DistributionCard>
+
+          <DistributionCard
+            title="Top Sources"
+            actions={<div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} /></div>}
+          >
+            <DistributionTable data={data.referrers} total={overview.totalViews} type="pages" filter={sourceFilter} />
+          </DistributionCard>
+        </div>
+
+        {/* SYSTEM & GEO Tables/Maps */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* System Environment */}
+          <DistributionCard
+            title={"System Environment"}
             actions={
               <div className="flex bg-muted/50 rounded-lg p-0.5">
                 {['browsers', 'os', 'devices'].map((m) => (
@@ -227,92 +379,33 @@ export default function WebDetail() {
               </div>
             }
           >
-            <BarChart data={system[sysMode]}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="_id" tick={{ fontSize: 10 }} stroke="#666" />
-              <YAxis hide />
-              <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
-              <Bar dataKey="count" fill={getColor("#ec4899")} radius={[4, 4, 0, 0]} name="Views" />
-            </BarChart>
-          </ChartCard>
+            <DistributionTable data={system[sysMode]} total={overview.totalViews} type="sys" />
+          </DistributionCard>
 
-          <ChartCard
-            title="Geographic Distribution"
+          {/* Geographic Distribution */}
+          <DistributionCard
+            title={"Geographic Distribution"}
             actions={
               <div className="flex bg-muted/50 rounded-lg p-0.5">
-                {['countries', 'cities'].map((m) => (
-                  <button key={m} onClick={() => setGeoMode(m as any)} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${geoMode === m ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{m}</button>
-                ))}
+                <button onClick={() => setGeoMode('map')} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${geoMode === 'map' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Map</button>
+                <button onClick={() => setGeoMode('countries')} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${geoMode === 'countries' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Countries</button>
+                <button onClick={() => setGeoMode('cities')} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${geoMode === 'cities' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Cities</button>
               </div>
             }
           >
-            <BarChart data={geo[geoMode]} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-              <XAxis type="number" hide />
-              <YAxis dataKey="_id" type="category" width={90} tick={{ fontSize: 10 }} stroke="#666" />
-              <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
-              <Bar dataKey="count" fill={getColor("#10b981")} radius={[0, 4, 4, 0]} name="Views" barSize={20} />
-            </BarChart>
-          </ChartCard>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="flex flex-col h-[420px]">
-            <CardHeader className="flex flex-row items-center justify-between py-4 border-b border-border/40">
-              <CardTitle className="text-sm font-medium">Top Pages</CardTitle>
-              <div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={pageFilter} onChange={(e) => setPageFilter(e.target.value)} /></div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10"><tr><th className="px-4 py-2 font-medium">Path</th><th className="px-4 py-2 text-right font-medium">Views</th></tr></thead>
-                <tbody>
-                  {filteredPages.map((p: any, i: number) => {
-                    const percent = overview.totalViews > 0 ? Math.round((p.count / overview.totalViews) * 100) : 0;
-                    return (
-                      <tr key={i} className="border-b border-border hover:bg-muted/20">
-                        <td className="px-4 py-2 truncate max-w-[200px] font-mono text-xs" title={p._id}>{p._id}</td>
-                        <td className="px-4 py-2 text-right">
-                          <span className="font-mono text-xs">{formatNumber(p.count)}</span>
-                          <span className="text-[10px] text-muted-foreground ml-2">({percent}%)</span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-
-          <Card className="flex flex-col h-[420px]">
-            <CardHeader className="flex flex-row items-center justify-between py-4 border-b border-border/40">
-              <CardTitle className="text-sm font-medium">Top Sources</CardTitle>
-              <div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} /></div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10"><tr><th className="px-4 py-2 font-medium">Referrer</th><th className="px-4 py-2 text-right font-medium">Views</th></tr></thead>
-                <tbody>
-                  {filteredReferrers.map((r: any, i: number) => {
-                    const percent = overview.totalViews > 0 ? Math.round((r.count / overview.totalViews) * 100) : 0;
-                    return (
-                      <tr key={i} className="border-b border-border hover:bg-muted/20">
-                        <td className="px-4 py-2 truncate max-w-[200px] font-mono text-xs" title={r._id}>{r._id.replace('https://', '').replace('http://', '')}</td>
-                        <td className="px-4 py-2 text-right">
-                          <span className="font-mono text-xs">{formatNumber(r.count)}</span>
-                          <span className="text-[10px] text-muted-foreground ml-2">({percent}%)</span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+            {geoMode === 'map' ? (
+              <div className="w-full h-full bg-card rounded-lg flex items-center justify-center p-4">
+                <WorldMap data={geo.countries} />
+              </div>
+            ) : (
+              <DistributionTable data={geo[geoMode]} total={overview.totalViews} type="geo" />
+            )}
+          </DistributionCard>
         </div>
 
         {/* Traffic Patterns (Split Charts) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ChartCard title="Traffic by Day of Week (UTC)">
+          <ChartCard title="Traffic by Day of Week">
             <BarChart data={traffic.days}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" />
@@ -322,8 +415,8 @@ export default function WebDetail() {
             </BarChart>
           </ChartCard>
 
-          <ChartCard title="Traffic by Hour of Day (UTC)">
-            <BarChart data={traffic.hours}>
+          <ChartCard title="Traffic by Hour of Day">
+            <BarChart data={localTrafficHours}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" interval={3} />
               <YAxis hide />

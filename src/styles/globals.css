@@ -123,7 +123,7 @@
     @apply bg-background text-foreground transition-colors duration-300;
   }
 
-  .logo{
+  .logo {
     filter: invert(var(--logo-invert));
   }
 
@@ -149,5 +149,11 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) hsl(var(--background));
+  }
+
+  /* remove outline appearing on focus */
+  .recharts-surface:focus,
+  g:focus{
+    outline: none !important;
   }
 }

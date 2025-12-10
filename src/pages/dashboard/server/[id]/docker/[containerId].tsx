@@ -38,7 +38,7 @@ const ChartCard = ({ title, children, color, isMono }: any) => {
     <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : 'h-[350px]'}`}>
       <CardHeader className="pb-2 border-b border-border/50 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-medium" style={{ color: !isMono ? color : undefined }}>{title}</CardTitle>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMaximized(!isMaximized)}>
+        <Button variant="ghost" size="icon" className="h-6 w-6  text-muted-foreground" onClick={() => setIsMaximized(!isMaximized)}>
           {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
         </Button>
       </CardHeader>
