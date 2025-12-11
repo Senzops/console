@@ -73,27 +73,3 @@ Before you begin, ensure you have the following:
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
-
-## **📂 Project Structure**
-
-```sh
-console/
-├── components/
-│   ├── Layout.tsx          # Main Dashboard Layout (Sidebar, Navbar)
-│   └── ui/
-│       └── core.tsx        # Reusable UI (Card, Button, Dialog, Spinner)
-├── lib/
-│   ├── auth.tsx            # Firebase Auth & Axios Interceptor
-│   └── theme.tsx           # Theme Context & LocalStorage Logic
-├── pages/
-│   ├── index.tsx           # Public Landing Page
-│   ├── _app.tsx            # Global Providers
-│   └── dashboard/
-│       ├── index.tsx       # "Honeycomb" Fleet View
-│       ├── [id].tsx        # Server Detail View
-│       └── [id]/docker/
-│           └── [containerId].tsx # Container Detail View
-├── public/                 # Static Assets
-└── styles/
-    └── globals.css         # Tailwind & CSS Variables (Theming)
-```

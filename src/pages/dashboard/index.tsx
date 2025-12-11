@@ -135,7 +135,10 @@ export default function Dashboard() {
                   )}
 
                   {/* Hover Info (Overlay) */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-muted/60 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm z-10">
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted/60 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm z-10"
+                    style={{
+                      clipPath: HEX_CLIP,
+                    }}>
                     <div className="text-xs text-foreground font-medium">
                       View Metrics
                     </div>

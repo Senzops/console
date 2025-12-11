@@ -128,9 +128,15 @@
   }
 
   /* --- Global Scrollbar Styling --- */
+  ::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 5px;
+    height: 5px;
   }
 
   ::-webkit-scrollbar-track {
@@ -145,7 +151,7 @@
     @apply bg-muted-foreground/50;
   }
 
-  /* Firefox */
+  /* Modern browser */
   * {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) hsl(var(--background));
@@ -153,7 +159,7 @@
 
   /* remove outline appearing on focus */
   .recharts-surface:focus,
-  g:focus{
+  g:focus {
     outline: none !important;
   }
 }

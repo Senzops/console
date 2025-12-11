@@ -9,6 +9,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Globe, CheckCircle2, XCircle, AlertCircle, Maximize } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/tweening';
+import { toast } from 'sonner';
+import { extractErrorMessage } from '@/utils/axiosError';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -147,7 +149,10 @@ export default function MonitorDetail() {
   const handleDelete = async () => {
     setIsDeleting(true);
     try { await api.delete(`/uptime/${id}`); router.push('/dashboard'); }
-    catch (e) { console.error(e); setIsDeleting(false); }
+    catch (e) {
+      console.error(e); setIsDeleting(false);
+      toast.error(extractErrorMessage(e, 'Failed to delete monitor'));
+    }
   }
 
   // --- Process Chart Data (Reverse to Chronological) ---

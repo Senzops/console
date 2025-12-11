@@ -9,6 +9,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue, useCounter } from '@/components/tweening';
+import { toast } from 'sonner';
+import { extractErrorMessage } from '@/utils/axiosError';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -170,8 +172,13 @@ export default function ServerDetail() {
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    try { await api.delete(`/vps/${id}`); router.push('/dashboard'); }
-    catch (e) { console.error(e); setIsDeleting(false); }
+    try {
+      await api.delete(`/vps/${id}`); router.push('/dashboard');
+    }
+    catch (e) {
+      console.error(e); setIsDeleting(false);
+      toast.error(extractErrorMessage(e, 'Failed to delete server'));
+    }
   }
 
   // --- Process Charts ---

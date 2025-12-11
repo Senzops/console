@@ -1,4 +1,4 @@
-import { Navbar } from '../components/Layout';
+import { Footer, Navbar } from '../components/Layout';
 import { Button, Card, Badge } from '../components/ui/core';
 import { Zap, Activity, Lock, Server, Cpu, Globe, Terminal, CheckCircle2, BarChart3, Code, Timer } from 'lucide-react';
 import Link from 'next/link';
@@ -253,24 +253,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t bg-card">
-        <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <div className="flex items-center justify-center gap-2 mb-4 font-bold text-foreground">
-            <div className="relative h-6 w-6 rounded overflow-hidden opacity-80">
-              <img src="/logo.svg" alt="Logo" className="object-cover h-full w-full logo" />
-            </div>
-            Senzor
-          </div>
-          <div className="flex justify-center gap-8 mb-8 text-sm">
-            <Link href="https://github.com/Senzops/.github/blob/dev/SELF_HOSTING.md" className="hover:text-emerald-500 transition-colors">Self Hosting</Link>
-            <Link href="/demo" className="hover:text-emerald-500 transition-colors">Demo</Link>
-            <Link href="https://github.com/Senzops" target="_blank" className="hover:text-emerald-500 transition-colors">GitHub</Link>
-            <Link href="mailto:ops@senzor.dev" className="hover:text-emerald-500 transition-colors">Contact</Link>
-          </div>
-          <p className="text-xs opacity-50">&copy; 2025 Senzor Platforms Inc. Built for the modern web.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

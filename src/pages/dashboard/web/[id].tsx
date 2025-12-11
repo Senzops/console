@@ -10,6 +10,8 @@ import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, Maximize2, X,
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/tweening';
 import { WorldMap } from '@/components/geo/WorldMap';
+import { toast } from 'sonner';
+import { extractErrorMessage } from '@/utils/axiosError';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -246,8 +248,13 @@ export default function WebDetail() {
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    try { await api.delete(`/web/${id}`); router.push('/dashboard'); }
-    catch (e) { console.error(e); setIsDeleting(false); }
+    try {
+      await api.delete(`/web/${id}`); router.push('/dashboard');
+    }
+    catch (e) {
+      console.error(e); setIsDeleting(false);
+      toast.error(extractErrorMessage(e, 'Failed to delete website'));
+    }
   }
 
   const filteredPages = useMemo(() => {
