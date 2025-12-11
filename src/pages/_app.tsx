@@ -3,11 +3,17 @@ import { AuthProvider } from '../lib/auth';
 import '../styles/globals.css';
 import Head from 'next/head';
 import { ThemeProvider } from '@/lib/theme';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Senzor } from '@senzops/web';
 import { Toaster } from 'sonner';
+import { buildTitleFromPath } from '@/utils/title';
+import { useRouter } from 'next/router';
 
 export default function App({ Component, pageProps }: AppProps) {
+
+  const router = useRouter();
+  const [title, setTitle] = useState(() => buildTitleFromPath(router.asPath));
+
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_SENZOR_WEB_ID) {
       Senzor.init({
@@ -16,11 +22,22 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const handle = (url: string) => {
+      setTitle(buildTitleFromPath(url));
+    };
+    handle(router.asPath);
+    router.events.on('routeChangeComplete', handle);
+    return () => {
+      router.events.off('routeChangeComplete', handle);
+    };
+  }, [router.events, router.asPath]);
+
   return (
     <AuthProvider>
       <ThemeProvider>
         <Head>
-          <title>Senzor | Console</title>
+          <title>{title}</title>
           <meta name="description" content="Infrastructure Monitoring Without the Bloat" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <link rel="icon" href="/icon.png" />
