@@ -118,7 +118,7 @@ export default function Dashboard() {
                   {item.type === 'monitor' && (
                     <>
                       {/* Status Indicator Ring */}
-                      <div className={`mb-3 p-3 rounded-full transition-colors ${item.status === 'online' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
+                      <div className={`mb-3 p-3 rounded-full transition-colors ${item.status === 'up' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
                         <Activity className="h-6 w-6" />
                       </div>
 
