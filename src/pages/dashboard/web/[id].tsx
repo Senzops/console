@@ -235,6 +235,8 @@ export default function WebDetail() {
   const [sourceFilter, setSourceFilter] = useState('');
   const [geoMode, setGeoMode] = useState<'map' | 'countries' | 'cities'>('map');
   const [sysMode, setSysMode] = useState<'browsers' | 'os' | 'devices'>('browsers');
+  const [pagesMode, setPagesMode] = useState<'path' | 'title'>('path');
+  const [sourceMode, setSourceMode] = useState<'referrers' | 'channels'>('referrers');
 
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? `/web/${id}/stats?range=${range}` : null,
@@ -249,14 +251,14 @@ export default function WebDetail() {
   }
 
   const filteredPages = useMemo(() => {
-    if (!data?.pages) return [];
-    return data.pages.filter((p: any) => p._id.toLowerCase().includes(pageFilter.toLowerCase()));
-  }, [data?.pages, pageFilter]);
+    if (!data?.pages?.[pagesMode]) return [];
+    return data.pages?.[pagesMode].filter((p: any) => p._id.toLowerCase().includes(pageFilter.toLowerCase()));
+  }, [data?.pages, pageFilter, pagesMode]);
 
   const filteredReferrers = useMemo(() => {
-    if (!data?.referrers) return [];
-    return data.referrers.filter((r: any) => r._id.toLowerCase().includes(sourceFilter.toLowerCase()));
-  }, [data?.referrers, sourceFilter]);
+    if (!data?.sources?.[sourceMode]) return [];
+    return data.sources?.[sourceMode].filter((r: any) => r._id.toLowerCase().includes(sourceFilter.toLowerCase()));
+  }, [data?.sources, sourceFilter, sourceMode]);
 
   const formattedGraph: any[] = useMemo(() => {
     if (!data?.graph) return [];
@@ -290,7 +292,7 @@ export default function WebDetail() {
   if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Website...</p></div></DashboardLayout>;
   if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load analytics.</div></div></DashboardLayout>;
 
-  const { meta, overview, liveVisitors, geo, system, traffic } = data;
+  const { meta, overview, liveVisitors, pages, sources, geo, system, traffic } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
@@ -353,16 +355,40 @@ export default function WebDetail() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <DistributionCard
             title="Top Pages"
-            actions={<div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={pageFilter} onChange={(e) => setPageFilter(e.target.value)} /></div>}
+            actions={
+              <>
+                <div className="flex bg-muted/50 rounded-lg p-0.5">
+                  {['path', 'title'].map((m) => (
+                    <button key={m} onClick={() => setPagesMode(m as any)} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${pagesMode === m ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{m}</button>
+                  ))}
+                </div>
+                <div className="relative w-32">
+                  <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+                  <input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={pageFilter} onChange={(e) => setPageFilter(e.target.value)} />
+                </div>
+              </>
+            }
           >
-            <DistributionTable data={data.pages} total={overview.totalViews} type="pages" filter={pageFilter} />
+            <DistributionTable data={pages[pagesMode]} total={overview.totalViews} type="pages" filter={pageFilter} />
           </DistributionCard>
 
           <DistributionCard
             title="Top Sources"
-            actions={<div className="relative w-32"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} /></div>}
+            actions={
+              <>
+                <div className="flex bg-muted/50 rounded-lg p-0.5">
+                  {['referrers', 'channels'].map((m) => (
+                    <button key={m} onClick={() => setSourceMode(m as any)} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${sourceMode === m ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{m}</button>
+                  ))}
+                </div>
+                <div className="relative w-32">
+                  <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+                  <input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Filter..." value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} />
+                </div>
+              </>
+            }
           >
-            <DistributionTable data={data.referrers} total={overview.totalViews} type="pages" filter={sourceFilter} />
+            <DistributionTable data={sources[sourceMode]} total={overview.totalViews} type="pages" filter={sourceFilter} />
           </DistributionCard>
         </div>
 
