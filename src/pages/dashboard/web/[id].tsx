@@ -142,11 +142,11 @@ const DistributionCard = ({ title, children, actions }: any) => {
 
 const DistributionTable = ({ data, total, type, filter }: { data: any[], total: number, type: 'pages' | 'geo' | 'sys', filter?: string }) => {
   const { isMaximized, toggle } = useContext(DistributionContext);
-  if (!data.length) return null;
   const filteredData = useMemo(() => {
     if (!filter) return data;
     return data.filter((item: any) => item._id.toLowerCase().includes(filter.toLowerCase()));
   }, [data, filter]);
+  if (!data?.length) return null;
 
   const limit = isMaximized ? filteredData.length : 6;
   const visibleData = filteredData.slice(0, limit);

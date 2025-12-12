@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useContext, createContext } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
@@ -68,6 +68,103 @@ const ChartCard = ({ title, children }: any) => {
       {isMaximized ? createPortal(Content, document.body) : Content}
     </>
   );
+};
+
+const DistributionContext = createContext<{ isMaximized: boolean; toggle: () => void }>({
+  isMaximized: false,
+  toggle: () => { }
+});
+
+const DistributionCard = ({ title, children, actions }: any) => {
+  const [isMaximized, setIsMaximized] = useState(false);
+  const toggle = () => setIsMaximized(!isMaximized);
+
+  const Header = (
+    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
+      <div className="flex items-center gap-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
+        {actions}
+      </div>
+      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={() => setIsMaximized(!isMaximized)}>
+        {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+      </Button>
+    </CardHeader>
+  );
+
+  const Content = (
+    <DistributionContext.Provider value={{ isMaximized, toggle }}>
+      <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : 'h-[400px]'}`}>
+        {Header}
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+          {/* Container for content ensuring it fills space */}
+          <div className="w-full h-full relative">
+            {children}
+          </div>
+        </CardContent>
+      </Card>
+    </DistributionContext.Provider>
+  );
+
+  return (
+    <>
+      {isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}
+      {isMaximized ? createPortal(Content, document.body) : Content}
+    </>
+  );
+};
+
+const DistributionTable = ({ data }: { data: any[] }) => {
+  const { isMaximized, toggle } = useContext(DistributionContext);
+  const filteredData = useMemo(() => {
+    return data;
+  }, [data]);
+  if (!data?.length) return null;
+
+  const limit = isMaximized ? filteredData.length : 5;
+  const visibleData = filteredData.slice(0, limit);
+  const hiddenCount = filteredData.length - limit;
+
+  return (
+    <div className="w-full h-full overflow-auto">
+      <table className="w-full text-sm text-left border-collapse">
+        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
+          <tr><th className="px-6 py-3">Time</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Code</th><th className="px-6 py-3 text-right">Latency</th></tr>
+        </thead>
+        <tbody>
+          {visibleData.map((run: any) => {
+            return (
+              <tr key={run._id} className="border-b border-border hover:bg-muted/20">
+                <td className="px-6 py-3 font-mono text-xs">{new Date(run.createdAt).toLocaleString()}</td>
+                <td className="px-6 py-3">
+                  <Badge variant={run.status === 'up' ? 'success' : run.status === 'timeout' ? 'warning' : 'destructive'} className="uppercase text-[10px] px-2">
+                    {run.status}
+                  </Badge>
+                </td>
+                <td className="px-6 py-3 font-mono"><SmartAnimatedValue value={run.statusCode} /></td>
+                <td className="px-6 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={`${run.latency}ms`} /></td>
+              </tr>
+            )
+          })}
+
+          {/* Show More Row */}
+          {hiddenCount > 0 && (
+            <tr
+              className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group"
+              onClick={toggle}
+            >
+              <td colSpan={4} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                Show {hiddenCount} more...
+              </td>
+            </tr>
+          )}
+
+          {filteredData.length === 0 && (
+            <tr><td colSpan={3} className="py-8 text-center text-muted-foreground text-xs">No data found</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
 };
 
 const UptimeStrip = ({ history }: { history: any[] }) => {
@@ -231,32 +328,11 @@ export default function MonitorDetail() {
         </ChartCard>
 
         {/* Execution Log Table */}
-        <Card className="flex flex-col h-[400px]">
-          <CardHeader className="pb-2 border-b border-border/40">
-            <CardTitle className="text-sm font-medium">Recent Checks</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
-                <tr><th className="px-6 py-3">Time</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Code</th><th className="px-6 py-3 text-right">Latency</th></tr>
-              </thead>
-              <tbody>
-                {history.map((run: any) => (
-                  <tr key={run._id} className="border-b border-border hover:bg-muted/20">
-                    <td className="px-6 py-3 font-mono text-xs">{new Date(run.createdAt).toLocaleString()}</td>
-                    <td className="px-6 py-3">
-                      <Badge variant={run.status === 'up' ? 'success' : run.status === 'timeout' ? 'warning' : 'destructive'} className="uppercase text-[10px] px-2">
-                        {run.status}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-3 font-mono">{run.statusCode}</td>
-                    <td className="px-6 py-3 text-right font-mono text-muted-foreground">{run.latency}ms</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+        <DistributionCard
+          title="Recent Checks"
+        >
+          <DistributionTable data={history} />
+        </DistributionCard>
 
       </div>
 

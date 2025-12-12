@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
@@ -77,6 +77,107 @@ const ChartCard = ({ title, children }: any) => {
       {isMaximized ? createPortal(Content, document.body) : Content}
     </>
   );
+};
+
+
+const DistributionContext = createContext<{ isMaximized: boolean; toggle: () => void }>({
+  isMaximized: false,
+  toggle: () => { }
+});
+
+const DistributionCard = ({ title, children, actions }: any) => {
+  const [isMaximized, setIsMaximized] = useState(false);
+  const toggle = () => setIsMaximized(!isMaximized);
+
+  const Header = (
+    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
+      <div className="flex items-center gap-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
+        {actions}
+      </div>
+      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={() => setIsMaximized(!isMaximized)}>
+        {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+      </Button>
+    </CardHeader>
+  );
+
+  const Content = (
+    <DistributionContext.Provider value={{ isMaximized, toggle }}>
+      <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : ''}`}>
+        {Header}
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+          {/* Container for content ensuring it fills space */}
+          <div className="w-full h-full relative">
+            {children}
+          </div>
+        </CardContent>
+      </Card>
+    </DistributionContext.Provider>
+  );
+
+  return (
+    <>
+      {isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}
+      {isMaximized ? createPortal(Content, document.body) : Content}
+    </>
+  );
+};
+
+const DistributionTable = ({ data, router, id }: { data: any[], router: any, id: any }) => {
+  const { isMaximized, toggle } = useContext(DistributionContext);
+  const filteredData = useMemo(() => {
+    return data;
+  }, [data]);
+  if (!data?.length) return <div className="p-8 text-center text-muted-foreground">No containers detected</div>;
+
+  const limit = isMaximized ? filteredData.length : 8;
+  const visibleData = filteredData.slice(0, limit);
+  const hiddenCount = filteredData.length - limit;
+
+  return (
+    <div className="w-full h-full overflow-auto">
+      <table className="w-full text-sm text-left border-collapse">
+        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
+          <tr>
+            <th className="px-6 py-3">Container</th>
+            <th className="px-6 py-3">Image</th>
+            <th className="px-6 py-3">State</th>
+            <th className="px-6 py-3 text-right">CPU</th>
+            <th className="px-6 py-3 text-right">Memory</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleData.map((c: any) => {
+            return (
+              <tr key={c.id} className="border-b border-border hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/server/${id}/docker/${c.id}`)}>
+                <td className="px-6 py-4 font-medium text-foreground">{c.name}</td>
+                <td className="px-6 py-4 text-muted-foreground font-mono">{c.image.split(':')[0]}</td>
+                <td className="px-6 py-4"><Badge variant={c.state === 'running' ? 'success' : 'secondary'}>{c.state}</Badge></td>
+                <td className="px-6 py-4 text-right font-mono"><SmartAnimatedValue value={`${c.cpuPercent.toFixed(2)}%`} /></td>
+                <td className="px-6 py-4 text-right font-mono"><SmartAnimatedValue value={`${c.memoryPercent.toFixed(2)}%`} /></td>
+              </tr>
+            )
+          })}
+
+          {/* Show More Row */}
+          {hiddenCount > 0 && (
+            <tr
+              className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group"
+              onClick={toggle}
+            >
+              <td colSpan={5} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                Show {hiddenCount} more...
+              </td>
+            </tr>
+          )}
+
+          {filteredData.length === 0 && (
+            <tr><td colSpan={3} className="py-8 text-center text-muted-foreground text-xs">No data found</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
 };
 
 // --- Uptime Strip (Unchanged logic) ---
@@ -360,39 +461,11 @@ export default function ServerDetail() {
         </div>
 
         {/* Docker Table */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Box className="h-5 w-5 text-purple-500" /> Docker Containers</CardTitle></CardHeader>
-          <div className="p-0">
-            {latest.docker?.length > 0 ? (
-              <div className="w-full overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-muted-foreground uppercase bg-muted/70">
-                    <tr>
-                      <th className="px-6 py-3">Container</th>
-                      <th className="px-6 py-3">Image</th>
-                      <th className="px-6 py-3">State</th>
-                      <th className="px-6 py-3 text-right">CPU</th>
-                      <th className="px-6 py-3 text-right">Memory</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {latest.docker.map((c: any) => (
-                      <tr key={c.id} className="border-b border-border hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/server/${id}/docker/${c.id}`)}>
-                        <td className="px-6 py-4 font-medium text-foreground">{c.name}</td>
-                        <td className="px-6 py-4 text-muted-foreground font-mono">{c.image.split(':')[0]}</td>
-                        <td className="px-6 py-4"><Badge variant={c.state === 'running' ? 'success' : 'secondary'}>{c.state}</Badge></td>
-                        <td className="px-6 py-4 text-right font-mono">{c.cpuPercent.toFixed(2)}%</td>
-                        <td className="px-6 py-4 text-right font-mono">{c.memoryPercent.toFixed(2)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-8 text-center text-muted-foreground">No containers detected.</div>
-            )}
-          </div>
-        </Card>
+        <DistributionCard
+          title="Docker Containers"
+        >
+          <DistributionTable data={latest.docker} router={router} id={id} />
+        </DistributionCard>
       </div>
 
       {/* Delete Confirmation Modal */}
