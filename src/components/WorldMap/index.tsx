@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { useTheme } from "../../lib/theme";
-import { Spinner } from "../ui/core";
+import { Spinner } from "../Core";
 // Detailed TopoJSON with ISO_A2 codes
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";

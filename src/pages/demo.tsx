@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '../lib/auth';
-import { Spinner } from '../components/ui/core';
+import { Spinner } from '../components/Core';
 
 export default function Demo() {
   const { loginAsDemo, user } = useAuth();

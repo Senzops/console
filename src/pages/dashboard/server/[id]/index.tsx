@@ -1,14 +1,14 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import { api, useAuth } from '../../../lib/auth';
-import { useTheme } from '../../../lib/theme';
-import { DashboardLayout } from '../../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../components/ui/core';
+import { api, useAuth } from '../../../../lib/auth';
+import { useTheme } from '../../../../lib/theme';
+import { DashboardLayout } from '../../../../components/Layout';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { SmartAnimatedValue, useCounter } from '@/components/tweening';
+import { SmartAnimatedValue, useCounter } from '@/components/Tween';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 

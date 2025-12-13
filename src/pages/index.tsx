@@ -1,6 +1,6 @@
 import { Footer, Navbar } from '../components/Layout';
-import { Button, Card, Badge } from '../components/ui/core';
-import { Zap, Activity, Lock, Server, Cpu, Globe, Terminal, CheckCircle2, BarChart3, Code, Timer } from 'lucide-react';
+import { Button, Badge } from '../components/Core';
+import { Zap, Activity, Lock, Server, Globe, Terminal, CheckCircle2, BarChart3, Code, Timer } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '../lib/auth';
 import { useRouter } from 'next/router';

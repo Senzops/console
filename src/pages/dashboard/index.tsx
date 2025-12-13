@@ -1,9 +1,9 @@
 import { DashboardLayout } from '../../components/Layout';
-import { ShieldCheck, Server, Cpu, Activity, Globe, ChartBar, ChartNoAxesCombined, Timer } from 'lucide-react';
+import { Server, Cpu, Activity, Globe, ChartNoAxesCombined, Timer } from 'lucide-react';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import Link from 'next/link';
-import { Badge, Spinner } from '../../components/ui/core';
+import { Badge, Spinner } from '../../components/Core';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 

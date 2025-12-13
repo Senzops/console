@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { useAuth, api } from "../lib/auth";
-import { useTheme } from "../lib/theme";
+import { useAuth, api } from "../../lib/auth";
+import { useTheme } from "../../lib/theme";
 import { useRouter } from "next/router";
-import { Button, Dialog, Avatar, Spinner, Badge } from "./ui/core";
+import { Button, Dialog, Avatar, Spinner, Badge } from "../Core";
 import {
   Plus,
   Copy,

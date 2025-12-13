@@ -4,12 +4,12 @@ import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { DashboardLayout } from '../../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../components/ui/core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, Maximize2, X, MousePointer, RefreshCw, Search, Smartphone, MapPin, Calendar, Sun, Maximize, ChartNoAxesCombined, MapIcon } from 'lucide-react';
+import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, X, RefreshCw, Search, Maximize, ChartNoAxesCombined } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { SmartAnimatedValue } from '@/components/tweening';
-import { WorldMap } from '@/components/geo/WorldMap';
+import { SmartAnimatedValue } from '@/components/Tween';
+import { WorldMap } from '@/components/WorldMap';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 

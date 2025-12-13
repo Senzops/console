@@ -20,15 +20,15 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Load from local storage on mount
-    const savedTheme = localStorage.getItem('sys-theme') as Theme;
-    const savedApp = localStorage.getItem('sys-appearance') as Appearance;
+    const savedTheme = localStorage.getItem('senzor-theme') as Theme;
+    const savedApp = localStorage.getItem('senzor-appearance') as Appearance;
     if (savedTheme) setThemeState(savedTheme);
     if (savedApp) setAppearance(savedApp);
   }, []);
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
-    localStorage.setItem('sys-theme', t);
+    localStorage.setItem('senzor-theme', t);
     // Apply to document
     const root = window.document.documentElement;
     root.setAttribute('data-theme', t);
@@ -48,7 +48,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   const toggleAppearance = (a: Appearance) => {
     setAppearance(a);
-    localStorage.setItem('sys-appearance', a);
+    localStorage.setItem('senzor-appearance', a);
   };
 
   return (
