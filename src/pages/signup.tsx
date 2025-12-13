@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 export default function Signup() {
   const { signupEmail, loginGoogle } = useAuth();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -16,11 +17,13 @@ export default function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pass.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (!name.trim()) { setError("Name is required."); return; }
+
     setError(null);
     setIsLoading(true);
     try {
-      await signupEmail(email, pass);
-      toast.success("Account created successfully!");
+      await signupEmail(email, pass, name);
+      toast.success("Account created! Please verify your email.");
     } catch (err: any) {
       const msg = err.code === 'auth/email-already-in-use' ? 'Email is already registered.' : 'Failed to create account.';
       setError(msg);
@@ -60,6 +63,11 @@ export default function Signup() {
                 <span>{error}</span>
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input id="name" type="text" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} disabled={isLoading} />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

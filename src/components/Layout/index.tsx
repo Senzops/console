@@ -15,11 +15,14 @@ import {
   Globe,
   Activity,
   AlertCircle,
+  ArrowRight,
+  Mail,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
 import md5 from "md5";
 import { extractErrorMessage } from "@/utils/axiosError";
+import { toast } from "sonner";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -106,7 +109,7 @@ export const DashboardLayout = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const { user, loading, logout, token } = useAuth();
+  const { user, loading, logout, token, resendVerification } = useAuth();
   const { theme, setTheme, appearance, setAppearance } = useTheme();
   const router = useRouter();
 
@@ -129,6 +132,8 @@ export const DashboardLayout = ({
   const [isWebModalOpen, setIsWebModalOpen] = useState(false);
   const [isMonitorModalOpen, setIsMonitorModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [isResending, setIsResending] = useState(false); // For email resend
 
 
   // Loading States for Actions
@@ -227,6 +232,18 @@ export const DashboardLayout = ({
       setIsRegisteringMonitor(false);
     }
   };
+
+  const handleResendEmail = async () => {
+    setIsResending(true);
+    try {
+      await resendVerification();
+      toast.success("Verification email sent!");
+    } catch (e) {
+      toast.error("Failed to send email");
+    } finally {
+      setIsResending(false);
+    }
+  }
 
   const closeModal = () => {
     setIsServerModalOpen(false);
@@ -425,6 +442,21 @@ export const DashboardLayout = ({
 
         {/* Profile */}
         <div className="p-4 border-t bg-card/50 shrink-0">
+          {!user.isDemo && !user.emailVerified && (
+            <div
+              onClick={() => setIsVerifyModalOpen(true)}
+              className="mb-4 p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20 transition-colors flex items-center gap-3 group"
+            >
+              <div className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                <AlertCircle className="h-3 w-3 text-amber-500" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wide leading-none mb-0.5 group-hover:underline">Verify Account</span>
+                <span className="text-[10px] text-muted-foreground truncate">Action required</span>
+              </div>
+              <ArrowRight className="h-3 w-3 text-amber-500 ml-auto opacity-50 group-hover:opacity-100" />
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-secondary/20">
             <Avatar
               src={getGravatar(user.email || "")}
@@ -432,7 +464,7 @@ export const DashboardLayout = ({
             />
             <div className="flex flex-col overflow-hidden justify-center">
               <span className="text-sm font-medium truncate leading-tight flex items-center gap-2">
-                {user.displayName || "Administrator"}
+                {user.displayName || "User"}
                 {user.isDemo && <Badge variant="warning" className="text-[9px] px-1 py-0 h-4">DEMO</Badge>}
               </span>
               <span
@@ -457,6 +489,30 @@ export const DashboardLayout = ({
       <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-background">
         {children}
       </main>
+
+      {/* --- VERIFY EMAIL MODAL --- */}
+      <Dialog open={isVerifyModalOpen} onClose={() => setIsVerifyModalOpen(false)} title="Verify Your Email">
+        <div className="space-y-4 text-center py-4">
+          <div className="h-16 w-16 mx-auto rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+            <Mail className="h-8 w-8 text-amber-500" />
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-lg font-semibold">Check your inbox</h4>
+            <p className="text-sm text-muted-foreground">
+              We've sent a verification link to <br /><span className="font-mono text-foreground">{user.email}</span>.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Please click the link to unlock full account features.
+            </p>
+          </div>
+          <div className="pt-4 flex gap-2 justify-center">
+            <Button variant="ghost" onClick={() => setIsVerifyModalOpen(false)}>I'll do it later</Button>
+            <Button onClick={handleResendEmail} disabled={isResending}>
+              {isResending ? <><Spinner className="mr-2 h-4 w-4" /> Sending...</> : 'Resend Email'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* --- SETTINGS MODAL --- */}
       <Dialog
