@@ -75,6 +75,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsubscribe();
   }, [user?.isDemo]);
 
+  // Helper to get dynamic redirect URL (client-side)
+  const getActionSettings = (path: string) => ({
+    url: `${window.location.origin}${path}`,
+    handleCodeInApp: true,
+  });
+
   const loginGoogle = async () => {
     await signInWithPopup(auth, googleProvider);
     router.push('/dashboard');
@@ -95,19 +101,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser({ ...auth.currentUser, displayName: name });
     }
 
-    // 2. Send Verification Email
-    await sendEmailVerification(creds.user);
+    // 2. Send Verification Email with Redirect
+    await sendEmailVerification(creds.user, getActionSettings('/dashboard'));
 
     router.push('/dashboard');
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, email, getActionSettings('/login'));
   };
 
   const resendVerification = async () => {
     if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser);
+      await sendEmailVerification(auth.currentUser, getActionSettings('/dashboard'));
     }
   };
 

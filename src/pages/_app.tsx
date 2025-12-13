@@ -48,6 +48,7 @@ export default function App({ Component, pageProps }: AppProps) {
             unstyled: true,
             classNames: {
               toast: 'w-full p-4 rounded-xl border border-border bg-card/50 backdrop-blur shadow-lg flex items-center gap-3 text-sm font-medium text-foreground transition-all truncate max-w-[250px]',
+              content: 'flex flex-col flex-1 min-w-0',
               title: 'text-foreground font-semibold truncate',
               description: 'text-muted-foreground truncate',
               actionButton: 'bg-primary text-primary-foreground',

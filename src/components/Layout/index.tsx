@@ -499,7 +499,7 @@ export const DashboardLayout = ({
           <div className="space-y-2">
             <h4 className="text-lg font-semibold">Check your inbox</h4>
             <p className="text-sm text-muted-foreground">
-              We've sent a verification link to <br /><span className="font-mono text-foreground">{user.email}</span>.
+              We've sent a verification link to <br /><span className="font-mono text-foreground font-bold">{user.email}</span>.
             </p>
             <p className="text-xs text-muted-foreground">
               Please click the link to unlock full account features.
