@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Spinner } from '../components/Core';
-import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react';
+import { PasswordField } from '../components/PasswordField'; // Import new component
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -10,16 +11,24 @@ export default function Signup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
-  const [showPass, setShowPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const validatePassword = (p: string) => {
+    const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})");
+    return strongRegex.test(p);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pass.length < 6) { setError("Password must be at least 6 characters."); return; }
-    if (!name.trim()) { setError("Name is required."); return; }
-
     setError(null);
+
+    if (!name.trim()) { setError("Name is required."); return; }
+    if (!validatePassword(pass)) {
+      setError("Password does not meet security requirements.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       await signupEmail(email, pass, name);
@@ -58,7 +67,7 @@ export default function Signup() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -74,15 +83,14 @@ export default function Signup() {
               <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input id="password" type={showPass ? "text" : "password"} required value={pass} onChange={(e) => setPass(e.target.value)} disabled={isLoading} />
-                <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-9 w-9 text-muted-foreground hover:text-foreground" onClick={() => setShowPass(!showPass)}>
-                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
+            {/* Reusable Password Field with Generator */}
+            <PasswordField
+              id="password"
+              value={pass}
+              onChange={setPass}
+              disabled={isLoading}
+              label="Secure Password"
+            />
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <><Spinner className="mr-2 h-4 w-4" /> Creating account...</> : 'Sign Up'}

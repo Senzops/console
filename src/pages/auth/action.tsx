@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { getAuth, applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Spinner } from '../../components/Core';
-import { CheckCircle2, XCircle, Key, Eye, EyeOff, MailCheck, ArrowRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Key, Eye, EyeOff, MailCheck, ArrowRight, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { PasswordField } from '@/components/PasswordField';
 
 export default function AuthAction() {
   const router = useRouter();
@@ -43,10 +44,25 @@ export default function AuthAction() {
     }
   };
 
+  const validatePassword = (p: string) => {
+    const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})");
+    return strongRegex.test(p);
+  };
+
   const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPass.length < 6) return;
+    if (!validatePassword(newPass)) {
+      // Basic check here, UI provides detailed feedback
+      setErrorMsg("Password does not meet security requirements.");
+      // We don't change status to error, just show local error if needed, 
+      // but for simplicity in this structure let's rely on the PasswordField visual cues
+      // and block submission.
+      return;
+    }
+
     setStatus('loading');
+    setErrorMsg(''); // Clear previous errors
+
     try {
       await confirmPasswordReset(auth, oobCode, newPass);
       setStatus('success');
@@ -139,8 +155,8 @@ export default function AuthAction() {
     // 5. Reset Password Input Form
     if (mode === 'resetPassword' && status === 'input') {
       return (
-        <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-          <div className="text-center mb-6">
+        <form onSubmit={handleResetPasswordSubmit} className="space-y-6">
+          <div className="text-center mb-2">
             <div className="mx-auto h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center mb-3">
               <Key className="h-5 w-5 text-primary" />
             </div>
@@ -148,23 +164,19 @@ export default function AuthAction() {
             <p className="text-xs text-muted-foreground">for {email}</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="new-pass">New Password</Label>
-            <div className="relative">
-              <Input
-                id="new-pass"
-                type={showPass ? "text" : "password"}
-                required
-                value={newPass}
-                onChange={(e) => setNewPass(e.target.value)}
-                placeholder="Minimum 6 characters"
-                minLength={6}
-              />
-              <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-9 w-9 text-muted-foreground" onClick={() => setShowPass(!showPass)}>
-                {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+          {errorMsg && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{errorMsg}</span>
             </div>
-          </div>
+          )}
+
+          <PasswordField
+            id="new-pass"
+            value={newPass}
+            onChange={setNewPass}
+            label="New Secure Password"
+          />
 
           <Button type="submit" className="w-full">Reset Password</Button>
         </form>
