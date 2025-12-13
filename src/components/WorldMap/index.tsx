@@ -200,7 +200,7 @@ export const WorldMap = ({ data }: MapProps) => {
                 // Use 'isReady' to trigger the transition from default -> active
                 const currentFill = (isReady && count > 0) ? activeFill : defaultFill;
 
-                const strokeColor = "hsl(var(--border) / 0.5)";
+                const strokeColor = "hsl(var(--ring) / 0.6)";
                 const hoverStroke = isMono ? "hsl(var(--foreground))" : "hsl(var(--primary))";
 
                 return (
