@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  User as FirebaseUser,
+  onAuthStateChanged,
+  signOut
+} from 'firebase/auth';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 
@@ -14,18 +24,19 @@ if (!getApps().length) initializeApp(firebaseConfig);
 const auth = getAuth();
 const googleProvider = new GoogleAuthProvider();
 
-// --- API Instance ---
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
 });
 
-// Extended User Type for Demo
 export type SenzorUser = (FirebaseUser & { isDemo?: boolean }) | { uid: string, email: string, displayName: string, isDemo: boolean };
 
 interface AuthContextType {
   user: SenzorUser | null;
   loading: boolean;
-  login: () => Promise<void>;
+  loginGoogle: () => Promise<void>;
+  loginEmail: (e: string, p: string) => Promise<void>;
+  signupEmail: (e: string, p: string) => Promise<void>;
+  resetPassword: (e: string) => Promise<void>;
   loginAsDemo: () => void;
   logout: () => Promise<void>;
   token: string | null;
@@ -39,9 +50,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 
-  // 1. Firebase Listener
   useEffect(() => {
-    // If we are already in demo mode, don't listen to firebase
     if (user?.isDemo) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (currUser) => {
@@ -49,11 +58,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(currUser);
         const t = await currUser.getIdToken();
         setToken(t);
-        // Standard Auth Header
         api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
         delete api.defaults.headers.common['x-demo-mode'];
       } else {
-        // Only reset if we aren't explicitly in demo mode (handled by loginAsDemo)
         if (!user?.isDemo) {
           setUser(null);
           setToken(null);
@@ -65,17 +72,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsubscribe();
   }, [user?.isDemo]);
 
-  const login = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      // Auto-redirect to dashboard after successful login
-      router.push('/dashboard');
-    } catch (error) {
-      console.error("Login failed", error);
-    }
+  const loginGoogle = async () => {
+    await signInWithPopup(auth, googleProvider);
+    router.push('/dashboard');
   };
 
-  // 2. Demo Login Logic
+  const loginEmail = async (email: string, pass: string) => {
+    await signInWithEmailAndPassword(auth, email, pass);
+    router.push('/dashboard');
+  };
+
+  const signupEmail = async (email: string, pass: string) => {
+    await createUserWithEmailAndPassword(auth, email, pass);
+    router.push('/dashboard');
+  };
+
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  };
+
   const loginAsDemo = () => {
     setLoading(true);
     const demoUser = {
@@ -84,14 +99,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       displayName: 'Demo Guest',
       isDemo: true
     };
-
-    setUser(demoUser);
+    setUser(demoUser as any);
     setToken('demo-token');
-
-    // Inject Demo Header
     delete api.defaults.headers.common['Authorization'];
     api.defaults.headers.common['x-demo-mode'] = 'true';
-
     setLoading(false);
     router.push('/dashboard');
   };
@@ -104,11 +115,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       router.push('/');
     } else {
       await signOut(auth);
+      router.push('/');
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginAsDemo, logout, token }}>
+    <AuthContext.Provider value={{ user, loading, loginGoogle, loginEmail, signupEmail, resetPassword, loginAsDemo, logout, token }}>
       {children}
     </AuthContext.Provider>
   );

@@ -31,7 +31,7 @@ const getGravatar = (email: string) =>
 
 // --- Public Navbar ---
 export const Navbar = () => {
-  const { user, login, logout, loading } = useAuth();
+  const { user, logout, loading } = useAuth();
 
   return (
     <nav className="fixed top-0 w-full z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -66,7 +66,9 @@ export const Navbar = () => {
               <Button onClick={logout} variant="outline">Sign Out</Button>
             </>
           ) : (
-            <Button onClick={login}>Sign In</Button>
+            <Link href="/login">
+              <Button>Sign In</Button>
+            </Link>
           )}
         </div>
       </div>

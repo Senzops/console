@@ -6,14 +6,14 @@ import { useAuth } from '../lib/auth';
 import { useRouter } from 'next/router';
 
 export default function Home() {
-  const { user, login } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
 
   const handleCtaClick = () => {
     if (user) {
       router.push('/dashboard');
     } else {
-      login();
+      router.push('/login');
     }
   };
   return (
