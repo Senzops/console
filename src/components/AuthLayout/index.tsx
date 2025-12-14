@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnimatedBackground } from '../AnimatedBackground';
+import { NetworkBackground } from '../NetworkBackground';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -11,7 +12,7 @@ export const AuthLayout = ({ children }: AuthLayoutProps) => {
 
       {/* Background Component */}
       <div className='fixed top-0 left-0 h-screen w-screen'>
-        <AnimatedBackground />
+        <NetworkBackground />
       </div>
 
       {/* Content Layer */}
