@@ -4,6 +4,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Spinner
 import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { AuthLayout } from '@/components/AuthLayout';
 
 export default function Login() {
   const { loginEmail, loginGoogle } = useAuth();
@@ -29,7 +30,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <AuthLayout>
       <Card className="w-full max-w-md border-border/50 shadow-2xl">
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-2">
@@ -88,6 +89,6 @@ export default function Login() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   );
 }

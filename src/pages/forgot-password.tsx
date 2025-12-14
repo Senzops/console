@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Spinner } from '../components/Core';
 import { AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+import { AuthLayout } from '@/components/AuthLayout';
 
 export default function ForgotPassword() {
   const { resetPassword } = useAuth();
@@ -26,7 +27,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <AuthLayout>
       <Card className="w-full max-w-md border-border/50 shadow-2xl">
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-2">
@@ -70,6 +71,6 @@ export default function ForgotPassword() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   );
 }

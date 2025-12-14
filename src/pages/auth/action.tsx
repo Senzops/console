@@ -5,6 +5,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Spinner
 import { CheckCircle2, XCircle, Key, Eye, EyeOff, MailCheck, ArrowRight, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { PasswordField } from '@/components/PasswordField';
+import { AuthLayout } from '@/components/AuthLayout';
 
 export default function AuthAction() {
   const router = useRouter();
@@ -187,7 +188,7 @@ export default function AuthAction() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <AuthLayout>
       <Card className="w-full max-w-md border-border/50 shadow-2xl">
         <CardHeader className="border-b border-border/40 pb-4">
           <div className="flex items-center justify-center gap-2">
@@ -205,6 +206,6 @@ export default function AuthAction() {
           {renderContent()}
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   );
 }

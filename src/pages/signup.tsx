@@ -5,6 +5,7 @@ import { PasswordField } from '../components/PasswordField'; // Import new compo
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { AuthLayout } from '@/components/AuthLayout';
 
 export default function Signup() {
   const { signupEmail, loginGoogle } = useAuth();
@@ -42,7 +43,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <AuthLayout>
       <Card className="w-full max-w-md border-border/50 shadow-2xl">
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-2">
@@ -102,6 +103,6 @@ export default function Signup() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   );
 }
