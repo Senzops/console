@@ -55,52 +55,98 @@ export const NetworkBackground = () => {
 
   // --- Path Generation ---
   const generatePath = (start: { x: number, y: number }, end: { x: number, y: number }) => {
-    const points = [start];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
 
-    // Simple random walker that biases towards target
-    // We want 1 or 2 intermediate turns usually
-    // Axis aligned moves only
+    const stepsX = Math.floor(absDx / GRID_SIZE);
+    const stepsY = Math.floor(absDy / GRID_SIZE);
 
-    const midX = Math.floor((Math.random() * (Math.abs(end.x - start.x) / GRID_SIZE))) * GRID_SIZE;
-    const midY = Math.floor((Math.random() * (Math.abs(end.y - start.y) / GRID_SIZE))) * GRID_SIZE;
+    // Base Case: Straight line if aligned
+    if (stepsX === 0 || stepsY === 0) {
+      return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+    }
 
-    // Determine complexity (1 turn or 2 turns)
-    const complexity = Math.random();
+    // Constraint: "number of turns should be less the min of horizontal and vertical steps"
+    // Range: [1, maxTurns). We force at least 1 turn for diagonal movement.
+    const maxTurns = Math.min(stepsX, stepsY);
+    const possibleTurns = Math.max(1, maxTurns - 1);
+    const numTurns = Math.floor(Math.random() * possibleTurns) + 1;
 
-    if (complexity > 0.5) {
-      // 2 Turns (Z-shape)
-      if (Math.random() > 0.5) {
-        // Horizontal first
-        const p1 = { x: start.x < end.x ? start.x + midX : start.x - midX, y: start.y };
-        if (p1.x !== start.x) points.push(p1);
+    const segments = numTurns + 1;
 
-        const p2 = { x: p1.x, y: end.y };
-        points.push(p2);
-      } else {
-        // Vertical first
-        const p1 = { x: start.x, y: start.y < end.y ? start.y + midY : start.y - midY };
-        if (p1.y !== start.y) points.push(p1);
+    // Partition function: distributes 'total' units into 'parts' buckets (each >= 1)
+    const partition = (total: number, parts: number) => {
+      if (parts <= 0) return [];
+      if (parts === 1) return [total];
 
-        const p2 = { x: end.x, y: p1.y };
-        points.push(p2);
+      // Start with 1 in each bucket
+      const buckets = new Array(parts).fill(1);
+      let remaining = total - parts;
+
+      // Randomly distribute remaining units
+      while (remaining > 0) {
+        const idx = Math.floor(Math.random() * parts);
+        buckets[idx]++;
+        remaining--;
       }
-    } else {
-      // 1 Turn (L-shape)
-      if (Math.random() > 0.5) {
-        points.push({ x: end.x, y: start.y });
+      return buckets;
+    };
+
+    // Determine axes for segments (Random start axis)
+    const startAxisX = Math.random() > 0.5;
+
+    let countX = 0;
+    let countY = 0;
+
+    // Calculate how many segments belong to each axis
+    for (let i = 0; i < segments; i++) {
+      // If starting X: Even i is X, Odd i is Y
+      if (startAxisX) {
+        if (i % 2 === 0) countX++; else countY++;
       } else {
-        points.push({ x: start.x, y: end.y });
+        if (i % 2 === 0) countY++; else countX++;
       }
     }
 
-    points.push(end);
+    const xSegs = partition(stepsX, countX);
+    const ySegs = partition(stepsY, countY);
 
-    // Remove duplicates
+    const points = [{ x: start.x, y: start.y }];
+    let curX = start.x;
+    let curY = start.y;
+
+    let xUsed = 0;
+    let yUsed = 0;
+
+    const dirX = dx > 0 ? 1 : -1;
+    const dirY = dy > 0 ? 1 : -1;
+
+    // Generate Waypoints
+    for (let i = 0; i < segments; i++) {
+      const isX = startAxisX ? (i % 2 === 0) : (i % 2 !== 0);
+
+      if (isX) {
+        if (xUsed < xSegs.length) {
+          const dist = xSegs[xUsed++] * GRID_SIZE;
+          curX += dist * dirX;
+        }
+      } else {
+        if (yUsed < ySegs.length) {
+          const dist = ySegs[yUsed++] * GRID_SIZE;
+          curY += dist * dirY;
+        }
+      }
+      points.push({ x: curX, y: curY });
+    }
+
+    // Filter duplicates just in case
     const uniquePoints = points.filter((p, i) => i === 0 || (p.x !== points[i - 1].x || p.y !== points[i - 1].y));
 
-    // Construct SVG Path with rounded corners
     if (uniquePoints.length < 2) return "";
 
+    // Construct SVG Path with rounded corners
     let d = `M ${uniquePoints[0].x} ${uniquePoints[0].y}`;
 
     for (let i = 1; i < uniquePoints.length; i++) {
@@ -114,18 +160,16 @@ export const NetworkBackground = () => {
         const dy = pCurr.y - pPrev.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // If segment is too short for radius, just line to it (no curve)
         if (dist < CORNER_RADIUS * 2) {
           d += ` L ${pCurr.x} ${pCurr.y}`;
         } else {
-          // Line to start of curve
           const ux = dx / dist;
           const uy = dy / dist;
           const targetX = pCurr.x - (ux * CORNER_RADIUS);
           const targetY = pCurr.y - (uy * CORNER_RADIUS);
           d += ` L ${targetX} ${targetY}`;
 
-          // Quadratic curve to end of curve (start of next segment)
+          // Quadratic curve to start of next segment
           const ndx = pNext.x - pCurr.x;
           const ndy = pNext.y - pCurr.y;
           const ndist = Math.sqrt(ndx * ndx + ndy * ndy);
@@ -137,7 +181,7 @@ export const NetworkBackground = () => {
           d += ` Q ${pCurr.x} ${pCurr.y} ${curveEndX} ${curveEndY}`;
         }
       } else {
-        // Last point, just line to it
+        // Last segment
         d += ` L ${pCurr.x} ${pCurr.y}`;
       }
     }
