@@ -33,8 +33,8 @@ export const AnimatedBackground = () => {
         className="absolute inset-0 opacity-[0.15]"
         style={{
           backgroundImage: `
-            linear-gradient(to right, hsl(var(--muted-foreground)) 1px, transparent 1px),
-            linear-gradient(to bottom, hsl(var(--muted-foreground)) 1px, transparent 1px)
+            linear-gradient(to right, hsl(var(--ring)) 1px, transparent 1px),
+            linear-gradient(to bottom, hsl(var(--ring)) 1px, transparent 1px)
           `,
           backgroundSize: '4rem 4rem',
           maskImage: 'radial-gradient(ellipse 80% 50% at 50% 50%, black 40%, transparent 100%)',

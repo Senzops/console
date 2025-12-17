@@ -4,6 +4,7 @@ import { Zap, Activity, Lock, Server, Globe, Terminal, CheckCircle2, BarChart3, 
 import Link from 'next/link';
 import { useAuth } from '../lib/auth';
 import { useRouter } from 'next/router';
+import { AnimatedBackground } from '@/components/AnimatedBackground';
 
 export default function Home() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-32 pb-24 lg:pt-48 lg:pb-32">
+        <AnimatedBackground/>
         <div className="container mx-auto px-4 relative z-10 text-center">
           <Badge variant="outline" className="mb-6 px-4 py-1.5 text-sm border-emerald-500/30 text-emerald-500 bg-emerald-500/5 backdrop-blur inline-flex items-center gap-2">
             <span className="relative flex h-2 w-2">
@@ -234,7 +236,8 @@ export default function Home() {
       </section>
 
       {/* --- CTA --- */}
-      <section className="py-32">
+      <section className="relative py-32">
+        <AnimatedBackground/>
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-4xl mx-auto bg-gradient-to-b from-card to-background border border-border p-12 rounded-3xl relative overflow-hidden shadow-2xl">
             {/* Decor */}
