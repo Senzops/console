@@ -17,6 +17,12 @@ import {
   AlertCircle,
   ArrowRight,
   Mail,
+  Book,
+  Layout,
+  Github,
+  Linkedin,
+  FileText,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -82,22 +88,95 @@ export const Navbar = () => {
 // --- Footer  ---
 export const Footer = () => {
   return (
-    <footer className="py-12 border-t bg-card">
-      <div className="container mx-auto px-4 text-center text-muted-foreground">
-        <div className="flex items-center justify-center gap-2 mb-4 font-bold text-foreground">
-          <div className="relative h-6 w-6 rounded overflow-hidden opacity-80">
-            <img src="/logo.svg" alt="Logo" className="object-cover h-full w-full logo" />
+    <footer className="border-t border-border bg-card/40 pt-16 pb-8">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+
+          {/* Brand Column */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 font-bold text-xl text-foreground">
+              <div className="relative h-8 w-8 rounded-lg overflow-hidden border border-border/50">
+                <img
+                  src="/logo.svg"
+                  alt="Logo"
+                  className="object-cover h-full w-full logo"
+                />
+              </div>
+              <span>Senzor</span>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
+              The complete observability platform for modern engineering teams. Open source, privacy-first, and lightweight.
+            </p>
           </div>
-          Senzor
+
+          {/* Platform & Legal */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-semibold text-foreground tracking-wide uppercase opacity-70">Platform</h4>
+            <ul className="space-y-2.5 text-sm text-muted-foreground">
+              <li>
+                <Link href="/demo" target="_blank" className="hover:text-emerald-500 transition-colors flex items-center gap-2 group">
+                  <Play className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Live Demo
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="hover:text-emerald-500 transition-colors flex items-center gap-2 group">
+                  <FileText className="h-3.5 w-3.5" /> Terms of Service
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Documentation */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-semibold text-foreground tracking-wide uppercase opacity-70">Documentation</h4>
+            <ul className="space-y-2.5 text-sm text-muted-foreground">
+              <li>
+                <a href="https://github.com/Senzops" target="_blank" rel="noreferrer" className="hover:text-blue-500 transition-colors flex items-center gap-2">
+                  <Book className="h-3.5 w-3.5" /> Overview
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/Senzops/server-agent" target="_blank" rel="noreferrer" className="hover:text-blue-500 transition-colors flex items-center gap-2">
+                  <Server className="h-3.5 w-3.5" /> Server Agent
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/Senzops/web-agent" target="_blank" rel="noreferrer" className="hover:text-blue-500 transition-colors flex items-center gap-2">
+                  <Globe className="h-3.5 w-3.5" /> Web Agent
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/Senzops/.github/blob/dev/SELF_HOSTING.md" target="_blank" rel="noreferrer" className="hover:text-blue-500 transition-colors flex items-center gap-2">
+                  <Layout className="h-3.5 w-3.5" /> Self Hosting
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Socials */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-semibold text-foreground tracking-wide uppercase opacity-70">Connect</h4>
+            <div className="flex gap-2">
+              <a href="https://github.com/Senzops" target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-secondary/50 hover:bg-foreground hover:text-background text-muted-foreground transition-all">
+                <Github className="h-5 w-5" />
+              </a>
+              <a href="https://linkedin.com/company/senzor-platforms" target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-secondary/50 hover:bg-blue-600 hover:text-white text-muted-foreground transition-all">
+                <Linkedin className="h-5 w-5" />
+              </a>
+              <a href="mailto:ops@senzor.dev" className="p-2 rounded-lg bg-secondary/50 hover:bg-emerald-500 hover:text-white text-muted-foreground transition-all">
+                <Mail className="h-5 w-5" />
+              </a>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Status: <span className="text-emerald-500 font-medium">All Systems Operational</span>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-center gap-8 mb-8 text-sm">
-          <Link href="https://github.com/Senzops/.github/blob/dev/SELF_HOSTING.md" className="hover:text-emerald-500 transition-colors">Self Hosting</Link>
-          <Link href="/demo" className="hover:text-emerald-500 transition-colors">Demo</Link>
-          <Link href="/terms" className="hover:text-emerald-500 transition-colors">Terms</Link>
-          <Link href="https://github.com/Senzops" target="_blank" className="hover:text-emerald-500 transition-colors">GitHub</Link>
-          <Link href="mailto:ops@senzor.dev" className="hover:text-emerald-500 transition-colors">Contact</Link>
+
+        <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground/60">
+          <p>&copy; {new Date().getFullYear()} Senzor Platforms Inc. All rights reserved.</p>
+          <p>Made with 🤍 for Developers</p>
         </div>
-        <p className="text-xs opacity-50">&copy; 2025 Senzor Platforms Inc. Built for the modern web.</p>
       </div>
     </footer>
   );
