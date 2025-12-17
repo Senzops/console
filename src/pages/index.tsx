@@ -23,7 +23,7 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-32 pb-24 lg:pt-48 lg:pb-32">
-        <AnimatedBackground/>
+        <AnimatedBackground />
         <div className="container mx-auto px-4 relative z-10 text-center">
           <Badge variant="outline" className="mb-6 px-4 py-1.5 text-sm border-emerald-500/30 text-emerald-500 bg-emerald-500/5 backdrop-blur inline-flex items-center gap-2">
             <span className="relative flex h-2 w-2">
@@ -53,7 +53,7 @@ export default function Home() {
               Start Monitoring
             </Button>
             <Link href="/demo" target="_blank">
-              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-border bg-card/50 hover:bg-card backdrop-blur hover:text-foreground">
+              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-border bg-card/50 backdrop-blur hover:bg-border hover:text-foreground">
                 View Demo
               </Button>
             </Link>
@@ -193,7 +193,7 @@ export default function Home() {
       </section>
 
       {/* --- FEATURE GRID --- */}
-      <section className="bg-secondary/20 py-32 border-y border-border">
+      <section className="bg-card/40 py-32 border-y border-border">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl font-bold mb-4 text-foreground">Why Developers Switch to Senzor</h2>
@@ -237,7 +237,7 @@ export default function Home() {
 
       {/* --- CTA --- */}
       <section className="relative py-32">
-        <AnimatedBackground/>
+        <AnimatedBackground />
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-4xl mx-auto bg-gradient-to-b from-card to-background border border-border p-12 rounded-3xl relative overflow-hidden shadow-2xl">
             {/* Decor */}
