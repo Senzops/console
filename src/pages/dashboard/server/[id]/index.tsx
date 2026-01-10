@@ -4,15 +4,16 @@ import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
 import { DashboardLayout } from '../../../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, cn } from '../../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
-import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal } from 'lucide-react';
+import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal, Layers, CloudLightning, ArrowRight, Route } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue, useCounter } from '@/components/Tween';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
+import Link from 'next/link';
 
-const fetcher = (url: string) => api.get(url).then(res => res.data);
+export const fetcher = (url: string) => api.get(url).then(res => res.data);
 
 // --- Formatter for Uptime ---
 const formatUptime = (seconds: number) => {
@@ -33,7 +34,7 @@ const formatUptime = (seconds: number) => {
   return parts.join(' ');
 };
 
-const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
+export const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
@@ -52,7 +53,7 @@ const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
 };
 
 // --- ChartCard with Maximize ---
-const ChartCard = ({ title, children }: any) => {
+export const ChartCard = ({ title, children }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
 
   const Content = (
@@ -315,6 +316,11 @@ export default function ServerDetail() {
   // If mono, fills matching stroke
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
+  // Integrations Flags (Check if active or if data exists)
+  const hasNginx = vps.activeIntegrations?.nginx || (latest.nginx !== null && latest.nginx !== undefined);
+  const hasTraefik = vps.activeIntegrations?.traefik || (latest.traefik !== null && latest.traefik !== undefined);
+
+
   return (
     <DashboardLayout>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
@@ -466,6 +472,60 @@ export default function ServerDetail() {
         >
           <DistributionTable data={latest.docker} router={router} id={id} />
         </DistributionCard>
+
+        {/* --- INTEGRATIONS LIST --- */}
+        {(hasNginx || hasTraefik) && (
+          <div className="space-y-6 pt-6 border-t border-border/50">
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold tracking-tight">Active Integrations</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {hasNginx && (
+                <Link href={`/dashboard/server/${id}/nginx`}>
+                  <Card className={cn("transition-all cursor-pointer group hover:shadow-md", isMono ? "hover:border-primary/50" : "hover:border-emerald-500/50")}>
+                    <CardContent className="p-6 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={cn("p-3 rounded-lg group-hover:scale-110 transition-transform", isMono ? "bg-primary/10 text-primary" : "bg-emerald-500/10 text-emerald-500")}>
+                          <CloudLightning className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-foreground">Nginx</h3>
+                          <div className={cn("text-xs flex items-center gap-1.5 mt-1", isMono ? "text-primary" : "text-emerald-500")}>
+                            <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMono ? "bg-primary" : "bg-emerald-500")} /> Active
+                          </div>
+                        </div>
+                      </div>
+                      <ArrowRight className={cn("h-4 w-4 text-muted-foreground transition-colors", isMono ? "group-hover:text-primary" : "group-hover:text-emerald-500")} />
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
+
+              {hasTraefik && (
+                <Link href={`/dashboard/server/${id}/traefik`}>
+                  <Card className={cn("transition-all cursor-pointer group hover:shadow-md", isMono ? "hover:border-primary/50" : "hover:border-blue-500/50")}>
+                    <CardContent className="p-6 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={cn("p-3 rounded-lg group-hover:scale-110 transition-transform", isMono ? "bg-primary/10 text-primary" : "bg-blue-500/10 text-blue-500")}>
+                          <Route className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-foreground">Traefik</h3>
+                          <div className={cn("text-xs flex items-center gap-1.5 mt-1", isMono ? "text-primary" : "text-blue-500")}>
+                            <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMono ? "bg-primary" : "bg-blue-500")} /> Active
+                          </div>
+                        </div>
+                      </div>
+                      <ArrowRight className={cn("h-4 w-4 text-muted-foreground transition-colors", isMono ? "group-hover:text-primary" : "group-hover:text-blue-500")} />
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -492,7 +552,7 @@ export default function ServerDetail() {
 }
 
 // Helpers
-const StatCard = ({ title, value, sub, icon: Icon, color, progressBarValue, isMono }: any) => {
+export const StatCard = ({ title, value, sub, icon: Icon, color, progressBarValue, isMono }: any) => {
   const colorMap: Record<string, string> = {
     "text-emerald-500": "bg-emerald-500",
     "text-blue-500": "bg-blue-500",
