@@ -7,7 +7,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { Spinner, Button, cn } from '../Core';
-import { AlertCircle, RefreshCw, Terminal as TerminalIcon, Maximize2, Minimize2, X, Lock, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, RefreshCw, Terminal as TerminalIcon, Maximize2, Minimize2, X, Lock, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import 'xterm/css/xterm.css';
 
@@ -15,7 +15,7 @@ interface TerminalViewProps {
   vpsId: string;
 }
 
-// 1. Precise Theme Colors (Matching globals.css HSL converted to Hex)
+// 1. Precise Theme Colors
 const getThemeColors = (theme: string) => {
   const common = {
     cursorAccent: '#000000',
@@ -66,36 +66,23 @@ const getThemeColors = (theme: string) => {
   }
 };
 
-// --- 2. Helper: Debounce for Resize Performance ---
-const useDebounce = (callback: Function, delay: number) => {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const debouncedCallback = useCallback((...args: any[]) => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      callback(...args);
-    }, delay);
-  }, [callback, delay]);
-  return debouncedCallback;
-};
-
 export default function TerminalView({ vpsId }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { user, getIdToken } = useAuth();
   const { theme } = useTheme();
 
-  // State
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Refs for Cleanup
+  // Refs
   const socketRef = useRef<Socket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- Actions ---
   const handleClose = () => {
     socketRef.current?.disconnect();
     router.push(`/dashboard/server/${vpsId}`);
@@ -103,33 +90,8 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
 
   const handleMaximize = () => {
     setIsMaximized(!isMaximized);
-    // Wait for CSS transition to finish before refitting text
-    setTimeout(() => {
-      fitAddonRef.current?.fit();
-      termRef.current?.focus();
-
-      // Notify backend of new dimensions
-      if (fitAddonRef.current && socketRef.current && socketRef.current.connected) {
-        const dims = fitAddonRef.current.proposeDimensions();
-        if (dims) socketRef.current.emit('term:resize', { vpsId, cols: dims.cols, rows: dims.rows });
-      }
-    }, 300);
+    setTimeout(() => fitAddonRef.current?.fit(), 100);
   };
-
-  const handleReconnect = () => {
-    window.location.reload();
-  };
-
-  // --- Resize Logic ---
-  const handleResize = useDebounce(() => {
-    if (fitAddonRef.current && socketRef.current && socketRef.current.connected) {
-      fitAddonRef.current.fit();
-      const dims = fitAddonRef.current.proposeDimensions();
-      if (dims) {
-        socketRef.current.emit('term:resize', { vpsId, cols: dims.cols, rows: dims.rows });
-      }
-    }
-  }, 150);
 
   // --- Theme Syncing ---
   useEffect(() => {
@@ -138,7 +100,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
     }
   }, [theme]);
 
-  // --- Main Initialization ---
+  // --- Init ---
   useEffect(() => {
     if (!terminalContainerRef.current || !user) return;
 
@@ -147,7 +109,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
         const token = await getIdToken();
         const colors = getThemeColors(theme);
 
-        // 1. Configure Xterm (Production Grade Settings)
+        // Xterm Configuration
         const term = new Terminal({
           cursorBlink: true,
           cursorStyle: 'block',
@@ -158,16 +120,12 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           theme: colors,
           allowProposedApi: true,
           scrollback: 5000,
-          disableStdin: true, // Block input until connected
-          macOptionIsMeta: true,
-          rightClickSelectsWord: true,
         });
 
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
         term.loadAddon(new WebLinksAddon());
 
-        // Clean container
         terminalContainerRef.current!.innerHTML = '';
         term.open(terminalContainerRef.current!);
         fitAddon.fit();
@@ -175,33 +133,31 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
         termRef.current = term;
         fitAddonRef.current = fitAddon;
 
-        // 2. Keyboard Shortcuts (Copy/Paste Railguards)
+        // Clipboard Handlers
         term.attachCustomKeyEventHandler((event) => {
-          // Ctrl+V / Cmd+V (Paste)
-          if ((event.ctrlKey || event.metaKey) && event.code === 'KeyV' && event.type === 'keydown') {
-            navigator.clipboard.readText()
-              .then(text => {
-                if (socketRef.current?.connected) {
-                  socketRef.current.emit('term:input', { vpsId, data: text });
-                }
-              })
-              .catch(() => toast.error('Clipboard access denied'));
+          if (event.ctrlKey && event.code === 'KeyV' && event.type === 'keydown') {
+            navigator.clipboard.readText().then(text => {
+              socketRef.current?.emit('term:input', { vpsId, data: text });
+              // Trigger processing on paste too
+              setIsProcessing(true);
+              if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
+              processingTimeoutRef.current = setTimeout(() => setIsProcessing(false), 2000);
+            }).catch(() => toast.error('Clipboard access denied'));
             return false;
           }
-          // Ctrl+C / Cmd+C (Copy)
-          if ((event.ctrlKey || event.metaKey) && event.code === 'KeyC' && event.type === 'keydown') {
+          if (event.ctrlKey && event.code === 'KeyC' && event.type === 'keydown') {
             const selection = term.getSelection();
             if (selection) {
               navigator.clipboard.writeText(selection);
-              toast.success('Copied to clipboard');
-              return false; // Prevent sending Ctrl+C to shell if copying
+              toast.success('Copied');
+              return false;
             }
-            return true; // Send SIGINT
+            return true;
           }
           return true;
         });
 
-        // 3. Socket Connection
+        // Socket Connection
         let socketUrl = 'http://localhost:5000';
         try {
           const urlObj = new URL(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
@@ -213,73 +169,69 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           auth: { token, type: 'client' },
           reconnection: false,
           transports: ['websocket'],
-          timeout: 10000,
         });
 
         socketRef.current = socket;
 
-        // --- Connection Railguards ---
-        connectionTimeoutRef.current = setTimeout(() => {
-          if (!socket.connected) {
-            socket.disconnect();
-            setStatus('error');
-            setErrorMsg('Connection timed out. Agent may be offline.');
-          }
-        }, 15000);
-
         socket.on('connect', () => {
-          if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
           setStatus('connected');
-          term.options.disableStdin = false; // Enable input
-
           socket.emit('term:connect', { vpsId });
 
-          // Resize handshake after connection settles
           setTimeout(() => {
             fitAddon.fit();
             const dims = fitAddon.proposeDimensions();
             if (dims) socket.emit('term:resize', { vpsId, cols: dims.cols, rows: dims.rows });
             term.focus();
-          }, 200);
+          }, 150);
         });
 
-        socket.on('disconnect', (reason) => {
-          setStatus('disconnected');
-          term.options.disableStdin = true;
-          if (reason !== 'io client disconnect') {
-            term.write('\r\n\x1b[33m[Connection Closed]\x1b[0m\r\n');
-          }
-        });
-
+        socket.on('disconnect', () => setStatus('disconnected'));
         socket.on('connect_error', (err) => {
-          if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
           setStatus('error');
-          setErrorMsg(err.message === 'xhr poll error' ? 'Network error' : err.message);
-          term.options.disableStdin = true;
+          setErrorMsg(err.message);
         });
 
-        // --- Data Flow ---
+        // Handle Output with Colorization
         socket.on('term:output', (data) => {
-          // Write directly. The Agent now handles PS1 colorization.
-          term.write(data);
-        });
+          // Reset processing state on response
+          setIsProcessing(false);
+          if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
 
-        socket.on('term:error', (msg) => {
-          term.write(`\r\n\x1b[31mSystem Error: ${msg}\x1b[0m\r\n`);
+          const brokenPromptRegex = /\\u@HOST:\\w\\\$/g;
+          const containerRegex = /\\u@CONTAINER:\\w\\\$/g;
+
+          let processed = data;
+
+          if (brokenPromptRegex.test(data) || containerRegex.test(data)) {
+            const colorized = '\r\n\x1b[1;32mroot@server\x1b[0m:\x1b[1;34m~\x1b[0m\x1b[1;36m$\x1b[0m \x1b[1;93m';
+            processed = data.replace(brokenPromptRegex, colorized).replace(containerRegex, colorized);
+          } else {
+            if (processed.includes('\r')) {
+              processed = processed.replace(/\r/g, '\x1b[0m\r');
+            }
+          }
+
+          term.write(processed);
         });
 
         term.onData((data) => {
           if (socket.connected) {
             socket.emit('term:input', { vpsId, data });
+            // Indicate processing
+            setIsProcessing(true);
+            if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
+            // Timeout to clear processing if server hangs/is silent
+            processingTimeoutRef.current = setTimeout(() => setIsProcessing(false), 2000);
           }
         });
 
-        // Window Resize Listener
+        term.onResize(({ cols, rows }) => socket.emit('term:resize', { vpsId, cols, rows }));
+
+        const handleResize = () => fitAddon.fit();
         window.addEventListener('resize', handleResize);
 
         return () => {
           window.removeEventListener('resize', handleResize);
-          if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
           socket.disconnect();
           term.dispose();
         };
@@ -291,32 +243,20 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
     };
 
     initTerminal();
-
-    return () => {
-      socketRef.current?.disconnect();
-      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
-    };
+    return () => { socketRef.current?.disconnect(); };
   }, [vpsId, user]);
 
-  // --- Render ---
   const currentColors = getThemeColors(theme);
 
-  // Error State UI
   if (status === 'error' || status === 'disconnected') {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center bg-card rounded-lg border border-border p-8 shadow-lg">
-        <div className="p-4 rounded-full bg-destructive/10 text-destructive mb-4 border border-destructive/20 animate-in fade-in zoom-in-95">
-          {status === 'error' ? <AlertCircle className="h-10 w-10" /> : <ZapOff className="h-10 w-10" />}
-        </div>
-        <h3 className="text-xl font-bold mb-2">Session Ended</h3>
-        <p className="text-sm text-muted-foreground mb-8 text-center max-w-xs leading-relaxed">
-          {errorMsg || 'The secure connection was closed. Check if the server agent is running.'}
-        </p>
+        <div className="p-4 rounded-full bg-destructive/10 text-destructive mb-4"><AlertCircle className="h-10 w-10" /></div>
+        <h3 className="text-xl font-bold mb-2">Session Terminated</h3>
+        <p className="text-sm text-muted-foreground mb-8 text-center max-w-sm">{errorMsg || 'Connection closed.'}</p>
         <div className="flex gap-4">
-          <Button variant="outline" onClick={handleClose}>Back to Dashboard</Button>
-          <Button onClick={handleReconnect} className="shadow-lg shadow-primary/20">
-            <RefreshCw className="mr-2 h-4 w-4" /> Reconnect
-          </Button>
+          <Button variant="outline" onClick={handleClose}>Back</Button>
+          <Button onClick={() => window.location.reload()}><RefreshCw className="mr-2 h-4 w-4" /> Reconnect</Button>
         </div>
       </div>
     );
@@ -326,66 +266,50 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
     <div
       className={cn(
         "flex flex-col bg-card overflow-hidden transition-all duration-300 ease-in-out border border-border shadow-2xl",
-        isMaximized ? "fixed inset-0 z-[100] rounded-none border-0" : "h-full w-full rounded-xl relative"
+        isMaximized ? "fixed inset-0 z-50 rounded-none" : "h-full w-full rounded-xl relative"
       )}
     >
-      {/* Mac-Style Header */}
+      {/* Header */}
       <div className="h-10 bg-muted/40 border-b border-border flex items-center justify-between px-4 shrink-0 select-none backdrop-blur-sm">
-        {/* Window Controls */}
+        {/* Mac-style Controls */}
         <div className="flex items-center gap-2 group">
-          <button
-            onClick={handleClose}
-            className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['✕'] after:text-[8px] after:text-black/50"
-            title="Close Session"
-          />
-          <button
-            onClick={isMaximized ? handleMaximize : undefined}
-            className={`w-3 h-3 rounded-full border transition-all shadow-sm flex items-center justify-center ${isMaximized ? 'bg-[#ffbd2e] border-[#dea123] hover:brightness-90 cursor-pointer group-hover:after:content-[\'−\'] after:text-[8px] after:text-black/50' : 'bg-secondary border-border cursor-default opacity-50'}`}
-            title="Minimize"
-          />
-          <button
-            onClick={handleMaximize}
-            className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['⤢'] after:text-[8px] after:text-black/50"
-            title="Fullscreen"
-          />
+          <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['✕'] after:text-[8px] after:text-black/50" />
+          <button onClick={isMaximized ? handleMaximize : undefined} className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:brightness-90 transition-all shadow-sm" />
+          <button onClick={handleMaximize} className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['⤢'] after:text-[8px] after:text-black/50" />
         </div>
 
-        {/* Session Identity */}
         <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground opacity-90 absolute left-1/2 -translate-x-1/2 pointer-events-none">
           <Lock className="h-3 w-3 text-emerald-500" />
           <span>root@{vpsId.slice(0, 8)}</span>
         </div>
 
-        {/* Connection Indicator */}
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
+          {/* Processing Indicator */}
+          {isProcessing && (
+            <div className="flex items-center gap-1.5 text-[10px] text-blue-500 font-medium animate-in fade-in duration-200">
+              <Activity className="h-3 w-3 animate-pulse" />
+              <span className="hidden sm:inline">Processing</span>
+            </div>
+          )}
+
           {status === 'connected' ? (
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium text-emerald-500 bg-emerald-500/10 border border-emerald-500/20">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
               SSH-WS
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground animate-pulse">
-              Connecting...
-            </div>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground"><Spinner className="h-3 w-3" /> Connecting...</div>
           )}
         </div>
       </div>
 
-      {/* Terminal Canvas */}
+      {/* Terminal Container */}
       <div
         className="flex-1 relative p-4 overflow-hidden cursor-text"
         style={{ backgroundColor: currentColors.background }}
         onClick={() => termRef.current?.focus()}
       >
         <div ref={terminalContainerRef} className="h-full w-full outline-none" />
-
-        {/* Centered Loading Overlay */}
-        {status === 'connecting' && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm animate-in fade-in">
-            <Spinner className="h-10 w-10 text-primary mb-4" />
-            <p className="text-sm font-medium text-muted-foreground animate-pulse">Initializing Secure Session...</p>
-          </div>
-        )}
       </div>
     </div>
   );
