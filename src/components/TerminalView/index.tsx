@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
@@ -165,8 +165,8 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
 
         // Xterm Configuration
         const term = new Terminal({
-          cursorBlink: true,       // Enable Blinking
-          cursorStyle: 'block',    // Block style is best for visibility
+          cursorBlink: true,
+          cursorStyle: 'block',    // Block cursor for better visibility
           cursorWidth: 2,
           fontFamily: 'Menlo, Consolas, "JetBrains Mono", monospace',
           fontSize: 14,
@@ -242,20 +242,20 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           setErrorMsg(err.message);
         });
 
-        // Handle Output with Colorization
+        // --- PROMPT COLORIZATION LOGIC ---
         socket.on('term:output', (data) => {
-          // Identify the raw prompt string coming from sh/ash shells
-          // This regex looks for the literal characters \u@HOST:\w$ which might appear if PS1 isn't evaluated
-          const brokenPromptRegex = /\\u@HOST:\\w\\\$\s?|\\u@CONTAINER:\\w\\\$\s?/g;
 
-          // Replace with ANSI Color Codes:
-          // \x1b[1;32m = Bold Green (User@Host)
-          // \x1b[0m    = Reset
-          // \x1b[1;34m = Bold Blue (Path ~)
-          const colorizedPrompt = '\x1b[1;32mroot@server\x1b[0m:\x1b[1;34m~\x1b[0m$ ';
+          const brokenPromptRegex = /\\u@HOST:\\w\$/g;
+          const containerRegex = /\\u@CONTAINER:\\w\$/g;
 
-          // Inject colors to create contrast between Prompt and Output
-          const processed = data.replace(brokenPromptRegex, colorizedPrompt);
+          let processed = data;
+
+          if (brokenPromptRegex.test(data) || containerRegex.test(data)) {
+            const colorized = '\x1b[1;32mroot@server\x1b[0m:\x1b[1;34m~\x1b[0m\x1b[1;36m$\x1b[0m ';
+            processed = data
+              .replace(brokenPromptRegex, colorized)
+              .replace(containerRegex, colorized);
+          }
 
           term.write(processed);
         });
