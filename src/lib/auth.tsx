@@ -30,7 +30,7 @@ export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
 });
 
-export type SenzorUser = (FirebaseUser & { isDemo?: boolean }) | { uid: string, email: string, displayName: string, isDemo: boolean, emailVerified: boolean };
+export type SenzorUser = (FirebaseUser & { isDemo?: boolean }) | { uid: string, email: string, displayName: string, isDemo: boolean, emailVerified: boolean, getIdToken: () => Promise<string | null> };
 
 interface AuthContextType {
   user: SenzorUser | null;
@@ -43,6 +43,7 @@ interface AuthContextType {
   loginAsDemo: () => void;
   logout: () => Promise<void>;
   token: string | null;
+  getIdToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as any);
@@ -52,6 +53,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
+
+  // Helper function to safely get token
+  const getIdToken = async () => {
+    if (!user) return null;
+    if (user.isDemo) return 'demo-token';
+    return await user.getIdToken();
+  };
 
   useEffect(() => {
     if (user?.isDemo) return;
@@ -147,7 +155,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginGoogle, loginEmail, signupEmail, resetPassword, resendVerification, loginAsDemo, logout, token }}>
+    <AuthContext.Provider value={{ user, loading, loginGoogle, loginEmail, signupEmail, resetPassword, resendVerification, loginAsDemo, logout, token, getIdToken }}>
       {children}
     </AuthContext.Provider>
   );

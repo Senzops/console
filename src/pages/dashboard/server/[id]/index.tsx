@@ -319,7 +319,7 @@ export default function ServerDetail() {
   // Integrations Flags (Check if active or if data exists)
   const hasNginx = vps.activeIntegrations?.nginx || (latest.nginx !== null && latest.nginx !== undefined);
   const hasTraefik = vps.activeIntegrations?.traefik || (latest.traefik !== null && latest.traefik !== undefined);
-
+  const hasTerminal = vps.activeIntegrations?.terminal;
 
   return (
     <DashboardLayout>
@@ -474,7 +474,7 @@ export default function ServerDetail() {
         </DistributionCard>
 
         {/* --- INTEGRATIONS LIST --- */}
-        {(hasNginx || hasTraefik) && (
+        {(hasNginx || hasTraefik || hasTerminal) && (
           <div className="space-y-6 pt-6 border-t border-border/50">
             <div className="flex items-center gap-2">
               <Layers className="h-5 w-5 text-primary" />
@@ -482,6 +482,27 @@ export default function ServerDetail() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {hasTerminal && (
+                <Link href={`/dashboard/server/${id}/terminal`}>
+                  <Card className={cn("transition-all cursor-pointer group hover:shadow-md", isMono ? "hover:border-primary/50" : "hover:border-purple-500/50")}>
+                    <CardContent className="p-6 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={cn("p-3 rounded-lg group-hover:scale-110 transition-transform", isMono ? "bg-primary/10 text-primary" : "bg-purple-500/10 text-purple-500")}>
+                          <Terminal className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-foreground">Web Terminal</h3>
+                          <div className={cn("text-xs flex items-center gap-1.5 mt-1", isMono ? "text-primary" : "text-purple-500")}>
+                            <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMono ? "bg-primary" : "bg-purple-500")} /> Online
+                          </div>
+                        </div>
+                      </div>
+                      <ArrowRight className={cn("h-4 w-4 text-muted-foreground transition-colors", isMono ? "group-hover:text-primary" : "group-hover:text-purple-500")} />
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
+
               {hasNginx && (
                 <Link href={`/dashboard/server/${id}/nginx`}>
                   <Card className={cn("transition-all cursor-pointer group hover:shadow-md", isMono ? "hover:border-primary/50" : "hover:border-emerald-500/50")}>
