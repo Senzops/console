@@ -1,50 +1,117 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
-import { Spinner, Button } from '../Core';
-import { AlertCircle, RefreshCw, Copy, Terminal as TerminalIcon } from 'lucide-react';
-import 'xterm/css/xterm.css';
+import { Spinner, Button, cn } from '../Core';
+import { AlertCircle, RefreshCw, Terminal as TerminalIcon, Maximize2, Minimize2, X, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import 'xterm/css/xterm.css';
 
 interface TerminalViewProps {
   vpsId: string;
 }
 
-// 1. Theme Configuration
+// 1. Precise Theme Colors (Matching globals.css HSL converted to Hex)
 const getThemeColors = (theme: string) => {
   const common = {
-    cursor: '#a1a1aa',
-    cursorAccent: '#000',
-    selectionForeground: '#ffffff',
+    cursorAccent: '#000000',
+    selectionForeground: '#ffffff'
   };
 
   switch (theme) {
     case 'light':
-      return { ...common, background: '#ffffff', foreground: '#18181b', selectionBackground: '#3b82f6' };
-    case 'nord':
-      return { ...common, background: '#2E3440', foreground: '#D8DEE9', selectionBackground: '#4C566A' };
-    case 'latte':
-      return { ...common, background: '#f5f5f4', foreground: '#44403c', selectionBackground: '#d6d3d1' };
-    case 'dark':
-    default:
       return {
         ...common,
-        background: '#09090b', // Zinc-950
-        foreground: '#fafafa',
-        selectionBackground: '#27272a',
-        black: '#09090b',
+        background: '#ffffff',
+        foreground: '#09090b',
+        cursor: '#18181b',
+        selectionBackground: '#a1a1aa',
+        black: '#000000',
         red: '#ef4444',
         green: '#10b981',
         yellow: '#f59e0b',
         blue: '#3b82f6',
         magenta: '#d946ef',
         cyan: '#06b6d4',
-        white: '#fafafa',
-        brightBlack: '#71717a',
+        white: '#71717a',
+        brightBlack: '#52525b',
+        brightRed: '#f87171',
+        brightGreen: '#34d399',
+        brightYellow: '#fbbf24',
+        brightBlue: '#60a5fa',
+        brightMagenta: '#e879f9',
+        brightCyan: '#22d3ee',
+        brightWhite: '#a1a1aa'
+      };
+    case 'nord':
+      return {
+        ...common,
+        background: '#2E3440',
+        foreground: '#D8DEE9',
+        cursor: '#88C0D0',
+        selectionBackground: '#434C5E',
+        black: '#3B4252',
+        red: '#BF616A',
+        green: '#A3BE8C',
+        yellow: '#EBCB8B',
+        blue: '#81A1C1',
+        magenta: '#B48EAD',
+        cyan: '#88C0D0',
+        white: '#E5E9F0',
+        brightBlack: '#4C566A',
+        brightRed: '#BF616A',
+        brightGreen: '#A3BE8C',
+        brightYellow: '#EBCB8B',
+        brightBlue: '#81A1C1',
+        brightMagenta: '#B48EAD',
+        brightCyan: '#8FBCBB',
+        brightWhite: '#ECEFF4'
+      };
+    case 'latte':
+      return {
+        ...common,
+        background: '#f5f5f4',
+        foreground: '#44403c',
+        cursor: '#78350f',
+        selectionBackground: '#d6d3d1',
+        black: '#292524',
+        red: '#b91c1c',
+        green: '#15803d',
+        yellow: '#b45309',
+        blue: '#1d4ed8',
+        magenta: '#be185d',
+        cyan: '#0e7490',
+        white: '#a8a29e',
+        brightBlack: '#57534e',
+        brightRed: '#ef4444',
+        brightGreen: '#22c55e',
+        brightYellow: '#f59e0b',
+        brightBlue: '#3b82f6',
+        brightMagenta: '#ec4899',
+        brightCyan: '#06b6d4',
+        brightWhite: '#d6d3d1'
+      };
+    case 'dark':
+    default:
+      return {
+        ...common,
+        background: '#09090b',
+        foreground: '#fafafa',
+        cursor: '#fafafa',
+        selectionBackground: '#27272a',
+        black: '#27272a',
+        red: '#ef4444',
+        green: '#10b981',
+        yellow: '#f59e0b',
+        blue: '#3b82f6',
+        magenta: '#d946ef',
+        cyan: '#06b6d4',
+        white: '#f4f4f5',
+        brightBlack: '#52525b',
         brightRed: '#f87171',
         brightGreen: '#34d399',
         brightYellow: '#fbbf24',
@@ -58,17 +125,36 @@ const getThemeColors = (theme: string) => {
 
 export default function TerminalView({ vpsId }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const { user, getIdToken } = useAuth();
   const { theme } = useTheme();
 
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('connecting');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
 
-  // --- Initialize Terminal ---
+  const handleClose = () => {
+    socketRef.current?.disconnect();
+    router.push(`/dashboard/server/${vpsId}`);
+  };
+
+  const handleMaximize = () => {
+    setIsMaximized(!isMaximized);
+    setTimeout(() => fitAddonRef.current?.fit(), 100);
+  };
+
+  // --- Theme Syncing ---
+  useEffect(() => {
+    if (termRef.current) {
+      termRef.current.options.theme = getThemeColors(theme);
+    }
+  }, [theme]);
+
+  // --- Init ---
   useEffect(() => {
     if (!terminalContainerRef.current || !user) return;
 
@@ -77,49 +163,51 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
         const token = await getIdToken();
         const colors = getThemeColors(theme);
 
-        // Xterm Setup
+        // Xterm Configuration
         const term = new Terminal({
-          cursorBlink: true,
-          fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+          cursorBlink: true,       // Enable Blinking
+          cursorStyle: 'block',    // Block style is best for visibility
+          cursorWidth: 2,
+          fontFamily: 'Menlo, Consolas, "JetBrains Mono", monospace',
           fontSize: 14,
-          lineHeight: 1.2,
+          lineHeight: 1.3,
           theme: colors,
           allowProposedApi: true,
-          convertEol: true,
+          scrollback: 5000,
         });
 
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
         term.loadAddon(new WebLinksAddon());
 
+        terminalContainerRef.current!.innerHTML = '';
         term.open(terminalContainerRef.current!);
         fitAddon.fit();
 
         termRef.current = term;
         fitAddonRef.current = fitAddon;
 
-        // Custom Key Handling (Ctrl+Shift+C/V)
+        // Clipboard Handlers
         term.attachCustomKeyEventHandler((event) => {
-          // Copy: Ctrl + Shift + C
-          if (event.ctrlKey && event.shiftKey && event.code === 'KeyC' && event.type === 'keydown') {
+          if (event.ctrlKey && event.code === 'KeyV' && event.type === 'keydown') {
+            navigator.clipboard.readText().then(text => {
+              socketRef.current?.emit('term:input', { vpsId, data: text });
+            }).catch(() => toast.error('Clipboard access denied'));
+            return false;
+          }
+          if (event.ctrlKey && event.code === 'KeyC' && event.type === 'keydown') {
             const selection = term.getSelection();
             if (selection) {
               navigator.clipboard.writeText(selection);
-              toast.success('Copied to clipboard');
+              toast.success('Copied');
+              return false;
             }
-            return false;
-          }
-          // Paste: Ctrl + Shift + V
-          if (event.ctrlKey && event.shiftKey && event.code === 'KeyV' && event.type === 'keydown') {
-            navigator.clipboard.readText().then(text => {
-              socketRef.current?.emit('term:input', { vpsId, data: text });
-            });
-            return false;
+            return true;
           }
           return true;
         });
 
-        // Socket Setup
+        // Socket Connection
         let socketUrl = 'http://localhost:5000';
         try {
           const urlObj = new URL(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
@@ -129,55 +217,58 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
         const socket = io(socketUrl, {
           path: '/api/socket',
           auth: { token, type: 'client' },
-          reconnection: false
+          reconnection: false,
+          transports: ['websocket'],
         });
 
         socketRef.current = socket;
 
-        // Events
         socket.on('connect', () => {
           setStatus('connected');
           socket.emit('term:connect', { vpsId });
-          // Send initial resize
-          if (fitAddonRef.current) {
-            const { cols, rows } = fitAddonRef.current.proposeDimensions() || { cols: 80, rows: 24 };
-            socket.emit('term:resize', { vpsId, cols, rows });
-          }
+
+          // Initial Resize
+          setTimeout(() => {
+            fitAddon.fit();
+            const dims = fitAddon.proposeDimensions();
+            if (dims) socket.emit('term:resize', { vpsId, cols: dims.cols, rows: dims.rows });
+            term.focus();
+          }, 150);
         });
 
+        socket.on('disconnect', () => setStatus('disconnected'));
         socket.on('connect_error', (err) => {
           setStatus('error');
           setErrorMsg(err.message);
-          term.write(`\r\n\x1b[31mConnection Error: ${err.message}\x1b[0m\r\n`);
         });
 
-        socket.on('disconnect', () => {
-          setStatus('disconnected');
-          term.write('\r\n\x1b[33mDisconnected from server.\x1b[0m\r\n');
+        // Handle Output with Colorization
+        socket.on('term:output', (data) => {
+          // Identify the raw prompt string coming from sh/ash shells
+          // This regex looks for the literal characters \u@HOST:\w$ which might appear if PS1 isn't evaluated
+          const brokenPromptRegex = /\\u@HOST:\\w\\\$\s?|\\u@CONTAINER:\\w\\\$\s?/g;
+
+          // Replace with ANSI Color Codes:
+          // \x1b[1;32m = Bold Green (User@Host)
+          // \x1b[0m    = Reset
+          // \x1b[1;34m = Bold Blue (Path ~)
+          const colorizedPrompt = '\x1b[1;32mroot@server\x1b[0m:\x1b[1;34m~\x1b[0m$ ';
+
+          // Inject colors to create contrast between Prompt and Output
+          const processed = data.replace(brokenPromptRegex, colorizedPrompt);
+
+          term.write(processed);
         });
 
-        socket.on('term:output', (data) => term.write(data));
-        socket.on('term:error', (msg) => term.write(`\r\n\x1b[31mRemote Error: ${msg}\x1b[0m\r\n`));
-
-        // Input Handling
         term.onData((data) => socket.emit('term:input', { vpsId, data }));
 
         term.onResize(({ cols, rows }) => socket.emit('term:resize', { vpsId, cols, rows }));
 
-        // Window Resize Observer
-        const resizeObserver = new ResizeObserver(() => {
-          if (fitAddonRef.current && socketRef.current) {
-            fitAddonRef.current.fit();
-            const dims = fitAddonRef.current.proposeDimensions();
-            if (dims) {
-              socketRef.current.emit('term:resize', { vpsId, cols: dims.cols, rows: dims.rows });
-            }
-          }
-        });
-        resizeObserver.observe(terminalContainerRef.current);
+        const handleResize = () => fitAddon.fit();
+        window.addEventListener('resize', handleResize);
 
         return () => {
-          resizeObserver.disconnect();
+          window.removeEventListener('resize', handleResize);
           socket.disconnect();
           term.dispose();
         };
@@ -188,57 +279,66 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
       }
     };
 
-    const cleanup = initTerminal();
+    initTerminal();
     return () => { socketRef.current?.disconnect(); };
-
   }, [vpsId, user]);
 
-  // Dynamic Theme Update
-  useEffect(() => {
-    if (termRef.current) {
-      termRef.current.options.theme = getThemeColors(theme);
-    }
-  }, [theme]);
+  // --- Render ---
+  const currentColors = getThemeColors(theme);
 
   if (status === 'error' || status === 'disconnected') {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-card rounded-b-lg p-8">
-        <div className="p-4 rounded-full bg-destructive/10 text-destructive mb-4">
-          <AlertCircle className="h-8 w-8" />
+      <div className="h-full w-full flex flex-col items-center justify-center bg-card rounded-lg border border-border p-8 shadow-lg">
+        <div className="p-4 rounded-full bg-destructive/10 text-destructive mb-4"><AlertCircle className="h-10 w-10" /></div>
+        <h3 className="text-xl font-bold mb-2">Session Terminated</h3>
+        <p className="text-sm text-muted-foreground mb-8 text-center max-w-sm">{errorMsg || 'Connection closed.'}</p>
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={handleClose}>Back</Button>
+          <Button onClick={() => window.location.reload()}><RefreshCw className="mr-2 h-4 w-4" /> Reconnect</Button>
         </div>
-        <h3 className="text-lg font-bold mb-2">Connection Lost</h3>
-        <p className="text-sm text-muted-foreground mb-6 max-w-xs text-center">{errorMsg || 'Socket connection closed.'}</p>
-        <Button onClick={() => window.location.reload()}>
-          <RefreshCw className="mr-2 h-4 w-4" /> Reconnect
-        </Button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full w-full rounded-xl overflow-hidden border border-border shadow-2xl bg-card">
-      {/* Modern Header / Title Bar */}
-      <div className="h-9 bg-muted/50 border-b border-border flex items-center px-4 justify-between shrink-0 select-none">
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1.5 group">
-            <div className="w-3 h-3 rounded-full bg-red-500/80 group-hover:bg-red-500" />
-            <div className="w-3 h-3 rounded-full bg-yellow-500/80 group-hover:bg-yellow-500" />
-            <div className="w-3 h-3 rounded-full bg-green-500/80 group-hover:bg-green-500" />
-          </div>
-          <div className="ml-3 flex items-center gap-2 text-xs text-muted-foreground font-mono">
-            <TerminalIcon className="h-3 w-3" />
-            <span>root@senzor-agent:~</span>
-          </div>
+    <div
+      className={cn(
+        "flex flex-col bg-card overflow-hidden transition-all duration-300 ease-in-out border border-border shadow-2xl",
+        isMaximized ? "fixed inset-0 z-50 rounded-none" : "h-full w-full rounded-xl relative"
+      )}
+    >
+      {/* Header */}
+      <div className="h-10 bg-muted/40 border-b border-border flex items-center justify-between px-4 shrink-0 select-none">
+        {/* Mac-style Controls */}
+        <div className="flex items-center gap-2 group">
+          <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['✕'] after:text-[8px] after:text-black/50" />
+          <button className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:brightness-90 transition-all shadow-sm" />
+          <button onClick={handleMaximize} className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['⤢'] after:text-[8px] after:text-black/50" />
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-background/50 px-2 py-0.5 rounded border border-border/50">
-          {status === 'connected' ? <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> : <Spinner className="h-3 w-3" />}
-          <span>{status === 'connected' ? 'SSH-Over-WS' : 'Connecting...'}</span>
+
+        <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground opacity-90 absolute left-1/2 -translate-x-1/2 pointer-events-none">
+          <Lock className="h-3 w-3 text-emerald-500" />
+          <span>root@{vpsId.slice(0, 8)}</span>
+        </div>
+
+        <div className="flex items-center">
+          {status === 'connected' ? (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium text-emerald-500 bg-emerald-500/10 border border-emerald-500/20">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
+              SSH-WS
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground"><Spinner className="h-3 w-3" /> Connecting...</div>
+          )}
         </div>
       </div>
 
-      {/* Terminal Container */}
-      <div className="flex-1 relative bg-card p-1">
-        <div ref={terminalContainerRef} className="h-full w-full" />
+      {/* Terminal Container with Floating Padding */}
+      <div
+        className="flex-1 relative p-4 overflow-hidden"
+        style={{ backgroundColor: currentColors.background }}
+      >
+        <div ref={terminalContainerRef} className="h-full w-full outline-none" />
       </div>
     </div>
   );

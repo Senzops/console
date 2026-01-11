@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'next/router';
-import dynamic from 'next/dynamic'; // Import Dynamic
+import dynamic from 'next/dynamic';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { DashboardLayout } from '../../../../components/Layout';
@@ -9,10 +9,10 @@ import { ArrowLeft, Terminal, ShieldCheck, Cpu } from 'lucide-react';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
-// Fix "self not defined" by disabling SSR for xterm
+// SSR disabled for Xterm
 const TerminalView = dynamic(
   () => import('../../../../components/TerminalView'),
-  { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-muted-foreground"><Spinner className="mr-2 h-4 w-4" /> Loading Shell...</div> }
+  { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-muted-foreground"><Spinner className="mr-2 h-4 w-4" /> Initializing Shell Environment...</div> }
 );
 
 export default function TerminalPage() {
@@ -34,45 +34,37 @@ export default function TerminalPage() {
 
   return (
     <DashboardLayout>
-      <div className="h-[calc(100vh-2rem)] flex flex-col p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto w-full">
+      <div className="h-[calc(100vh-1rem)] flex flex-col p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto w-full">
 
-        {/* Refined Header (Matches Nginx/Traefik style) */}
-        <div className="flex items-center gap-4 mb-2 shrink-0">
-          <Button variant="ghost" onClick={() => router.back()} className="pl-0 hover:bg-transparent hover:text-primary">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        {/* Refined Header */}
+        <div className="flex flex-col gap-2 shrink-0">
+          <Button variant="ghost" onClick={() => router.back()} className="pl-0 w-fit hover:bg-transparent hover:text-primary -ml-2 h-auto py-0">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Server
           </Button>
 
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <Terminal className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                {vps.name} <span className="text-muted-foreground font-normal text-lg">/ Terminal</span>
-              </h1>
-              <div className="flex gap-2 text-sm text-muted-foreground font-mono items-center">
-                <ShieldCheck className="h-3 w-3 text-emerald-500" /> Secure Tunnel Active
-                <span className="text-border">|</span>
-                <Cpu className="h-3 w-3" /> {vps.metadata?.os || 'Linux'}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500 border border-purple-500/20">
+                <Terminal className="h-5 w-5" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold flex items-center gap-2">
+                  {vps.name} <span className="text-muted-foreground font-normal opacity-50">/</span> Terminal
+                </h1>
               </div>
             </div>
-          </div>
 
-          <div className="ml-auto hidden md:block">
-            <Badge variant="outline" className="font-mono text-xs border-purple-500/20 text-purple-500 bg-purple-500/5">
-              root access granted
-            </Badge>
+            <div className="hidden md:flex items-center gap-2">
+              <Badge variant="outline" className="font-mono text-[10px] border-purple-500/30 text-purple-500 bg-purple-500/5 px-2 py-0.5">
+                SSH-OVER-WEBSOCKET
+              </Badge>
+            </div>
           </div>
         </div>
 
         {/* Main Terminal Area */}
         <div className="flex-1 min-h-0 relative">
           <TerminalView vpsId={id as string} />
-        </div>
-
-        {/* Footer Hint */}
-        <div className="text-[10px] text-muted-foreground text-center shrink-0">
-          Use <span className="font-mono bg-muted px-1 rounded text-foreground">Ctrl+Shift+C</span> to copy and <span className="font-mono bg-muted px-1 rounded text-foreground">Ctrl+Shift+V</span> to paste.
         </div>
 
       </div>
