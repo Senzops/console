@@ -8,7 +8,15 @@ import { WebLinksAddon } from "xterm-addon-web-links";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
-import { Spinner, Button, cn } from "../Core";
+import {
+  Spinner,
+  Button,
+  cn,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "../Core";
 import {
   AlertCircle,
   RefreshCw,
@@ -18,6 +26,8 @@ import {
   X,
   Lock,
   Activity,
+  ClipboardCheck,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import "xterm/css/xterm.css";
@@ -153,9 +163,19 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Paste Modal State
+  const [pasteContent, setPasteContent] = useState<string | null>(null);
+  const [pasteMode, setPasteMode] = useState<"flatten" | "raw">("flatten");
+
   const socketRef = useRef<Socket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+
+  // --- HISTORY STATE ---
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const currentLineBufferRef = useRef<string>("");
+
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -176,9 +196,41 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
       });
   }, 150);
 
+  // Load history from storage
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(`term_history_${vpsId}`);
+      if (saved) historyRef.current = JSON.parse(saved);
+    } catch (e) {}
+  }, [vpsId]);
+
   useEffect(() => {
     if (termRef.current) termRef.current.options.theme = getThemeColors(theme);
   }, [theme]);
+
+  // --- CONFIRM PASTE HANDLER ---
+  const confirmPaste = () => {
+    if (!pasteContent || !termRef.current) return;
+
+    let textToSend = pasteContent;
+
+    if (pasteMode === "flatten") {
+      // Replace newlines with "; " to execute sequentially but stay on prompt (usually)
+      // Removes blank lines and trims
+      const lines = pasteContent
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      textToSend = lines.join("; ");
+    } else {
+      // Raw mode: convert all to \r for execution
+      textToSend = pasteContent.replace(/\r?\n/g, "\r");
+    }
+
+    termRef.current.paste(textToSend); // Feeds into onData
+    setPasteContent(null);
+    termRef.current.focus();
+  };
 
   useEffect(() => {
     if (!terminalContainerRef.current || !user) return;
@@ -214,53 +266,84 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
         termRef.current = term;
         fitAddonRef.current = fitAddon;
 
-        // --- KEY HANDLERS (Fix for Double Paste) ---
+        // --- KEY HANDLER ---
         term.attachCustomKeyEventHandler((event) => {
-          // Paste (Ctrl+V)
-          if (
-            (event.ctrlKey || event.metaKey) &&
-            event.code === "KeyV" &&
-            event.type === "keydown"
-          ) {
-            // 1. Prevent Default to stop Browser/Xterm from native pasting
+          if (event.type !== "keydown") return true;
+
+          // 1. Paste (Ctrl+V)
+          if ((event.ctrlKey || event.metaKey) && event.code === "KeyV") {
             event.preventDefault();
             event.stopPropagation();
-
             navigator.clipboard
               .readText()
               .then((text) => {
-                // 2. Use term.paste() to insert text safely (handles Bracketed Paste Mode)
-                // This automatically triggers the 'onData' listener below
-                term.paste(text);
-
-                // UI Feedback
-                setIsProcessing(true);
-                if (processingTimeoutRef.current)
-                  clearTimeout(processingTimeoutRef.current);
-                processingTimeoutRef.current = setTimeout(
-                  () => setIsProcessing(false),
-                  2000,
-                );
+                // Multiline Check
+                if (text.includes("\n") || text.includes("\r")) {
+                  setPasteContent(text);
+                } else {
+                  term.paste(text); // Single line is safe to paste directly
+                }
               })
               .catch(() => toast.error("Clipboard access denied"));
-
-            return false; // Stop processing
+            return false;
           }
 
-          // Copy (Ctrl+C)
-          if (
-            (event.ctrlKey || event.metaKey) &&
-            event.code === "KeyC" &&
-            event.type === "keydown"
-          ) {
-            const selection = term.getSelection();
-            if (selection) {
-              navigator.clipboard.writeText(selection);
+          // 2. Copy (Ctrl+C)
+          if ((event.ctrlKey || event.metaKey) && event.code === "KeyC") {
+            if (term.getSelection()) {
+              navigator.clipboard.writeText(term.getSelection());
               toast.success("Copied");
-              return false; // Block sending Ctrl+C signal if text is selected
+              return false;
             }
-            return true; // Send SIGINT (Ctrl+C)
+            return true; // SigInt
           }
+
+          // 3. History Up
+          if (event.code === "ArrowUp") {
+            const history = historyRef.current;
+            const idx = historyIndexRef.current;
+            if (history.length > 0) {
+              const newIdx = idx + 1;
+              if (newIdx < history.length) {
+                historyIndexRef.current = newIdx;
+                const cmd = history[history.length - 1 - newIdx];
+                if (socketRef.current?.connected) {
+                  socketRef.current.emit("term:input", {
+                    vpsId,
+                    data: "\x15" + cmd,
+                  });
+                  currentLineBufferRef.current = cmd;
+                }
+                return false;
+              }
+            }
+            return true;
+          }
+
+          // 4. History Down
+          if (event.code === "ArrowDown") {
+            const idx = historyIndexRef.current;
+            if (idx !== -1) {
+              const newIdx = idx - 1;
+              historyIndexRef.current = newIdx;
+              let cmd = "";
+              if (newIdx === -1) cmd = "";
+              else
+                cmd =
+                  historyRef.current[historyRef.current.length - 1 - newIdx];
+
+              if (socketRef.current?.connected) {
+                socketRef.current.emit("term:input", {
+                  vpsId,
+                  data: "\x15" + cmd,
+                });
+                currentLineBufferRef.current = cmd;
+              }
+              return false;
+            }
+            return true;
+          }
+
           return true;
         });
 
@@ -269,7 +352,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           socketUrl = new URL(
             process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
           ).origin;
-        } catch (e) { }
+        } catch (e) {}
 
         const socket = io(socketUrl, {
           path: "/api/socket",
@@ -314,7 +397,6 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           term.options.disableStdin = true;
         });
 
-        // --- OUTPUT HANDLER ---
         socket.on("term:output", (data) => {
           setIsProcessing(false);
           if (processingTimeoutRef.current)
@@ -322,10 +404,47 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           term.write(data);
         });
 
-        // --- INPUT HANDLER ---
+        // --- DATA INTERCEPTION & BUFFERING ---
         term.onData((data) => {
           if (socket.connected) {
             socket.emit("term:input", { vpsId, data });
+
+            if (data.charCodeAt(0) === 27) return;
+
+            for (let i = 0; i < data.length; i++) {
+              const char = data[i];
+              const code = char.charCodeAt(0);
+
+              if (char === "\r") {
+                const cmd = currentLineBufferRef.current.trim();
+                if (cmd.length > 0) {
+                  const history = historyRef.current;
+                  if (
+                    history.length === 0 ||
+                    history[history.length - 1] !== cmd
+                  ) {
+                    history.push(cmd);
+                    if (history.length > 100) history.shift();
+                    try {
+                      sessionStorage.setItem(
+                        `term_history_${vpsId}`,
+                        JSON.stringify(history),
+                      );
+                    } catch (e) {}
+                  }
+                }
+                currentLineBufferRef.current = "";
+                historyIndexRef.current = -1;
+              } else if (char === "\x7f") {
+                currentLineBufferRef.current =
+                  currentLineBufferRef.current.slice(0, -1);
+              } else if (char === "\x03" || char === "\x15") {
+                currentLineBufferRef.current = "";
+              } else if (code >= 32) {
+                currentLineBufferRef.current += char;
+              }
+            }
+
             setIsProcessing(true);
             if (processingTimeoutRef.current)
               clearTimeout(processingTimeoutRef.current);
@@ -360,6 +479,79 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
 
   const currentColors = getThemeColors(theme);
 
+  // --- PASTE MODAL RENDER ---
+  const renderPasteModal = () => {
+    if (!pasteContent) return null;
+    const lines = pasteContent.split(/\r?\n/);
+    const displayPreview =
+      lines.slice(0, 5).join("\n") +
+      (lines.length > 5 ? `\n... (+${lines.length - 5} more lines)` : "");
+
+    return (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+        <Card className="w-full max-w-lg shadow-2xl border-primary/20 bg-card">
+          <CardHeader className="pb-2 border-b border-border/50">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              Confirm Paste
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-4">
+            <div className="text-sm text-muted-foreground">
+              You are about to paste <strong>{lines.length} lines</strong> of
+              text. How would you like to handle newlines?
+            </div>
+
+            <div className="bg-muted/50 p-3 rounded-md font-mono text-xs overflow-x-auto max-h-32 border border-border/50">
+              <pre>{displayPreview}</pre>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setPasteMode("flatten")}
+                className={cn(
+                  "p-3 rounded-lg border text-left transition-all",
+                  pasteMode === "flatten"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border hover:border-border/80",
+                )}
+              >
+                <div className="font-semibold text-sm mb-1">Flatten (Safe)</div>
+                <div className="text-[10px] text-muted-foreground">
+                  Replaces newlines with semicolons. Executes as single command
+                  block.
+                </div>
+              </button>
+              <button
+                onClick={() => setPasteMode("raw")}
+                className={cn(
+                  "p-3 rounded-lg border text-left transition-all",
+                  pasteMode === "raw"
+                    ? "border-destructive bg-destructive/5 ring-1 ring-destructive"
+                    : "border-border hover:border-border/80",
+                )}
+              >
+                <div className="font-semibold text-sm mb-1">Raw (Direct)</div>
+                <div className="text-[10px] text-muted-foreground">
+                  Sends actual newlines. Commands may execute immediately.
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setPasteContent(null)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmPaste} className="gap-2">
+                Paste <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   if (status === "error" || status === "disconnected") {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center bg-card rounded-lg border border-border p-8 shadow-lg">
@@ -367,7 +559,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           <AlertCircle className="h-10 w-10" />
         </div>
         <h3 className="text-xl font-bold mb-2">Session Ended</h3>
-        <p className="text-sm text-muted-foreground mb-8 text-center">
+        <p className="text-sm text-muted-foreground mb-8 text-center max-w-sm">
           {errorMsg || "Connection closed."}
         </p>
         <div className="flex gap-4">
@@ -395,7 +587,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
         <div className="flex items-center gap-2 group">
           <button
             onClick={handleClose}
-            className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:brightness-90 flex items-center justify-center group-hover:after:content-['✕'] after:text-[8px] after:text-black/50"
+            className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['✕'] after:text-[8px] after:text-black/50"
           />
           <button
             onClick={isMaximized ? handleMaximize : undefined}
@@ -403,7 +595,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
           />
           <button
             onClick={handleMaximize}
-            className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] hover:brightness-90 flex items-center justify-center group-hover:after:content-['⤢'] after:text-[8px] after:text-black/50"
+            className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] hover:brightness-90 transition-all shadow-sm flex items-center justify-center group-hover:after:content-['⤢'] after:text-[8px] after:text-black/50"
           />
         </div>
         <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground opacity-90 absolute left-1/2 -translate-x-1/2 pointer-events-none">
@@ -447,6 +639,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
             </p>
           </div>
         )}
+        {renderPasteModal()}
       </div>
     </div>
   );
