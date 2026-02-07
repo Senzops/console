@@ -556,7 +556,7 @@ export const DashboardLayout = ({
           <div className="space-y-1">
             <div className="flex items-center justify-between px-2 mb-2">
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Services
+                APM
               </div>
               {!user.isDemo && (
                 <Button
@@ -569,6 +569,13 @@ export const DashboardLayout = ({
                 </Button>
               )}
             </div>
+
+            {!apmList && (
+              <div className="flex justify-center py-4">
+                <Spinner className="h-4 w-4 text-muted-foreground" />
+              </div>
+            )}
+            
             {apmList?.map((a: any) => (
               <Link href={`/dashboard/apm/${a._id}`} key={a._id}>
                 <Button
@@ -588,6 +595,12 @@ export const DashboardLayout = ({
                 </Button>
               </Link>
             ))}
+
+            {apmList?.length === 0 && (
+              <div className="px-2 text-[10px] text-muted-foreground">
+                No APM tracing.
+              </div>
+            )}
           </div>
 
           {/* MONITORS */}
