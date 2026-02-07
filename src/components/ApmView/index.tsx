@@ -163,7 +163,7 @@ const DistributionTable = ({ data, total, type, renderRow, filterPlaceholder, hi
 
 
 // 4. Endpoints Table (Dedicated Component for Complex Row)
-const EndpointsTable = ({ routes, serviceId }: any) => {
+const EndpointsTable = ({ routes, router, serviceId }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [filter, setFilter] = useState('');
 
@@ -193,21 +193,16 @@ const EndpointsTable = ({ routes, serviceId }: any) => {
        <CardContent className="p-0 flex-1 overflow-auto bg-card">
           <table className="w-full text-sm text-left border-collapse">
              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
-                <tr><th className="px-6 py-3 font-medium">Method</th><th className="px-6 py-3 font-medium w-full">Route</th><th className="px-6 py-3 text-right font-medium">Reqs</th><th className="px-6 py-3 text-right font-medium">Errors</th><th className="px-6 py-3 text-right font-medium">Latency</th><th className="px-4"></th></tr>
+                <tr><th className="px-6 py-3 font-medium">Method</th><th className="px-6 py-3 font-medium w-full">Route</th><th className="px-6 py-3 text-right font-medium">Reqs</th><th className="px-6 py-3 text-right font-medium">Errors</th><th className="px-6 py-3 text-right font-medium">Latency</th></tr>
              </thead>
              <tbody>
                 {visibleRoutes.map((r: any, i: number) => (
-                   <tr key={i} className="border-b border-border hover:bg-muted/20 group cursor-pointer transition-colors">
+                  <tr key={i} className="border-b border-border hover:bg-muted/20 group cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/apm/${serviceId}/${encodeURIComponent(r.route)}`)}>
                       <td className="px-6 py-3"><Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(r.method)}`}>{r.method}</Badge></td>
                       <td className="px-6 py-3 font-mono text-xs truncate max-w-[300px] text-foreground">{r.route}</td>
                       <td className="px-6 py-3 text-right font-mono text-xs">{formatNumber(r.count)}</td>
                       <td className="px-6 py-3 text-right font-mono text-xs text-red-500">{r.errorRate > 0 ? `${r.errorRate.toFixed(1)}%` : '-'}</td>
                       <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground">{Math.round(r.avgLatency)}ms</td>
-                      <td className="px-4 py-3 text-right">
-                         <Link href={`/dashboard/apm/${serviceId}/${encodeURIComponent(r.route)}`}>
-                            <Button size="icon" variant="ghost" className="h-6 w-6"><ArrowRight className="h-3 w-3 text-muted-foreground hover:text-primary" /></Button>
-                         </Link>
-                      </td>
                    </tr>
                 ))}
                 {!isMaximized && hiddenCount > 0 && (
@@ -283,13 +278,12 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const geoTitle = geoMode === 'map' ? 'Request Map' : geoMode === 'countries' ? 'Top Countries' : 'Top Cities';
 
    // Header Logic
-  const isActive = meta.lastSeen && (Date.now() - new Date(meta.lastSeen).getTime()) < 5 * 60 * 1000;
+  const isActive = meta.lastSeen && (new Date().getTime() - new Date(meta.lastSeen).getTime()) < 5 * 60 * 1000;
   
 
   return (
     <DashboardLayout>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        
         
         {/* Header */}
         <div className="flex flex-col gap-4">
@@ -319,6 +313,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                     <option value="7d">Last 7 Days</option>
                 </Select>
                 <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}><RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} /></Button>
+                <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>
               </div>
            </div>
         </div>
@@ -336,13 +331,13 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         <ChartCard title="Requests per Second (RPS)">
             <div className="p-4 w-full h-full">
               <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={formattedGraph} wrapperStyle={{ outline: 'none' }}>
-                      {!isMono && <defs><linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.3} /><stop offset="95%" stopColor="#f97316" stopOpacity={0} /></linearGradient></defs>}
+                  <AreaChart data={formattedGraph}>
+                      <defs><linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#f97316")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#f97316")} stopOpacity={0} /></linearGradient></defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                       <XAxis dataKey="time" hide />
                       <YAxis hide />
                       <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit=" rps" />} />
-                      <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={getFill("url(#colorRps)")} strokeWidth={2} name="RPS" />
+                      <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={("url(#colorRps)")} strokeWidth={2} name="RPS" />
                   </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -380,7 +375,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         </div>
 
         {/* Endpoints Table (Only on Main Service View) */}
-        {!route && <EndpointsTable routes={routes} serviceId={serviceId} />}
+        {!route && <EndpointsTable routes={routes} router={router} serviceId={serviceId} />}
 
         {/* Context Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
