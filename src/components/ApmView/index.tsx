@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo, createContext, useContext } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -6,7 +7,7 @@ import { useTheme } from '../../lib/theme';
 import { DashboardLayout } from '../Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
-import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon } from 'lucide-react';
+import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { WorldMap } from '../WorldMap';
 import Link from 'next/link';
@@ -37,6 +38,14 @@ const getCountryName = (code: string) => {
   } catch { return code; }
 };
 
+const getColorForCode = (code: number) => {
+  if (code >= 200 && code < 300) return code === 200 ? '#10b981' : '#34d399'; // Green / Bright Green
+  if (code >= 300 && code < 400) return code === 304 ? '#60a5fa' : '#3b82f6'; // Blue
+  if (code >= 400 && code < 500) return code === 404 ? '#f59e0b' : '#fbbf24'; // Orange / Yellow
+  if (code >= 500) return code === 500 ? '#ef4444' : '#f87171'; // Red
+  return '#9ca3af'; // Grey
+};
+
 // --- COMPONENTS ---
 
 const CustomTooltip = ({ active, payload, label, unit = '', labelFormatter }: any) => {
@@ -45,9 +54,9 @@ const CustomTooltip = ({ active, payload, label, unit = '', labelFormatter }: an
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
         <p className="font-semibold text-foreground mb-1">{labelFormatter ? labelFormatter(label) : label}</p>
         {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" style={{ color: entry.fill || entry.color || entry.stroke }}>
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.fill || entry.color || entry.stroke }} />
-            <span className="capitalize">{entry.name}:</span>
+          <div key={idx} className="flex items-center gap-2" style={{ color: entry.fill || entry.stroke || entry.color }}>
+            {/* If detailed mode, name is like "code_200", clean it up */}
+            <span className="capitalize">{entry.name.replace('code_', '')}:</span>
             <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
           </div>
         ))}
@@ -67,13 +76,13 @@ const ChartCard = ({ title, children, actions }: any) => {
   const Header = (
     <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0 border-b border-border/40 mb-2 h-14 shrink-0">
         <div className="flex items-center gap-4"><CardTitle className="text-sm font-medium text-foreground">{title}</CardTitle>{actions}</div>
-        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={toggle}>{isMaximized ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={toggle}>{isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}</Button>
     </CardHeader>
   );
   
   const Content = (
     <ChartContext.Provider value={{ isMaximized, toggle }}>
-      <Card className={`flex flex-col transition-all duration-300 ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl border-orange-500/50' : 'h-[400px]'}`}>
+      <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-[400px]'}`}>
          {Header}
          <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden"><div className="w-full h-full relative">{children}</div></CardContent>
       </Card>
@@ -133,16 +142,10 @@ const DistributionTable = ({ data, total, type, renderRow, filterPlaceholder, hi
                 // Default renderer (Geo/Sys)
                 const percent = total > 0 ? Math.round((item.count / total) * 100) : 0;
                 const name = type === 'geo' ? getCountryName(item._id) : item._id;
-                let Icon = null;
-                if (type === 'geo') {
-                   const code = item._id.toLowerCase();
-                   if(code.length === 2) Icon = <img src={`https://flagcdn.com/20x15/${code}.png`} alt={code} className="w-4 h-3 mr-2 object-cover rounded-[1px] shadow-sm inline-block" />;
-                   else Icon = <MapIcon className="w-3 h-3 mr-2 inline-block text-muted-foreground" />;
-                }
                 return (
                   <tr key={i} className="group relative border-b border-border/40 hover:bg-muted/20 transition-colors">
                     <td colSpan={3} className="p-0 h-full absolute inset-0 pointer-events-none"><div className="h-[calc(100%-2px)] my-[1px] bg-muted/40 transition-all duration-500 origin-left" style={{ width: `${percent}%` }} /></td>
-                    <td className="px-4 py-2.5 relative z-10 truncate max-w-[200px] flex items-center">{Icon}<span className="truncate block w-full" title={name}>{name}</span></td>
+                    <td className="px-4 py-2.5 relative z-10 truncate max-w-[200px] flex items-center"><span className="truncate block w-full" title={name}>{name}</span></td>
                     <td className="px-4 py-2.5 relative z-10 text-right font-mono text-xs">{formatNumber(item.count)}</td>
                     <td className="px-4 py-2.5 relative z-10 text-right text-xs text-muted-foreground">{percent}%</td>
                   </tr>
@@ -182,13 +185,13 @@ const EndpointsTable = ({ routes, router, serviceId }: any) => {
        <CardTitle className="text-sm font-medium">Top Endpoints</CardTitle>
        <div className="flex items-center gap-2">
          <div className="relative w-48"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-orange-500 outline-none" placeholder="Filter routes..." value={filter} onChange={(e) => setFilter(e.target.value)} /></div>
-         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMaximized(!isMaximized)}>{isMaximized ? <X className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}</Button>
+         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMaximized(!isMaximized)}>{isMaximized ? <X className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}</Button>
        </div>
     </CardHeader>
   );
 
   const Content = (
-    <Card className={`flex flex-col transition-all duration-300 ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl border-orange-500/50' : 'h-auto min-h-[300px]'}`}>
+    <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-auto min-h-[300px]'}`}>
        {Header}
        <CardContent className="p-0 flex-1 overflow-auto bg-card">
           <table className="w-full text-sm text-left border-collapse">
@@ -233,6 +236,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const [range, setRange] = useState('24h');
   const [geoMode, setGeoMode] = useState<'map'|'countries'|'cities'>('map');
   const [sysMode, setSysMode] = useState<'browsers'|'os'|'devices'>('browsers');
+  const [statusChartMode, setStatusChartMode] = useState<'errors'|'distribution'|'detailed'>('distribution');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -245,18 +249,38 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
     catch (e) { console.error(e); setIsDeleting(false); }
   }
 
-  const formattedGraph = useMemo(() => {
+  const formattedGraph: any = useMemo(() => {
     if (!data?.graph) return [];
-    return data.graph.map((point: any) => {
-      // Scale requests to RPS
+    
+    // Collect all unique status codes for detailed mode
+    const allStatusCodes = new Set<string>();
+    
+    const processed = data.graph.map((point: any) => {
       const interval = range === '1h' ? 60 : 3600;
+      
+      // Flatten statusBreakdown for Recharts
+      // Input: statusBreakdown: [{ code: 200, count: 5 }, { code: 404, count: 2 }]
+      // Output: { code_200: 5, code_404: 2 }
+      const flattenedCodes: Record<string, number> = {};
+      if (point.statusBreakdown) {
+          point.statusBreakdown.forEach((item: any) => {
+              const key = `code_${item.code}`;
+              flattenedCodes[key] = item.count;
+              allStatusCodes.add(item.code.toString());
+          });
+      }
+
       return {
         ...point,
         rps: point.requests / interval,
-        // Keep raw ISO time for uniqueness
-        time: point.time
+        rawTime: point.time,
+        ...flattenedCodes
       };
     });
+    
+    // Sort codes for legend consistency
+    const sortedCodes = Array.from(allStatusCodes).sort().map(c => parseInt(c));
+    return { data: processed, codes: sortedCodes };
   }, [data?.graph, range]);
 
   const formatAxisDate = (str: string) => {
@@ -267,8 +291,8 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
     });
   };
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-orange-500" /></div></DashboardLayout>;
-  if (error || !data?.meta) return <DashboardLayout><div className="p-8 text-destructive">Service not found.</div></DashboardLayout>;
+  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM...</p></div></DashboardLayout>;
+  if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM.</div></div></DashboardLayout>;
 
   const { meta, overview, routes, geo, system } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
@@ -331,13 +355,13 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         <ChartCard title="Requests per Second (RPS)">
             <div className="p-4 w-full h-full">
               <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={formattedGraph}>
-                      <defs><linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#f97316")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#f97316")} stopOpacity={0} /></linearGradient></defs>
+                  <AreaChart data={formattedGraph.data}>
+                      {!isMono && <defs><linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.3} /><stop offset="95%" stopColor="#f97316" stopOpacity={0} /></linearGradient></defs>}
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                      <XAxis dataKey="time" hide />
+                      <XAxis dataKey="rawTime" hide />
                       <YAxis hide />
                       <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit=" rps" />} />
-                      <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={("url(#colorRps)")} strokeWidth={2} name="RPS" />
+                      <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={getFill("url(#colorRps)")} strokeWidth={2} name="RPS" />
                   </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -348,9 +372,9 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
            <ChartCard title="Latency Distribution (ms)">
               <div className="p-4 w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={formattedGraph} wrapperStyle={{ outline: 'none' }}>
+                  <LineChart data={formattedGraph.data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="time" hide />
+                    <XAxis dataKey="rawTime" hide />
                     <YAxis hide />
                     <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit="ms" />} />
                     <Line type="monotone" dataKey="avgLatency" stroke={getColor("#3b82f6")} strokeWidth={2} dot={false} name="Avg" />
@@ -360,14 +384,37 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
               </div>
            </ChartCard>
 
-           <ChartCard title="Error Count">
+           <ChartCard 
+              title="Response Status"
+              actions={
+                <div className="flex bg-muted/50 rounded-lg p-0.5">
+                   <button onClick={() => setStatusChartMode('distribution')} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${statusChartMode === 'distribution' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Codes</button>
+                   <button onClick={() => setStatusChartMode('errors')} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${statusChartMode === 'errors' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Errors</button>
+                   <button onClick={() => setStatusChartMode('detailed')} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${statusChartMode === 'detailed' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Detailed</button>
+                </div>
+              }
+           >
               <div className="p-4 w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={formattedGraph} wrapperStyle={{ outline: 'none' }}>
+                  <BarChart data={formattedGraph?.data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="time" hide />
+                    <XAxis dataKey="rawTime" hide />
                     <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
-                    <Bar dataKey="errors" fill={getColor("#ef4444")} name="Errors" radius={[2, 2, 0, 0]} />
+                    
+                    {statusChartMode === 'errors' && <Bar dataKey="errors" fill={getColor("#ef4444")} name="Errors" radius={[2, 2, 0, 0]} />}
+                    
+                    {statusChartMode === 'distribution' && (
+                       <>
+                         <Bar dataKey="codes2xx" stackId="a" fill={getColor("#10b981")} name="2xx" />
+                         <Bar dataKey="codes3xx" stackId="a" fill={getColor("#3b82f6")} name="3xx" />
+                         <Bar dataKey="codes4xx" stackId="a" fill={getColor("#f97316")} name="4xx" />
+                         <Bar dataKey="codes5xx" stackId="a" fill={getColor("#ef4444")} name="5xx" radius={[2, 2, 0, 0]} />
+                       </>
+                    )}
+
+                    {statusChartMode === 'detailed' && formattedGraph.codes.map((code: number) => (
+                         <Bar key={code} dataKey={`code_${code}`} stackId="a" fill={getColorForCode(code)} name={`${code}`} />
+                    ))}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -380,7 +427,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         {/* Context Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
            <ChartCard 
-             title={sysTitle}
+             title="System Environment"
              actions={
                 <div className="flex bg-muted/50 rounded-lg p-0.5">
                    {['browsers', 'os', 'devices'].map((m) => (<button key={m} onClick={() => setSysMode(m as any)} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${sysMode === m ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{m}</button>))}
@@ -391,7 +438,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
            </ChartCard>
 
            <ChartCard 
-             title={geoTitle} 
+             title="Geographic Distribution" 
              actions={
                 <div className="flex bg-muted/50 rounded-lg p-0.5">
                    <button onClick={() => setGeoMode('map')} className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md transition-colors ${geoMode === 'map' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Map</button>
