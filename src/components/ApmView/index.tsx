@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useMemo, createContext, useContext } from 'react';
+import React, { useState, useMemo, createContext, useContext, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
@@ -75,7 +75,7 @@ const ChartCard = ({ title, children, actions }: any) => {
   
   const Header = (
     <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0 border-b border-border/40 mb-2 h-14 shrink-0">
-        <div className="flex items-center gap-4"><CardTitle className="text-sm font-medium text-foreground">{title}</CardTitle>{actions}</div>
+        <div className="flex items-center gap-4"><CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>{actions}</div>
         <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={toggle}>{isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}</Button>
     </CardHeader>
   );
@@ -182,7 +182,7 @@ const EndpointsTable = ({ routes, router, serviceId }: any) => {
 
   const Header = (
     <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between h-16 shrink-0">
-       <CardTitle className="text-sm font-medium">Top Endpoints</CardTitle>
+       <CardTitle className="text-sm font-medium text-muted-foreground">Top Endpoints</CardTitle>
        <div className="flex items-center gap-2">
          <div className="relative w-48"><Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" /><input className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-orange-500 outline-none" placeholder="Filter routes..." value={filter} onChange={(e) => setFilter(e.target.value)} /></div>
          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMaximized(!isMaximized)}>{isMaximized ? <X className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}</Button>
@@ -221,6 +221,42 @@ const EndpointsTable = ({ routes, router, serviceId }: any) => {
   );
 
   return <>{isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}{isMaximized ? createPortal(Content, document.body) : Content}</>;
+};
+
+// 5. Status Table (Dedicated)
+const StatusTable = ({ statusCodes, totalRequests }: any) => {
+  const { isMaximized, toggle } = useContext(ChartContext);
+
+  const limit = isMaximized ? (statusCodes?.length || 0) : 6;
+  const visibleCodes = statusCodes ? statusCodes.slice(0, limit) : [];
+  const hiddenCount = (statusCodes?.length || 0) - limit;
+
+  return (
+    <div className="w-full h-full overflow-auto">
+       <table className="w-full text-sm text-left border-collapse">
+          <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10"><tr><th className="px-4 py-2 font-medium">Code</th><th className="px-4 py-2 text-right font-medium">Count</th><th className="px-4 py-2 text-right font-medium">%</th></tr></thead>
+          <tbody>
+             {visibleCodes.map((s:any, i:number) => {
+                 const percent = totalRequests > 0 ? Math.round((s.count/totalRequests)*100) : 0;
+                 const color = getColorForCode(s.status);
+                 return (
+                   <tr key={i} className="border-b border-border/40 hover:bg-muted/20">
+                      <td className="px-4 py-2"><Badge variant="outline" className="font-mono text-xs" style={{ borderColor: color, color: color, backgroundColor: `${color}1A` }}>{s.status}</Badge></td>
+                      <td className="px-4 py-2 text-right font-mono">{formatNumber(s.count)}</td>
+                      <td className="px-4 py-2 text-right text-xs text-muted-foreground">{percent}%</td>
+                   </tr>
+                 )
+             })}
+             {!isMaximized && hiddenCount > 0 && (
+                <tr className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group" onClick={toggle}>
+                  <td colSpan={3} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hiddenCount} more...</td>
+                </tr>
+             )}
+             {(!statusCodes || statusCodes.length === 0) && <tr><td colSpan={3} className="py-8 text-center text-muted-foreground text-xs">No data available</td></tr>}
+          </tbody>
+       </table>
+    </div>
+  );
 };
 
 interface ApmViewProps {
@@ -283,18 +319,26 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
     return { data: processed, codes: sortedCodes };
   }, [data?.graph, range]);
 
-  const formatAxisDate = (str: string) => {
-    if (!str) return '';
-    const date = new Date(str);
-    return date.toLocaleString(undefined, { 
-      month: range === '24h' ? undefined : 'short', day: range === '24h' ? undefined : 'numeric', hour: 'numeric', minute: range === '24h' ? '2-digit' : undefined 
-    });
-  };
+  const formatAxisDate = useCallback(
+    (str: string) => {
+      if (!str) return '';
+      const date = new Date(str);
+
+      return date.toLocaleString(undefined, {
+        month: range === '1h' ? undefined : 'short',
+        day: range === '1h' ? undefined : 'numeric',
+        hour: 'numeric',
+        minute: range === '1h' ? '2-digit' : undefined,
+      });
+    },
+    [range]
+  );
+
 
   if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM...</p></div></DashboardLayout>;
   if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM.</div></div></DashboardLayout>;
 
-  const { meta, overview, routes, geo, system } = data;
+  const { meta, overview, routes, referrers, channels, geo, system, statusCodes } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
   
@@ -394,30 +438,35 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                 </div>
               }
            >
-              <div className="p-4 w-full h-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={formattedGraph?.data}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="rawTime" hide />
-                    <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
-                    
-                    {statusChartMode === 'errors' && <Bar dataKey="errors" fill={getColor("#ef4444")} name="Errors" radius={[2, 2, 0, 0]} />}
-                    
-                    {statusChartMode === 'distribution' && (
-                       <>
-                         <Bar dataKey="codes2xx" stackId="a" fill={getColor("#10b981")} name="2xx" />
-                         <Bar dataKey="codes3xx" stackId="a" fill={getColor("#3b82f6")} name="3xx" />
-                         <Bar dataKey="codes4xx" stackId="a" fill={getColor("#f97316")} name="4xx" />
-                         <Bar dataKey="codes5xx" stackId="a" fill={getColor("#ef4444")} name="5xx" radius={[2, 2, 0, 0]} />
-                       </>
+              {statusChartMode === 'detailed' ? (
+                <StatusTable statusCodes={statusCodes} totalRequests={overview.totalRequests} />
+              ) : (
+                <div className="p-4 w-full h-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {/* Render AreaChart for Errors (Red Gradient) */}
+                    {statusChartMode === 'errors' ? (
+                        <AreaChart data={formattedGraph.data}>
+                            {!isMono && <defs><linearGradient id="colorErr" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} /><stop offset="95%" stopColor="#ef4444" stopOpacity={0} /></linearGradient></defs>}
+                            <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                            <XAxis dataKey="rawTime" hide />
+                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
+                            <Area type="monotone" dataKey="errors" stroke={getColor("#ef4444")} fill={("url(#colorErr)")} strokeWidth={2} name="Errors" />
+                        </AreaChart>
+                    ) : (
+                        /* Standard Distribution Bar Chart */
+                        <BarChart data={formattedGraph.data}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                            <XAxis dataKey="rawTime" hide />
+                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
+                            <Bar dataKey="codes2xx" stackId="a" fill={getColor("#10b981")} name="2xx" />
+                            <Bar dataKey="codes3xx" stackId="a" fill={getColor("#3b82f6")} name="3xx" />
+                            <Bar dataKey="codes4xx" stackId="a" fill={getColor("#f97316")} name="4xx" />
+                            <Bar dataKey="codes5xx" stackId="a" fill={getColor("#ef4444")} name="5xx" radius={[2, 2, 0, 0]} />
+                        </BarChart>
                     )}
-
-                    {statusChartMode === 'detailed' && formattedGraph.codes.map((code: number) => (
-                         <Bar key={code} dataKey={`code_${code}`} stackId="a" fill={getColorForCode(code)} name={`${code}`} />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+                  </ResponsiveContainer>
+                </div>
+              )}
            </ChartCard>
         </div>
 
