@@ -1,9 +1,10 @@
 import { DashboardLayout } from '../../components/Layout';
-import { Server, Cpu, Activity, Globe, ChartNoAxesCombined, Timer } from 'lucide-react';
+import { Server, Cpu, Activity, Globe, ChartNoAxesCombined, Timer, Zap, Code } from 'lucide-react';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import Link from 'next/link';
 import { Badge, Spinner } from '../../components/Core';
+import { formatDistanceToNow } from 'date-fns';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -15,10 +16,11 @@ export default function Dashboard() {
   const { data: serverList } = useSWR(token ? '/vps/list' : null, fetcher);
   const { data: webList } = useSWR(token ? '/web/list' : null, fetcher);
   const { data: monitorList } = useSWR(token ? '/uptime/list' : null, fetcher);
+  const { data: apmList } = useSWR(token ? '/apm/list' : null, fetcher);
 
 
-  const isLoading = !serverList && !webList && !monitorList;
-  const isEmpty = (serverList?.length || 0) === 0 && (webList?.length || 0) === 0 && (monitorList?.length || 0) === 0;
+  const isLoading = !serverList && !webList && !monitorList && !apmList;
+  const isEmpty = (serverList?.length || 0) === 0 && (webList?.length || 0) === 0 && (monitorList?.length || 0) === 0 && (apmList?.length || 0) === 0;
 
   if (isLoading) {
     return (
@@ -48,6 +50,7 @@ export default function Dashboard() {
   const items = [
     ...(serverList || []).map((s: any) => ({ ...s, type: 'server' })),
     ...(webList || []).map((w: any) => ({ ...w, type: 'web' })),
+    ...(apmList || []).map((a:any) => ({...a, type: 'apm'})),
     ...(monitorList || []).map((m: any) => ({ ...m, type: 'monitor' }))
   ];
 
@@ -65,6 +68,11 @@ export default function Dashboard() {
             let href = `/dashboard/server/${item._id}`;
             if (item.type === 'web') href = `/dashboard/web/${item._id}`;
             if (item.type === 'monitor') href = `/dashboard/monitor/${item._id}`;
+            if (item.type === 'apm') href = `/dashboard/apm/${item._id}`;
+
+            // Logic for APM Active state (Last seen within 5 mins)
+            const isApmActive = item.type === 'apm' && item.lastSeen && (new Date().getTime() - new Date(item.lastSeen).getTime() < 5 * 60 * 1000);
+
             return (
               <Link
                 href={href}
@@ -112,6 +120,27 @@ export default function Dashboard() {
                       <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
                         <ChartNoAxesCombined className="h-3 w-3" /> Analytics
                       </div>
+                    </>
+                  )}
+
+                  {item.type === 'apm' && (
+                    <>
+                      <div className={`mb-3 p-3 rounded-full transition-colors ${isApmActive ? 'bg-orange-500/10 text-orange-500' : 'bg-secondary text-muted-foreground'}`}>
+                        <Code className="h-6 w-6" />
+                      </div>
+                      <h3 className="font-bold text-sm mb-1 truncate w-full px-4">{item.name}</h3>
+                      <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-80">
+                          <Zap className="h-3 w-3" /> {item.framework && item.framework!== 'unknown' ? item.framework : 'APM'}
+                      </div>
+                      {isApmActive ? (
+                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-orange-500 border-orange-500/30 bg-orange-500/5">
+                           LIVE
+                        </Badge>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground font-mono">
+                           {item.lastSeen ? formatDistanceToNow(new Date(item.lastSeen)) : 'Never'}
+                        </span>
+                      )}
                     </>
                   )}
 
