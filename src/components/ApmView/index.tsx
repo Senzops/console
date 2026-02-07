@@ -400,12 +400,12 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
             <div className="p-4 w-full h-full">
               <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={formattedGraph.data}>
-                      {!isMono && <defs><linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.3} /><stop offset="95%" stopColor="#f97316" stopOpacity={0} /></linearGradient></defs>}
+                      <defs><linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#f97316")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#f97316")} stopOpacity={0} /></linearGradient></defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                       <XAxis dataKey="rawTime" hide />
                       <YAxis hide />
                       <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit=" rps" />} />
-                      <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={getFill("url(#colorRps)")} strokeWidth={2} name="RPS" />
+                      <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={("url(#colorRps)")} strokeWidth={2} name="RPS" />
                   </AreaChart>
               </ResponsiveContainer>
             </div>
