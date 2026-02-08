@@ -32,6 +32,12 @@ const getMethodColor = (method: string) => {
   }
 };
 
+const getLatencyColor = (ms: number) => {
+  if (ms < 200) return 'text-emerald-500';
+  if (ms < 1000) return 'text-yellow-500';
+  return 'text-red-500';
+};
+
 const getCountryName = (code: string) => {
   try {
     return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
@@ -259,6 +265,66 @@ const StatusTable = ({ statusCodes, totalRequests }: any) => {
   );
 };
 
+// 6. Invocations List Table
+const InvocationsList = ({ invocations, serviceId }: any) => {
+  const router = useRouter();
+
+  return (
+    <div className="w-full h-full overflow-auto">
+      <table className="w-full text-sm text-left border-collapse">
+        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-20">
+          <tr>
+            <th className="px-6 py-3 font-medium">Trace</th>
+            <th className="px-6 py-3 font-medium">Status</th>
+            <th className="px-6 py-3 font-medium">Duration</th>
+            <th className="px-6 py-3 font-medium">Client</th>
+            <th className="px-6 py-3 text-right font-medium">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invocations?.map((trace: any) => (
+            <tr 
+              key={trace._id} 
+              className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors group"
+              onClick={() => router.push(`/dashboard/apm/${serviceId}/trace/${trace._id}`)}
+            >
+              <td className="px-6 py-3">
+                 <div className="flex items-center gap-3">
+                    <Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(trace.method)}`}>{trace.method}</Badge>
+                    <span className="font-mono text-xs text-foreground truncate max-w-[200px]">{trace.route}</span>
+                 </div>
+              </td>
+              <td className="px-6 py-3">
+                 <Badge variant="outline" className="font-mono text-xs" style={{ 
+                     borderColor: getColorForCode(trace.status), 
+                     color: getColorForCode(trace.status), 
+                     backgroundColor: `${getColorForCode(trace.status)}15` 
+                 }}>
+                    {trace.status}
+                 </Badge>
+              </td>
+              <td className="px-6 py-3 font-mono text-xs">
+                 <span className={getLatencyColor(trace.duration)}>{trace.duration.toFixed(2)}ms</span>
+              </td>
+              <td className="px-6 py-3 text-xs text-muted-foreground">
+                 {trace.country !== 'Unknown' ? (
+                    <span className="flex items-center gap-1.5"><img src={`https://flagcdn.com/16x12/${trace.country.toLowerCase()}.png`} alt={trace.country} className="w-3.5 h-2.5 rounded-sm"/> {trace.ip}</span>
+                 ) : trace.ip}
+              </td>
+              <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono">
+                 {formatDistanceToNow(new Date(trace.timestamp))} ago
+              </td>
+            </tr>
+          ))}
+          {(!invocations || invocations.length === 0) && (
+             <tr><td colSpan={5} className="py-12 text-center text-muted-foreground">No recent invocations</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 interface ApmViewProps {
   serviceId: string;
   route?: string;
@@ -278,6 +344,11 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
 
   const endpoint = `/apm/${serviceId}/stats?range=${range}` + (route ? `&route=${encodeURIComponent(route)}` : '');
   const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 10000 });
+
+    // Fetch Invocations (List)
+  const invocationsEndpoint = `/apm/${serviceId}/invocations` + (route ? `?route=${encodeURIComponent(route)}` : '');
+  const { data: invocations } = useSWR(token && serviceId ? invocationsEndpoint : null, fetcher, { refreshInterval: 5000 });
+
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -335,8 +406,8 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   );
 
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM...</p></div></DashboardLayout>;
-  if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM.</div></div></DashboardLayout>;
+  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM service...</p></div></DashboardLayout>;
+  if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM service.</div></div></DashboardLayout>;
 
   const { meta, overview, routes, referrers, channels, geo, system, statusCodes } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
@@ -499,6 +570,11 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
               {geoMode === 'map' ? <div className="w-full h-full bg-card rounded-lg flex items-center justify-center p-4"><WorldMap data={geo.countries} /></div> : <DistributionTable data={geo[geoMode]} total={overview.totalRequests} type="geo" />}
            </ChartCard>
         </div>
+
+        {/* NEW 5. Recent Invocations (Trace List) */} 
+        <ChartCard title="Recent Invocations" actions={<Link href="#"><Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => mutate()}>Refresh</Button></Link>}>
+           <InvocationsList invocations={invocations} serviceId={serviceId} />
+        </ChartCard>
       </div>
 
       <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="Delete Service?">
