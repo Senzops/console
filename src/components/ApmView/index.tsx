@@ -268,9 +268,47 @@ const StatusTable = ({ statusCodes, totalRequests }: any) => {
 // 6. Invocations List Table
 const InvocationsList = ({ invocations, serviceId }: any) => {
   const router = useRouter();
+  const { isMaximized, toggle } = useContext(ChartContext);
+  const [filter, setFilter] = useState('');
+
+  const getLatencyColor = (ms: number) => {
+    if (ms < 200) return 'text-emerald-500';
+    if (ms < 1000) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const filteredInvocations = useMemo(() => {
+    if (!invocations) return [];
+    if (!filter) return invocations;
+    const lower = filter.toLowerCase();
+    return invocations.filter((t: any) => 
+        t.method.toLowerCase().includes(lower) || 
+        t.path.toLowerCase().includes(lower) || 
+        String(t.status).includes(lower) ||
+        (t.ip && t.ip.includes(lower))
+    );
+  }, [invocations, filter]);
+
+  const limit = isMaximized ? filteredInvocations.length : 5;
+  const visibleInvocations = filteredInvocations.slice(0, limit);
+  const hiddenCount = filteredInvocations.length - limit;
 
   return (
-    <div className="w-full h-full overflow-auto">
+    <div className="w-full h-full flex flex-col bg-card">
+      {isMaximized && (
+         <div className="px-4 py-2 border-b border-border/40 shrink-0">
+            <div className="relative">
+                <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+                <input 
+                  className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-orange-500 outline-none" 
+                  placeholder="Filter trace by path, method, status..." 
+                  value={filter} 
+                  onChange={(e) => setFilter(e.target.value)} 
+                />
+            </div>
+         </div>
+      )}
+      <div className="flex-1 overflow-auto">
       <table className="w-full text-sm text-left border-collapse">
         <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-20">
           <tr>
@@ -282,7 +320,7 @@ const InvocationsList = ({ invocations, serviceId }: any) => {
           </tr>
         </thead>
         <tbody>
-          {invocations?.map((trace: any) => (
+          {visibleInvocations.map((trace: any) => (
             <tr 
               key={trace._id} 
               className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors group"
@@ -291,7 +329,7 @@ const InvocationsList = ({ invocations, serviceId }: any) => {
               <td className="px-6 py-3">
                  <div className="flex items-center gap-3">
                     <Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(trace.method)}`}>{trace.method}</Badge>
-                    <span className="font-mono text-xs text-foreground truncate max-w-[200px]">{trace.route}</span>
+                    <span className="font-mono text-xs text-foreground truncate max-w-[200px]" title={trace.path}>{trace.path}</span>
                  </div>
               </td>
               <td className="px-6 py-3">
@@ -307,20 +345,26 @@ const InvocationsList = ({ invocations, serviceId }: any) => {
                  <span className={getLatencyColor(trace.duration)}>{trace.duration.toFixed(2)}ms</span>
               </td>
               <td className="px-6 py-3 text-xs text-muted-foreground">
-                 {trace.country !== 'Unknown' ? (
-                    <span className="flex items-center gap-1.5"><img src={`https://flagcdn.com/16x12/${trace.country.toLowerCase()}.png`} alt={trace.country} className="w-3.5 h-2.5 rounded-sm"/> {trace.ip}</span>
-                 ) : trace.ip}
+                 { (
+                    <span className="font-mono text-[10px]">{trace.ip}</span>
+                 )}
               </td>
               <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono">
                  {formatDistanceToNow(new Date(trace.timestamp))} ago
               </td>
             </tr>
           ))}
-          {(!invocations || invocations.length === 0) && (
-             <tr><td colSpan={5} className="py-12 text-center text-muted-foreground">No recent invocations</td></tr>
+          {!isMaximized && hiddenCount > 0 && (
+             <tr className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group" onClick={toggle}>
+                <td colSpan={5} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hiddenCount} more...</td>
+             </tr>
+          )}
+          {filteredInvocations.length === 0 && (
+             <tr><td colSpan={5} className="py-12 text-center text-muted-foreground">No recent invocations found</td></tr>
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 };
