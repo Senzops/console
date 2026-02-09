@@ -7,11 +7,12 @@ import { useTheme } from '../../lib/theme';
 import { DashboardLayout } from '../Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
-import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize } from 'lucide-react';
+import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize, Filter } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { WorldMap } from '../WorldMap';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -272,6 +273,12 @@ const InvocationsList = ({ invocations, serviceId, onRefresh, isRefreshing }: an
   const toggle = () => setIsMaximized(!isMaximized);
   const [filter, setFilter] = useState('');
 
+  const handleFilterClick = (e: React.MouseEvent, value: string) => {
+    e.stopPropagation();
+    setFilter(value);
+    toast.success(`Filtered by ${value}`);
+  };
+
   const filteredInvocations = useMemo(() => {
     if (!invocations) return [];
     if (!filter) return invocations;
@@ -321,18 +328,31 @@ const InvocationsList = ({ invocations, serviceId, onRefresh, isRefreshing }: an
              </thead>
              <tbody>
                 {visibleInvocations.map((trace: any) => (
-                   <tr key={trace._id} className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors group" onClick={() => router.push(`/dashboard/apm/${serviceId}/trace/${trace._id}`)}>
+                   <tr 
+                     key={trace._id} 
+                     className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors group"
+                     onClick={() => router.push(`/dashboard/apm/${serviceId}/trace/${trace._id}`)}
+                   >
                       <td className="px-6 py-3">
-                         <div className="flex items-center gap-3">
+                         <div className="flex items-center gap-2 group/cell">
                             <Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(trace.method)}`}>{trace.method}</Badge>
                             <span className="font-mono text-xs text-foreground truncate max-w-[200px]" title={trace.path}>{trace.path}</span>
+                            <button onClick={(e) => handleFilterClick(e, trace.path)} className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary transition-opacity"><Filter className="w-3 h-3"/></button>
                          </div>
                       </td>
                       <td className="px-6 py-3">
-                         <Badge variant="outline" className="font-mono text-xs" style={{ borderColor: getColorForCode(trace.status), color: getColorForCode(trace.status), backgroundColor: `${getColorForCode(trace.status)}15` }}>{trace.status}</Badge>
+                         <div className="flex items-center gap-2 group/cell">
+                             <Badge variant="outline" className="font-mono text-xs" style={{ borderColor: getColorForCode(trace.status), color: getColorForCode(trace.status), backgroundColor: `${getColorForCode(trace.status)}15` }}>{trace.status}</Badge>
+                             <button onClick={(e) => handleFilterClick(e, String(trace.status))} className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary transition-opacity"><Filter className="w-3 h-3"/></button>
+                         </div>
                       </td>
                       <td className="px-6 py-3 font-mono text-xs"><span className={getLatencyColor(trace.duration)}>{trace.duration.toFixed(2)}ms</span></td>
-                      <td className="px-6 py-3 text-xs text-muted-foreground"><span className="font-mono text-[10px]">{trace.ip}</span></td>
+                      <td className="px-6 py-3 text-xs text-muted-foreground">
+                         <div className="flex items-center gap-2 group/cell">
+                             <span className="font-mono text-[10px]">{trace.ip}</span>
+                             {trace.ip && <button onClick={(e) => handleFilterClick(e, trace.ip)} className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary transition-opacity"><Filter className="w-3 h-3"/></button>}
+                         </div>
+                      </td>
                       <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono">{formatDistanceToNow(new Date(trace.timestamp))} ago</td>
                    </tr>
                 ))}
