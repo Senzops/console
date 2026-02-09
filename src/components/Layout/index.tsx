@@ -1094,10 +1094,10 @@ export const DashboardLayout = ({
               </label>
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
                 <p className="text-xs font-mono text-orange-300 break-all pr-8 leading-relaxed">
-                  npm install @senzops/node
+                  npm install @senzops/apm-node
                   <br />
                   <br />
-                  const senzor = require('@senzops/node');
+                  const senzor = require('@senzops/apm-node');
                   <br />
                   senzor.init(&#123; apiKey: "{newCreds.apiKey}" &#125;);
                   <br />
@@ -1109,7 +1109,7 @@ export const DashboardLayout = ({
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={() =>
                     navigator.clipboard.writeText(
-                      `npm install @senzops/node\n\nconst senzor = require('@senzops/node');\nsenzor.init({ apiKey: "${newCreds.apiKey}" });\napp.use(senzor.requestHandler());`,
+                      `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${newCreds.apiKey}" });\napp.use(senzor.requestHandler());`,
                     )
                   }
                 >
