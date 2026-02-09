@@ -266,16 +266,11 @@ const StatusTable = ({ statusCodes, totalRequests }: any) => {
 };
 
 // 6. Invocations List Table
-const InvocationsList = ({ invocations, serviceId }: any) => {
+const InvocationsList = ({ invocations, serviceId, onRefresh, isRefreshing }: any) => {
   const router = useRouter();
-  const { isMaximized, toggle } = useContext(ChartContext);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const toggle = () => setIsMaximized(!isMaximized);
   const [filter, setFilter] = useState('');
-
-  const getLatencyColor = (ms: number) => {
-    if (ms < 200) return 'text-emerald-500';
-    if (ms < 1000) return 'text-yellow-500';
-    return 'text-red-500';
-  };
 
   const filteredInvocations = useMemo(() => {
     if (!invocations) return [];
@@ -289,84 +284,67 @@ const InvocationsList = ({ invocations, serviceId }: any) => {
     );
   }, [invocations, filter]);
 
-  const limit = isMaximized ? filteredInvocations.length : 5;
+  const limit = isMaximized ? filteredInvocations.length : 10;
   const visibleInvocations = filteredInvocations.slice(0, limit);
   const hiddenCount = filteredInvocations.length - limit;
 
-  return (
-    <div className="w-full h-full flex flex-col bg-card">
-      {isMaximized && (
-         <div className="px-4 py-2 border-b border-border/40 shrink-0">
-            <div className="relative">
-                <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
-                <input 
-                  className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-orange-500 outline-none" 
-                  placeholder="Filter trace by path, method, status..." 
-                  value={filter} 
-                  onChange={(e) => setFilter(e.target.value)} 
-                />
-            </div>
+  const Header = (
+    <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between h-16 shrink-0">
+       <CardTitle className="text-sm font-medium">Recent Invocations</CardTitle>
+       <div className="flex items-center gap-2">
+         <div className="relative w-48">
+             <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+             <input 
+                className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-orange-500 outline-none" 
+                placeholder="Filter traces..." 
+                value={filter} 
+                onChange={(e) => setFilter(e.target.value)} 
+             />
          </div>
-      )}
-      <div className="flex-1 overflow-auto">
-      <table className="w-full text-sm text-left border-collapse">
-        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-20">
-          <tr>
-            <th className="px-6 py-3 font-medium">Trace</th>
-            <th className="px-6 py-3 font-medium">Status</th>
-            <th className="px-6 py-3 font-medium">Duration</th>
-            <th className="px-6 py-3 font-medium">Client</th>
-            <th className="px-6 py-3 text-right font-medium">Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visibleInvocations.map((trace: any) => (
-            <tr 
-              key={trace._id} 
-              className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors group"
-              onClick={() => router.push(`/dashboard/apm/${serviceId}/trace/${trace._id}`)}
-            >
-              <td className="px-6 py-3">
-                 <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(trace.method)}`}>{trace.method}</Badge>
-                    <span className="font-mono text-xs text-foreground truncate max-w-[200px]" title={trace.path}>{trace.path}</span>
-                 </div>
-              </td>
-              <td className="px-6 py-3">
-                 <Badge variant="outline" className="font-mono text-xs" style={{ 
-                     borderColor: getColorForCode(trace.status), 
-                     color: getColorForCode(trace.status), 
-                     backgroundColor: `${getColorForCode(trace.status)}15` 
-                 }}>
-                    {trace.status}
-                 </Badge>
-              </td>
-              <td className="px-6 py-3 font-mono text-xs">
-                 <span className={getLatencyColor(trace.duration)}>{trace.duration.toFixed(2)}ms</span>
-              </td>
-              <td className="px-6 py-3 text-xs text-muted-foreground">
-                 { (
-                    <span className="font-mono text-[10px]">{trace.ip}</span>
-                 )}
-              </td>
-              <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono">
-                 {formatDistanceToNow(new Date(trace.timestamp))} ago
-              </td>
-            </tr>
-          ))}
-          {!isMaximized && hiddenCount > 0 && (
-             <tr className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group" onClick={toggle}>
-                <td colSpan={5} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hiddenCount} more...</td>
-             </tr>
-          )}
-          {filteredInvocations.length === 0 && (
-             <tr><td colSpan={5} className="py-12 text-center text-muted-foreground">No recent invocations found</td></tr>
-          )}
-        </tbody>
-      </table>
-      </div>
-    </div>
+         <Button variant="outline" size="icon" className="h-7 w-7" onClick={onRefresh} disabled={isRefreshing}>
+             <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+         </Button>
+         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggle}>
+             {isMaximized ? <X className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
+         </Button>
+       </div>
+    </CardHeader>
   );
+
+  const Content = (
+    <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-auto min-h-[300px]'}`}>
+       {Header}
+       <CardContent className="p-0 flex-1 overflow-auto bg-card">
+          <table className="w-full text-sm text-left border-collapse">
+             <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
+                <tr><th className="px-6 py-3 font-medium">Trace</th><th className="px-6 py-3 font-medium">Status</th><th className="px-6 py-3 font-medium">Duration</th><th className="px-6 py-3 font-medium">Client</th><th className="px-6 py-3 text-right font-medium">Time</th></tr>
+             </thead>
+             <tbody>
+                {visibleInvocations.map((trace: any) => (
+                   <tr key={trace._id} className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors group" onClick={() => router.push(`/dashboard/apm/${serviceId}/trace/${trace._id}`)}>
+                      <td className="px-6 py-3">
+                         <div className="flex items-center gap-3">
+                            <Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(trace.method)}`}>{trace.method}</Badge>
+                            <span className="font-mono text-xs text-foreground truncate max-w-[200px]" title={trace.path}>{trace.path}</span>
+                         </div>
+                      </td>
+                      <td className="px-6 py-3">
+                         <Badge variant="outline" className="font-mono text-xs" style={{ borderColor: getColorForCode(trace.status), color: getColorForCode(trace.status), backgroundColor: `${getColorForCode(trace.status)}15` }}>{trace.status}</Badge>
+                      </td>
+                      <td className="px-6 py-3 font-mono text-xs"><span className={getLatencyColor(trace.duration)}>{trace.duration.toFixed(2)}ms</span></td>
+                      <td className="px-6 py-3 text-xs text-muted-foreground"><span className="font-mono text-[10px]">{trace.ip}</span></td>
+                      <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono">{formatDistanceToNow(new Date(trace.timestamp))} ago</td>
+                   </tr>
+                ))}
+                {!isMaximized && hiddenCount > 0 && <tr className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group" onClick={toggle}><td colSpan={5} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hiddenCount} more...</td></tr>}
+                {visibleInvocations.length === 0 && <tr><td colSpan={5} className="py-12 text-center text-muted-foreground">No recent invocations found</td></tr>}
+             </tbody>
+          </table>
+       </CardContent>
+    </Card>
+  );
+
+  return <>{isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}{isMaximized ? createPortal(Content, document.body) : Content}</>;
 };
 
 interface ApmViewProps {
@@ -390,8 +368,8 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
 
     // Fetch Invocations (List)
-  const invocationsEndpoint = `/apm/${serviceId}/invocations` + (route ? `?route=${encodeURIComponent(route)}` : '');
-  const { data: invocations } = useSWR(token && serviceId ? invocationsEndpoint : null, fetcher, { refreshInterval: 5000 });
+   const invocationsEndpoint = `/apm/${serviceId}/invocations` + (route ? `?route=${encodeURIComponent(route)}` : '');
+  const { data: invocations, mutate: mutateInvocations, isValidating: isValidatingInvocations } = useSWR(token && serviceId ? invocationsEndpoint : null, fetcher, { refreshInterval: 30000 });
 
 
   const handleDelete = async () => {
@@ -616,9 +594,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         </div>
 
         {/* NEW 5. Recent Invocations (Trace List) */} 
-        <ChartCard title="Recent Invocations" actions={<Link href="#"><Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => mutate()}>Refresh</Button></Link>}>
-           <InvocationsList invocations={invocations} serviceId={serviceId} />
-        </ChartCard>
+        <InvocationsList invocations={invocations} serviceId={serviceId} onRefresh={() => mutateInvocations()} isRefreshing={isValidatingInvocations} />
       </div>
 
       <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="Delete Service?">
