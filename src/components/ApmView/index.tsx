@@ -379,7 +379,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const { token } = useAuth();
   const { isMono } = useTheme();
   
-  const [range, setRange] = useState('24h');
+  const [range, setRange] = useState('1h');
   const [geoMode, setGeoMode] = useState<'map'|'countries'|'cities'>('map');
   const [sysMode, setSysMode] = useState<'browsers'|'os'|'devices'>('browsers');
   const [statusChartMode, setStatusChartMode] = useState<'errors'|'distribution'|'detailed'>('distribution');
@@ -387,7 +387,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const endpoint = `/apm/${serviceId}/stats?range=${range}` + (route ? `&route=${encodeURIComponent(route)}` : '');
-  const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 10000 });
+  const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
 
     // Fetch Invocations (List)
   const invocationsEndpoint = `/apm/${serviceId}/invocations` + (route ? `?route=${encodeURIComponent(route)}` : '');
