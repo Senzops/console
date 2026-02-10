@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { TraceWaterfall } from "../../../../../components/TraceWaterfall";
 import { formatDistanceToNow } from "date-fns";
+import { SmartAnimatedValue } from '@/components/Tween';
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -61,7 +62,7 @@ const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
         <div className="text-xs font-bold text-muted-foreground uppercase mb-1">
           {label}
         </div>
-        <div className="text-xl font-bold text-foreground">{value}</div>
+        <div className="text-xl font-bold text-foreground"><SmartAnimatedValue value={value} /></div>
         {sub && (
           <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>
         )}

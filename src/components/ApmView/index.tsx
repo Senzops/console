@@ -13,6 +13,7 @@ import { WorldMap } from '../WorldMap';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { SmartAnimatedValue } from '@/components/Tween';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -104,7 +105,7 @@ const StatCard = ({ title, value, sub, icon: Icon, color, isMono }: any) => {
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center justify-between space-y-0 pb-2"><p className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</p><Icon className={`h-4 w-4 ${iconClass}`} /></div>
-        <div className="text-2xl font-bold text-foreground">{value}</div>
+        <div className="text-2xl font-bold text-foreground"><SmartAnimatedValue value={value} /></div>
         {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
       </CardContent>
     </Card>
@@ -153,8 +154,8 @@ const DistributionTable = ({ data, total, type, renderRow, filterPlaceholder, hi
                   <tr key={i} className="group relative border-b border-border/40 hover:bg-muted/20 transition-colors">
                     <td colSpan={3} className="p-0 h-full absolute inset-0 pointer-events-none"><div className="h-[calc(100%-2px)] my-[1px] bg-muted/40 transition-all duration-500 origin-left" style={{ width: `${percent}%` }} /></td>
                     <td className="px-4 py-2.5 relative z-10 truncate max-w-[200px] flex items-center"><span className="truncate block w-full" title={name}>{name}</span></td>
-                    <td className="px-4 py-2.5 relative z-10 text-right font-mono text-xs">{formatNumber(item.count)}</td>
-                    <td className="px-4 py-2.5 relative z-10 text-right text-xs text-muted-foreground">{percent}%</td>
+                    <td className="px-4 py-2.5 relative z-10 text-right font-mono text-xs"><SmartAnimatedValue value={formatNumber(item.count)} /></td>
+                    <td className="px-4 py-2.5 relative z-10 text-right text-xs text-muted-foreground"><SmartAnimatedValue value={`${percent}%`} /></td>
                   </tr>
                 )
               })}
@@ -210,9 +211,9 @@ const EndpointsTable = ({ routes, router, serviceId }: any) => {
                   <tr key={i} className="border-b border-border hover:bg-muted/20 group cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/apm/${serviceId}/${encodeURIComponent(r.route)}`)}>
                       <td className="px-6 py-3"><Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(r.method)}`}>{r.method}</Badge></td>
                       <td className="px-6 py-3 font-mono text-xs truncate max-w-[300px] text-foreground">{r.route}</td>
-                      <td className="px-6 py-3 text-right font-mono text-xs">{formatNumber(r.count)}</td>
-                      <td className="px-6 py-3 text-right font-mono text-xs text-red-500">{r.errorRate > 0 ? `${r.errorRate.toFixed(1)}%` : '-'}</td>
-                      <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground">{Math.round(r.avgLatency)}ms</td>
+                      <td className="px-6 py-3 text-right font-mono text-xs"><SmartAnimatedValue value={formatNumber(r.count)} /></td>
+                      <td className="px-6 py-3 text-right font-mono text-xs text-red-500"><SmartAnimatedValue value={r.errorRate > 0 ? `${r.errorRate.toFixed(1)}%` : '-'} /></td>
+                      <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground"><SmartAnimatedValue value={`${Math.round(r.avgLatency)}ms`} /></td>
                    </tr>
                 ))}
                 {!isMaximized && hiddenCount > 0 && (
@@ -249,8 +250,8 @@ const StatusTable = ({ statusCodes, totalRequests }: any) => {
                  return (
                    <tr key={i} className="border-b border-border/40 hover:bg-muted/20">
                       <td className="px-4 py-2"><Badge variant="outline" className="font-mono text-xs" style={{ borderColor: color, color: color, backgroundColor: `${color}1A` }}>{s.status}</Badge></td>
-                      <td className="px-4 py-2 text-right font-mono">{formatNumber(s.count)}</td>
-                      <td className="px-4 py-2 text-right text-xs text-muted-foreground">{percent}%</td>
+                      <td className="px-4 py-2 text-right font-mono"><SmartAnimatedValue value={formatNumber(s.count)} /></td>
+                      <td className="px-4 py-2 text-right text-xs text-muted-foreground"><SmartAnimatedValue value={`${percent}%`} /></td>
                    </tr>
                  )
              })}
@@ -346,7 +347,7 @@ const InvocationsList = ({ invocations, serviceId, onRefresh, isRefreshing }: an
                              <button onClick={(e) => handleFilterClick(e, String(trace.status))} className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary transition-opacity"><Filter className="w-3 h-3"/></button>
                          </div>
                       </td>
-                      <td className="px-6 py-3 font-mono text-xs"><span className={getLatencyColor(trace.duration)}>{trace.duration.toFixed(2)}ms</span></td>
+                      <td className="px-6 py-3 font-mono text-xs"><span className={getLatencyColor(trace.duration)}><SmartAnimatedValue value={`${trace.duration.toFixed(2)}ms`} /></span></td>
                       <td className="px-6 py-3 text-xs text-muted-foreground">
                          <div className="flex items-center gap-2 group/cell">
                              <span className="font-mono text-[10px]">{trace.ip}</span>
