@@ -301,6 +301,28 @@ export const DashboardLayout = ({
     apiKey?: string;
   } | null>(null);
 
+  // APM Snippet State
+  const [selectedFramework, setSelectedFramework] = useState("Express");
+
+  const getApmSnippet = (framework: string, apiKey?: string) => {
+    switch (framework) {
+      case "Express":
+        return `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${apiKey}" });\n\n// Must be first middleware\napp.use(senzor.requestHandler());`;
+      case "Next.js (App)":
+        return `npm install @senzops/apm-node\n\n// app/api/route.ts\nimport Senzor from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport const GET = Senzor.wrapNextRoute(async (req) => {\n  return Response.json({ ok: true });\n});`;
+      case "Next.js (Pages)":
+        return `npm install @senzops/apm-node\n\n// pages/api/hello.ts\nimport Senzor from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nconst handler = (req, res) => res.json({ ok: true });\nexport default Senzor.wrapNextPages(handler);`;
+      case "Fastify":
+        return `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\nfastify.register(Senzor.fastifyPlugin, {\n  apiKey: "${apiKey}"\n});`;
+      case "NestJS":
+        return `npm install @senzops/apm-node\n\n// main.ts\nimport Senzor from '@senzops/apm-node';\n\nasync function bootstrap() {\n  Senzor.init({ apiKey: "${apiKey}" });\n  const app = await NestFactory.create(AppModule);\n  app.use(Senzor.requestHandler());\n  await app.listen(3000);\n}`;
+      case "Nuxt / Nitro":
+        return `npm install @senzops/apm-node\n\n// server/middleware/senzor.ts\nimport Senzor from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport default Senzor.wrapH3(defineEventHandler((event) => {\n  // Your logic\n}));`;
+      default:
+        return "";
+    }
+  };
+
   if (loading)
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-background text-foreground gap-4">
@@ -575,7 +597,7 @@ export const DashboardLayout = ({
                 <Spinner className="h-4 w-4 text-muted-foreground" />
               </div>
             )}
-            
+
             {apmList?.map((a: any) => (
               <Link href={`/dashboard/apm/${a._id}`} key={a._id}>
                 <Button
@@ -1088,30 +1110,47 @@ export const DashboardLayout = ({
                 {newCreds.apiKey}
               </div>
             </div>
+            {/* FRAMEWORK SELECTOR */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Install Node.js Middleware
-              </label>
+              <label className="text-sm font-medium">Install & Configure</label>
+              <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
+                {[
+                  "Express",
+                  "Next.js (App)",
+                  "Next.js (Pages)",
+                  "Fastify",
+                  "NestJS",
+                  "Nuxt / Nitro",
+                ].map((fw) => (
+                  <button
+                    key={fw}
+                    onClick={() => setSelectedFramework(fw)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-all",
+                      selectedFramework === fw
+                        ? "bg-orange-500 text-white border-orange-600"
+                        : "bg-muted border-border hover:bg-muted/80 text-muted-foreground",
+                    )}
+                  >
+                    {fw}
+                  </button>
+                ))}
+              </div>
+
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <p className="text-xs font-mono text-orange-300 break-all pr-8 leading-relaxed">
-                  npm install @senzops/apm-node
-                  <br />
-                  <br />
-                  const senzor = require('@senzops/apm-node');
-                  <br />
-                  senzor.init(&#123; apiKey: "{newCreds.apiKey}" &#125;);
-                  <br />
-                  app.use(senzor.requestHandler());
-                </p>
+                <pre className="text-xs font-mono text-orange-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
+                  {getApmSnippet(selectedFramework, newCreds.apiKey)}
+                </pre>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() =>
+                  onClick={() => {
                     navigator.clipboard.writeText(
-                      `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${newCreds.apiKey}" });\napp.use(senzor.requestHandler());`,
-                    )
-                  }
+                      getApmSnippet(selectedFramework, newCreds.apiKey),
+                    );
+                    toast.success("Copied!");
+                  }}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
