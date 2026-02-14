@@ -494,7 +494,7 @@ export const DashboardLayout = ({
               </div>
             )}
 
-            {serverList?.map((server: any) => {
+            {serverList?.slice(0, 2)?.map((server: any) => {
               const isActive = router.asPath.includes(`/server/${server._id}`);
               return (
                 <Link href={`/dashboard/server/${server._id}`} key={server._id}>
@@ -518,6 +518,17 @@ export const DashboardLayout = ({
                 </Link>
               );
             })}
+
+            {serverList?.length - 2 > 0 && (
+              <Link href={"/dashboard/server"}>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
+                >
+                  Show {serverList?.length - 2} more
+                </Button>
+              </Link>
+            )}
             {serverList?.length === 0 && (
               <div className="px-2 text-[10px] text-muted-foreground">
                 No servers connected.
@@ -549,7 +560,7 @@ export const DashboardLayout = ({
               </div>
             )}
 
-            {webList?.map((site: any) => {
+            {webList?.slice(0.2)?.map((site: any) => {
               const isActive = router.asPath.includes(`/web/${site._id}`);
               return (
                 <Link href={`/dashboard/web/${site._id}`} key={site._id}>
@@ -567,6 +578,16 @@ export const DashboardLayout = ({
                 </Link>
               );
             })}
+            {webList?.length - 2 > 0 && (
+              <Link href={"/dashboard/web"}>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
+                >
+                  Show {webList?.length - 2} more
+                </Button>
+              </Link>
+            )}
             {webList?.length === 0 && (
               <div className="px-2 text-[10px] text-muted-foreground">
                 No websites tracked.
@@ -598,7 +619,7 @@ export const DashboardLayout = ({
               </div>
             )}
 
-            {apmList?.map((a: any) => (
+            {apmList?.slice(0, 2)?.map((a: any) => (
               <Link href={`/dashboard/apm/${a._id}`} key={a._id}>
                 <Button
                   variant={
@@ -618,6 +639,16 @@ export const DashboardLayout = ({
               </Link>
             ))}
 
+            {apmList?.length - 2 > 0 && (
+              <Link href={"/dashboard/apm"}>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
+                >
+                  Show {apmList?.length - 2} more
+                </Button>
+              </Link>
+            )}
             {apmList?.length === 0 && (
               <div className="px-2 text-[10px] text-muted-foreground">
                 No APM tracing.
@@ -649,7 +680,7 @@ export const DashboardLayout = ({
               </div>
             )}
 
-            {monitorList?.map((m: any) => (
+            {monitorList?.slice(0, 2)?.map((m: any) => (
               <Link href={`/dashboard/monitor/${m._id}`} key={m._id}>
                 <Button
                   variant={
@@ -674,6 +705,17 @@ export const DashboardLayout = ({
                 </Button>
               </Link>
             ))}
+
+            {monitorList?.length - 2 > 0 && (
+              <Link href={"/dashboard/monitor"}>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
+                >
+                  Show {monitorList?.length - 2} more
+                </Button>
+              </Link>
+            )}
             {monitorList?.length === 0 && (
               <div className="px-2 text-[10px] text-muted-foreground">
                 No uptimes monitored.
