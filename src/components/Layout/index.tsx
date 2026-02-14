@@ -434,7 +434,7 @@ export const DashboardLayout = ({
   const getApmSnippet = (framework: string, apiKey?: string) => {
     switch (framework) {
       case "Express":
-        return `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${apiKey}" });\n\n// Must be first middleware\napp.use(senzor.requestHandler());`;
+         return `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${apiKey}" });\n\n// 1. Request Handler (First)\napp.use(senzor.requestHandler());\n\n// ... your routes ...\n\n// 2. Error Handler (Last)\napp.use(senzor.errorHandler());`;
       case "Next.js (App)":
         return `npm install @senzops/apm-node\n\n// app/api/route.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport const GET = Senzor.wrapNextRoute(async (req) => {\n  return Response.json({ ok: true });\n});`;
       case "Next.js (Pages)":
@@ -445,6 +445,8 @@ export const DashboardLayout = ({
         return `npm install @senzops/apm-node\n\n// main.ts\nimport {Senzor} from '@senzops/apm-node';\n\nasync function bootstrap() {\n  Senzor.init({ apiKey: "${apiKey}" });\n  const app = await NestFactory.create(AppModule);\n  app.use(Senzor.requestHandler());\n  await app.listen(3000);\n}`;
       case "Nuxt / Nitro":
         return `npm install @senzops/apm-node\n\n// server/middleware/senzor.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport default Senzor.wrapH3(defineEventHandler((event) => {\n  // Your logic\n}));`;
+      case "Nitro + CloudFlare worker": 
+        return `npm install @senzops/apm-worker\n\n// server/plugins/senzor.ts\nimport { Senzor } from "@senzops/apm-worker";\n\nexport default defineNitroPlugin((nitroApp) => {\n  Senzor.init({\n    apiKey: "${apiKey}",\n  });\n\n  Senzor.nitroPlugin(nitroApp);\n});`;
       default:
         return "";
     }
@@ -1089,7 +1091,7 @@ export const DashboardLayout = ({
             {/* FRAMEWORK SELECTOR */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Install & Configure</label>
-              <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
+               <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
                 {[
                   "Express",
                   "Next.js (App)",
@@ -1097,6 +1099,7 @@ export const DashboardLayout = ({
                   "Fastify",
                   "NestJS",
                   "Nuxt / Nitro",
+                  "Nitro + CloudFlare worker",
                 ].map((fw) => (
                   <button
                     key={fw}
