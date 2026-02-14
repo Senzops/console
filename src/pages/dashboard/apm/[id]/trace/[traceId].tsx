@@ -20,10 +20,11 @@ import {
   Hash,
   Code,
   Calendar,
+  FileWarning,
 } from "lucide-react";
 import { TraceWaterfall } from "../../../../../components/TraceWaterfall";
 import { formatDistanceToNow } from "date-fns";
-import { SmartAnimatedValue } from '@/components/Tween';
+import { SmartAnimatedValue } from "@/components/Tween";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -62,7 +63,9 @@ const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
         <div className="text-xs font-bold text-muted-foreground uppercase mb-1">
           {label}
         </div>
-        <div className="text-xl font-bold text-foreground"><SmartAnimatedValue value={value} /></div>
+        <div className="text-xl font-bold text-foreground">
+          <SmartAnimatedValue value={value} />
+        </div>
         {sub && (
           <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>
         )}
@@ -206,6 +209,33 @@ export default function TraceDetail() {
             color="bg-emerald-500"
           />
         </div>
+
+        {trace.error && (
+          <Card className="bg-red-500/5 border-red-500/20 shrink-0">
+            <CardContent className="p-4 flex items-start gap-4">
+              <div className="p-2 rounded-lg bg-red-500/10 text-red-500 mt-1">
+                <FileWarning className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-red-500 text-sm flex items-center gap-2 mb-1">
+                  {trace.error.name} <span className="text-red-500/50">•</span>{" "}
+                  Unhandled Exception
+                </h3>
+                <p className="font-mono text-sm text-foreground break-all mb-4">
+                  {trace.error.message}
+                </p>
+
+                {trace.error.stack && (
+                  <div className="bg-black/80 p-4 rounded-lg border border-red-500/20 overflow-x-auto">
+                    <pre className="text-[10px] font-mono leading-relaxed text-red-300/90 whitespace-pre-wrap">
+                      {trace.error.stack}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* --- Waterfall --- */}
         <div className="flex-1 min-h-0 relative">
