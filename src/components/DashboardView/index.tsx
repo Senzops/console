@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "../Layout";
 import {
@@ -32,6 +32,7 @@ import {
   cn,
 } from "../Core";
 import { formatDistanceToNow } from "date-fns";
+import { useTheme } from "@/lib/theme";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -46,9 +47,10 @@ interface DashboardViewProps {
 export default function DashboardView({ filterType }: DashboardViewProps) {
   const router = useRouter();
   const { token } = useAuth();
-
-  // 1. Default View Mode -> 'list'
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const { defaultViewMode } = useTheme(); // Get Global Setting
+  
+  // Initialize with global preference
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(defaultViewMode);
   const [search, setSearch] = useState("");
 
   const { data: serverList } = useSWR(token ? "/vps/list" : null, fetcher);
@@ -58,6 +60,10 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
 
   const isLoading = !serverList && !webList && !monitorList && !apmList;
   const isEmpty = (serverList?.length || 0) === 0 && (webList?.length || 0) === 0 && (monitorList?.length || 0) === 0 && (apmList?.length || 0) === 0;
+
+  useEffect(()=>{
+    setViewMode(defaultViewMode);
+  },[defaultViewMode])
 
   if (isLoading) {
     return (

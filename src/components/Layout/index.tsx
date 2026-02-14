@@ -25,6 +25,9 @@ import {
   FileText,
   Play,
   Box,
+  ChevronRight,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -241,6 +244,121 @@ export const Footer = () => {
   );
 };
 
+// Helper for Sidebar Sections
+const SidebarSection = ({
+  title,
+  items,
+  hrefPrefix,
+  icon: Icon,
+  colorClass,
+  linkPrefix,
+  onAdd,
+}: any) => {
+  const router = useRouter();
+  const { sidebarMode } = useTheme();
+
+  // Show max 2 items
+  const showAll = sidebarMode === "all";
+  const visibleItems = showAll ? items : items?.slice(0, 2) || [];
+  const remaining = (items?.length || 0) - visibleItems?.length;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between px-2 mb-2 group">
+        <Link
+          href={linkPrefix}
+          className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground flex items-center gap-1 transition-colors"
+        >
+          {title}{" "}
+          <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </Link>
+        {onAdd && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-5 w-5"
+            onClick={onAdd}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+
+      {!items && (
+        <div className="flex justify-center py-4">
+          <Spinner className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
+
+      {visibleItems?.map((item: any) => {
+        const isActive = router.asPath.includes(`${hrefPrefix}/${item._id}`);
+        // Status color logic (simplified for generic use)
+        let statusColor = "bg-secondary";
+        if (item.status === "online" || item.status === "up")
+          statusColor = "bg-emerald-500";
+        else if (item.status === "offline" || item.status === "down")
+          statusColor = "bg-destructive";
+        else if (hrefPrefix.includes("apm")) statusColor = "bg-orange-500";
+        else if (hrefPrefix.includes("web")) statusColor = "bg-blue-500";
+
+        return (
+          <Link href={`${hrefPrefix}/${item._id}`} key={item._id}>
+            <Button
+              variant={isActive ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start gap-2 mb-1 h-9",
+                isActive &&
+                  "bg-secondary/80 font-semibold border border-border/50",
+              )}
+            >
+              {hrefPrefix.includes("web") ? (
+                <Globe className="h-3 w-3 text-blue-500 shrink-0" />
+              ) : hrefPrefix.includes("apm") ? (
+                <Box className="h-3 w-3 text-orange-500" />
+              ) : hrefPrefix.includes("monitor") ? (
+                <Activity
+                  className={`h-3 w-3 shrink-0 ${
+                    item.status === "up"
+                      ? "text-emerald-500"
+                      : "text-destructive"
+                  }`}
+                />
+              ) : (
+                <div
+                  className={`h-2 w-2 rounded-full shadow-[0_0_8px] shrink-0 ${
+                    item.status === "online"
+                      ? "bg-emerald-500 shadow-emerald-500/50"
+                      : "bg-destructive shadow-destructive/50"
+                  }`}
+                />
+              )}
+              <span className="truncate">{item.name}</span>
+            </Button>
+          </Link>
+        );
+      })}
+
+      {/* "View More" Link */}
+      {!showAll && remaining > 0 && (
+        <Link href={linkPrefix}>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
+          >
+            Show {remaining} more
+          </Button>
+        </Link>
+      )}
+
+      {items?.length === 0 && (
+        <div className="px-2 text-[10px] text-muted-foreground">
+          No service items
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Dashboard Layout ---
 export const DashboardLayout = ({
   children,
@@ -248,7 +366,16 @@ export const DashboardLayout = ({
   children: React.ReactNode;
 }) => {
   const { user, loading, logout, token, resendVerification } = useAuth();
-  const { theme, setTheme, appearance, setAppearance } = useTheme();
+  const {
+    theme,
+    setTheme,
+    appearance,
+    setAppearance,
+    sidebarMode,
+    setSidebarMode,
+    defaultViewMode,
+    setDefaultViewMode,
+  } = useTheme();
   const router = useRouter();
 
   // Fetch Lists
@@ -471,257 +598,34 @@ export const DashboardLayout = ({
 
         {/* Scrollable Nav Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* SERVERS */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Servers
-              </div>
-              {!user.isDemo && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-5 w-5"
-                  onClick={() => setIsServerModalOpen(true)}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-            {!serverList && (
-              <div className="flex justify-center py-4">
-                <Spinner className="h-4 w-4 text-muted-foreground" />
-              </div>
-            )}
-
-            {serverList?.slice(0, 2)?.map((server: any) => {
-              const isActive = router.asPath.includes(`/server/${server._id}`);
-              return (
-                <Link href={`/dashboard/server/${server._id}`} key={server._id}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn(
-                      "w-full justify-start gap-2 mb-1 h-9",
-                      isActive &&
-                        "bg-secondary/80 font-semibold border border-border/50",
-                    )}
-                  >
-                    <div
-                      className={`h-2 w-2 rounded-full shadow-[0_0_8px] shrink-0 ${
-                        server.status === "online"
-                          ? "bg-emerald-500 shadow-emerald-500/50"
-                          : "bg-destructive shadow-destructive/50"
-                      }`}
-                    />
-                    <span className="truncate">{server.name}</span>
-                  </Button>
-                </Link>
-              );
-            })}
-
-            {serverList?.length - 2 > 0 && (
-              <Link href={"/dashboard/server"}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
-                >
-                  Show {serverList?.length - 2} more
-                </Button>
-              </Link>
-            )}
-            {serverList?.length === 0 && (
-              <div className="px-2 text-[10px] text-muted-foreground">
-                No servers connected.
-              </div>
-            )}
-          </div>
-
-          {/* WEBSITES */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Websites
-              </div>
-              {!user.isDemo && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-5 w-5"
-                  onClick={() => setIsWebModalOpen(true)}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-
-            {!webList && (
-              <div className="flex justify-center py-4">
-                <Spinner className="h-4 w-4 text-muted-foreground" />
-              </div>
-            )}
-
-            {webList?.slice(0.2)?.map((site: any) => {
-              const isActive = router.asPath.includes(`/web/${site._id}`);
-              return (
-                <Link href={`/dashboard/web/${site._id}`} key={site._id}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn(
-                      "w-full justify-start gap-2 mb-1 h-9",
-                      isActive &&
-                        "bg-secondary/80 font-semibold border border-border/50",
-                    )}
-                  >
-                    <Globe className="h-3 w-3 text-blue-500 shrink-0" />
-                    <span className="truncate">{site.name}</span>
-                  </Button>
-                </Link>
-              );
-            })}
-            {webList?.length - 2 > 0 && (
-              <Link href={"/dashboard/web"}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
-                >
-                  Show {webList?.length - 2} more
-                </Button>
-              </Link>
-            )}
-            {webList?.length === 0 && (
-              <div className="px-2 text-[10px] text-muted-foreground">
-                No websites tracked.
-              </div>
-            )}
-          </div>
-
-          {/* APM SERVICES */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                APM
-              </div>
-              {!user.isDemo && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-5 w-5"
-                  onClick={() => setIsApmModalOpen(true)}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-
-            {!apmList && (
-              <div className="flex justify-center py-4">
-                <Spinner className="h-4 w-4 text-muted-foreground" />
-              </div>
-            )}
-
-            {apmList?.slice(0, 2)?.map((a: any) => (
-              <Link href={`/dashboard/apm/${a._id}`} key={a._id}>
-                <Button
-                  variant={
-                    router.asPath.includes(`/apm/${a._id}`)
-                      ? "secondary"
-                      : "ghost"
-                  }
-                  className={cn(
-                    "w-full justify-start gap-2 mb-1 h-9",
-                    router.asPath.includes(`/apm/${a._id}`) &&
-                      "bg-secondary/80 font-semibold border border-border/50",
-                  )}
-                >
-                  <Box className="h-3 w-3 text-orange-500" />{" "}
-                  <span className="truncate">{a.name}</span>
-                </Button>
-              </Link>
-            ))}
-
-            {apmList?.length - 2 > 0 && (
-              <Link href={"/dashboard/apm"}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
-                >
-                  Show {apmList?.length - 2} more
-                </Button>
-              </Link>
-            )}
-            {apmList?.length === 0 && (
-              <div className="px-2 text-[10px] text-muted-foreground">
-                No APM tracing.
-              </div>
-            )}
-          </div>
-
-          {/* MONITORS */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Uptime
-              </div>
-              {!user.isDemo && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-5 w-5"
-                  onClick={() => setIsMonitorModalOpen(true)}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-
-            {!monitorList && (
-              <div className="flex justify-center py-4">
-                <Spinner className="h-4 w-4 text-muted-foreground" />
-              </div>
-            )}
-
-            {monitorList?.slice(0, 2)?.map((m: any) => (
-              <Link href={`/dashboard/monitor/${m._id}`} key={m._id}>
-                <Button
-                  variant={
-                    router.asPath.includes(`/monitor/${m._id}`)
-                      ? "secondary"
-                      : "ghost"
-                  }
-                  className={cn(
-                    "w-full justify-start gap-2 mb-1 h-9",
-                    router.asPath.includes(`/monitor/${m._id}`) &&
-                      "bg-secondary/80 font-semibold border border-border/50",
-                  )}
-                >
-                  <Activity
-                    className={`h-3 w-3 shrink-0 ${
-                      m.status === "up"
-                        ? "text-emerald-500"
-                        : "text-destructive"
-                    }`}
-                  />
-                  <span className="truncate">{m.name}</span>
-                </Button>
-              </Link>
-            ))}
-
-            {monitorList?.length - 2 > 0 && (
-              <Link href={"/dashboard/monitor"}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
-                >
-                  Show {monitorList?.length - 2} more
-                </Button>
-              </Link>
-            )}
-            {monitorList?.length === 0 && (
-              <div className="px-2 text-[10px] text-muted-foreground">
-                No uptimes monitored.
-              </div>
-            )}
-          </div>
+          <SidebarSection
+            title="Servers"
+            items={serverList}
+            hrefPrefix="/dashboard/server"
+            linkPrefix="/dashboard/server"
+            onAdd={!user.isDemo ? () => setIsServerModalOpen(true) : undefined}
+          />
+          <SidebarSection
+            title="Websites"
+            items={webList}
+            hrefPrefix="/dashboard/web"
+            linkPrefix="/dashboard/web"
+            onAdd={!user.isDemo ? () => setIsWebModalOpen(true) : undefined}
+          />
+          <SidebarSection
+            title="APM Services"
+            items={apmList}
+            hrefPrefix="/dashboard/apm"
+            linkPrefix="/dashboard/apm"
+            onAdd={!user.isDemo ? () => setIsApmModalOpen(true) : undefined}
+          />
+          <SidebarSection
+            title="Uptime"
+            items={monitorList}
+            hrefPrefix="/dashboard/monitor"
+            linkPrefix="/dashboard/monitor"
+            onAdd={!user.isDemo ? () => setIsMonitorModalOpen(true) : undefined}
+          />
 
           {/* Settings */}
           <div className="pt-4 border-t border-border/40">
@@ -840,43 +744,28 @@ export const DashboardLayout = ({
         title="Global Settings"
       >
         <div className="space-y-6">
+          {/* 1. Theme */}
           <div className="space-y-3">
-            <h4 className="text-sm font-medium flex items-center gap-2">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
               <Palette className="h-4 w-4" /> Interface Theme
             </h4>
             <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant={theme === "dark" ? "default" : "outline"}
-                onClick={() => setTheme("dark")}
-                className="justify-start"
-              >
-                Dark (Default)
-              </Button>
-              <Button
-                variant={theme === "light" ? "default" : "outline"}
-                onClick={() => setTheme("light")}
-                className="justify-start"
-              >
-                Light
-              </Button>
-              <Button
-                variant={theme === "nord" ? "default" : "outline"}
-                onClick={() => setTheme("nord")}
-                className="justify-start"
-              >
-                Nord
-              </Button>
-              <Button
-                variant={theme === "latte" ? "default" : "outline"}
-                onClick={() => setTheme("latte")}
-                className="justify-start"
-              >
-                Latte
-              </Button>
+              {["dark", "light", "nord", "latte"].map((t) => (
+                <Button
+                  key={t}
+                  variant={theme === t ? "default" : "outline"}
+                  onClick={() => setTheme(t as any)}
+                  className="justify-start capitalize"
+                >
+                  {t}
+                </Button>
+              ))}
             </div>
           </div>
+
+          {/* 2. Visuals */}
           <div className="space-y-3">
-            <h4 className="text-sm font-medium flex items-center gap-2">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
               <Monitor className="h-4 w-4" /> Data Visualization
             </h4>
             <div className="flex gap-2">
@@ -895,10 +784,55 @@ export const DashboardLayout = ({
                 Monochromatic
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
+            {/* <p className="text-xs text-muted-foreground">
               Monochromatic mode forces all charts to use the theme's primary
               accent color for a cleaner look.
-            </p>
+            </p> */}
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+              <LayoutGrid className="h-4 w-4" /> Navigation Layout
+            </h4>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={sidebarMode === "restricted" ? "default" : "outline"}
+                onClick={() => setSidebarMode("restricted")}
+                className="justify-start"
+              >
+                Compact
+              </Button>
+              <Button
+                variant={sidebarMode === "all" ? "default" : "outline"}
+                onClick={() => setSidebarMode("all")}
+                className="justify-start"
+              >
+                Expanded
+              </Button>
+            </div>
+          </div>
+
+          {/* 4. Dashboard Defaults */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+              <List className="h-4 w-4" /> Default Dashboard View
+            </h4>
+            <div className="flex gap-2">
+              <Button
+                variant={defaultViewMode === "list" ? "default" : "outline"}
+                onClick={() => setDefaultViewMode("list")}
+                className="flex-1"
+              >
+                <List className="mr-2 h-4 w-4" /> List
+              </Button>
+              <Button
+                variant={defaultViewMode === "grid" ? "default" : "outline"}
+                onClick={() => setDefaultViewMode("grid")}
+                className="flex-1"
+              >
+                <LayoutGrid className="mr-2 h-4 w-4" /> Grid
+              </Button>
+            </div>
           </div>
         </div>
       </Dialog>
