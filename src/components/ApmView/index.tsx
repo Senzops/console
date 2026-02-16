@@ -389,7 +389,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
 
     // Fetch Invocations (List)
-   const invocationsEndpoint = `/apm/${serviceId}/invocations` + (route ? `?route=${encodeURIComponent(route)}` : '');
+   const invocationsEndpoint = `/apm/${serviceId}/invocations?range=${range}` + (route ? `&route=${encodeURIComponent(route)}` : '');
   const { data: invocations, mutate: mutateInvocations, isValidating: isValidatingInvocations } = useSWR(token && serviceId ? invocationsEndpoint : null, fetcher, { refreshInterval: 30000 });
 
 
