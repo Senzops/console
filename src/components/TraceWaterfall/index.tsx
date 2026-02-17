@@ -264,7 +264,7 @@ export const TraceWaterfall = ({
                     className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/5 cursor-pointer hover:bg-blue-500/10 transition-colors group relative overflow-hidden"
                     onClick={() =>
                       router.push(
-                        `/dashboard/apm/${linkedChild.serviceId}/trace/${linkedChild.traceId || linkedChild._id}`,
+                        `/dashboard/apm/${linkedChild.serviceId}/trace/${linkedChild._id}`,
                       )
                     }
                   >

@@ -21,10 +21,12 @@ import {
   Code,
   Calendar,
   FileWarning,
+  ArrowUpRight,
 } from "lucide-react";
 import { TraceWaterfall } from "../../../../../components/TraceWaterfall";
 import { formatDistanceToNow } from "date-fns";
 import { SmartAnimatedValue } from "@/components/Tween";
+import Link from "next/link";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -108,13 +110,31 @@ export default function TraceDetail() {
         {/* --- Header --- */}
         <div className="flex flex-col gap-4 shrink-0">
           {/* Navigation */}
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="pl-0 w-fit hover:bg-transparent hover:text-orange-500 -ml-2"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invocations
-          </Button>
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="pl-0 w-fit hover:bg-transparent hover:text-orange-500 -ml-2"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invocations
+            </Button>
+
+            {/* Upstream Link */}
+            {trace.parent && (
+              <Link
+                href={`/dashboard/apm/${trace.parent.serviceId}/trace/${trace.parent._id}`}
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-2 border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5" /> Called by{" "}
+                  {trace.parent.serviceName}
+                </Button>
+              </Link>
+            )}
+          </div>
 
           {/* Main Info Card */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-card/50 p-4 rounded-xl border border-border shadow-sm">
@@ -242,6 +262,7 @@ export default function TraceDetail() {
           <TraceWaterfall
             spans={trace.spans || []}
             totalDuration={trace.duration}
+            childrenTraces={trace.children}
           />
         </div>
       </div>
