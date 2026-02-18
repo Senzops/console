@@ -236,7 +236,7 @@ export const TraceWaterfall = ({
       {selectedSpan && (
         <div className="absolute inset-y-0 right-0 w-full md:w-[450px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-50 animate-in slide-in-from-right duration-300 flex flex-col">
           {/* Simple Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border bg-muted/5 shrink-0">
+          <div className="flex items-center justify-between h-12 px-4 border-b border-border bg-muted/20 shrink-0">
             <div className="flex items-center gap-2">
               <LayoutList className="w-4 h-4 text-muted-foreground" />
               <span className="font-semibold text-sm">Span Details</span>
