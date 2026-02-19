@@ -1,6 +1,7 @@
 import * as React from "react"
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { AlertCircle, RefreshCw } from "lucide-react"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -160,3 +161,45 @@ export const Label = React.forwardRef<HTMLLabelElement, React.LabelHTMLAttribute
   />
 ))
 Label.displayName = "Label"
+
+// --- Reusable Data Error Component ---
+export const DataError = ({ onRetry, message }: { onRetry?: () => Promise<any> | void, message?: string }) => {
+  const [isRetrying, setIsRetrying] = React.useState(false);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    try {
+      if (onRetry) {
+        await onRetry();
+      } else {
+        window.location.reload();
+      }
+    } finally {
+      setTimeout(() => setIsRetrying(false), 600);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center p-8 text-center bg-card border border-destructive/20 rounded-xl shadow-sm w-full max-w-md mx-auto my-8">
+      <div className="p-4 bg-destructive/10 rounded-full mb-4">
+        <AlertCircle className="h-8 w-8 text-destructive" />
+      </div>
+      <h3 className="text-xl font-bold text-foreground mb-2">Failed to load data</h3>
+      <p className="text-sm text-muted-foreground mb-6">
+        {message || "We encountered an error while communicating with the server. Please check your connection and try again."}
+      </p>
+      <Button 
+        onClick={handleRetry} 
+        disabled={isRetrying}
+        variant="outline" 
+        className="gap-2 border-border hover:bg-secondary"
+      >
+        {isRetrying ? (
+          <><Spinner className="h-4 w-4 mr-1" /> Retrying...</>
+        ) : (
+          <><RefreshCw className="h-4 w-4" /> Try Again</>
+        )}
+      </Button>
+    </div>
+  );
+};

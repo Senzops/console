@@ -30,6 +30,40 @@ export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
 });
 
+// --- Automatic Token Refresh & Retry Interceptor ---
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If the error is 401/403 and we haven't already retried this request
+    if (error.response && [401, 403].includes(error.response.status) && !originalRequest._retry) {
+      originalRequest._retry = true; // Prevent infinite loops
+      
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          // Force fetch a fresh token from Firebase
+          const newToken = await currentUser.getIdToken(true);
+          
+          // Update the global Axios instance AND the original request headers
+          api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+          
+          // Transparently retry the failed request
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+// --------------------------------------------------------
+
+
 export type SenzorUser = (FirebaseUser & { isDemo?: boolean }) | { uid: string, email: string, displayName: string, isDemo: boolean, emailVerified: boolean, getIdToken: () => Promise<string | null> };
 
 interface AuthContextType {

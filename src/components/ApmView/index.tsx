@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { DashboardLayout } from '../Layout';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog } from '../Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize, Filter } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -450,7 +450,8 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
 
 
   if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM service...</p></div></DashboardLayout>;
-  if (error || !data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM service.</div></div></DashboardLayout>;
+  if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => { mutate(); mutateInvocations(); }} /></div></DashboardLayout>;
+  if (!data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM service.</div></div></DashboardLayout>;
 
   const { meta, overview, routes, referrers, channels, geo, system, statusCodes } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
