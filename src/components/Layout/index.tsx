@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useAuth, api } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
 import { useRouter } from "next/router";
-import { Button, Dialog, Avatar, Spinner, Badge } from "../Core";
+import { Button, Dialog, Avatar, Spinner, Badge, Select } from "../Core";
 import {
   Plus,
   Copy,
@@ -28,6 +28,9 @@ import {
   ChevronRight,
   LayoutGrid,
   List,
+  Database,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -249,15 +252,13 @@ const SidebarSection = ({
   title,
   items,
   hrefPrefix,
-  icon: Icon,
-  colorClass,
   linkPrefix,
   onAdd,
+  icon: DefaultIcon,
 }: any) => {
   const router = useRouter();
   const { sidebarMode } = useTheme();
 
-  // Show max 2 items
   const showAll = sidebarMode === "all";
   const visibleItems = showAll ? items : items?.slice(0, 2) || [];
   const remaining = (items?.length || 0) - visibleItems?.length;
@@ -292,14 +293,29 @@ const SidebarSection = ({
 
       {visibleItems?.map((item: any) => {
         const isActive = router.asPath.includes(`${hrefPrefix}/${item._id}`);
-        // Status color logic (simplified for generic use)
         let statusColor = "bg-secondary";
         if (item.status === "online" || item.status === "up")
           statusColor = "bg-emerald-500";
         else if (item.status === "offline" || item.status === "down")
           statusColor = "bg-destructive";
-        else if (hrefPrefix.includes("apm")) statusColor = "bg-orange-500";
-        else if (hrefPrefix.includes("web")) statusColor = "bg-blue-500";
+
+        let Icon = DefaultIcon;
+        if (!Icon) {
+          if (hrefPrefix.includes("web"))
+            Icon = <Globe className="h-3 w-3 text-blue-500 shrink-0" />;
+          else if (hrefPrefix.includes("apm"))
+            Icon = <Box className="h-3 w-3 text-orange-500 shrink-0" />;
+          else if (hrefPrefix.includes("monitor"))
+            Icon = (
+              <Activity
+                className={`h-3 w-3 shrink-0 ${item.status === "up" ? "text-emerald-500" : "text-destructive"}`}
+              />
+            );
+          else
+            Icon = (
+              <div className={`h-2 w-2 rounded-full shrink-0 ${statusColor}`} />
+            );
+        }
 
         return (
           <Link href={`${hrefPrefix}/${item._id}`} key={item._id}>
@@ -311,34 +327,13 @@ const SidebarSection = ({
                   "bg-secondary/80 font-semibold border border-border/50",
               )}
             >
-              {hrefPrefix.includes("web") ? (
-                <Globe className="h-3 w-3 text-blue-500 shrink-0" />
-              ) : hrefPrefix.includes("apm") ? (
-                <Box className="h-3 w-3 text-orange-500" />
-              ) : hrefPrefix.includes("monitor") ? (
-                <Activity
-                  className={`h-3 w-3 shrink-0 ${
-                    item.status === "up"
-                      ? "text-emerald-500"
-                      : "text-destructive"
-                  }`}
-                />
-              ) : (
-                <div
-                  className={`h-2 w-2 rounded-full shadow-[0_0_8px] shrink-0 ${
-                    item.status === "online"
-                      ? "bg-emerald-500 shadow-emerald-500/50"
-                      : "bg-destructive shadow-destructive/50"
-                  }`}
-                />
-              )}
+              {Icon}
               <span className="truncate">{item.name}</span>
             </Button>
           </Link>
         );
       })}
 
-      {/* "View More" Link */}
       {!showAll && remaining > 0 && (
         <Link href={linkPrefix}>
           <Button
@@ -396,11 +391,19 @@ export const DashboardLayout = ({
     fetcher,
   );
 
+  const { data: dbList, mutate: mutateDb } = useSWR(
+    token ? "/database/list" : null,
+    fetcher,
+  );
+
   // Modal States
   const [isServerModalOpen, setIsServerModalOpen] = useState(false);
   const [isWebModalOpen, setIsWebModalOpen] = useState(false);
   const [isMonitorModalOpen, setIsMonitorModalOpen] = useState(false);
   const [isApmModalOpen, setIsApmModalOpen] = useState(false);
+  const [isDbModalOpen, setIsDbModalOpen] = useState(false);
+  const [showUri, setShowUri] = useState(false);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [isResending, setIsResending] = useState(false); // For email resend
@@ -410,23 +413,22 @@ export const DashboardLayout = ({
   const [isRegisteringWeb, setIsRegisteringWeb] = useState(false);
   const [isRegisteringMonitor, setIsRegisteringMonitor] = useState(false);
   const [isRegisteringApm, setIsRegisteringApm] = useState(false);
+  const [isRegisteringDb, setIsRegisteringDb] = useState(false);
 
   // Error States
   const [serverError, setServerError] = useState<string | null>(null);
   const [webError, setWebError] = useState<string | null>(null);
   const [monitorError, setMonitorError] = useState<string | null>(null);
   const [apmError, setApmError] = useState<string | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   // Form State
   const [newName, setNewName] = useState("");
   const [newDomain, setNewDomain] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [newInterval, setNewInterval] = useState("15");
-  const [newCreds, setNewCreds] = useState<{
-    vpsId?: string;
-    webId?: string;
-    apiKey?: string;
-  } | null>(null);
+  const [newDbType, setNewDbType] = useState("mongodb");
+  const [newCreds, setNewCreds] = useState<any>(null);
 
   // APM Snippet State
   const [selectedFramework, setSelectedFramework] = useState("Express");
@@ -434,7 +436,7 @@ export const DashboardLayout = ({
   const getApmSnippet = (framework: string, apiKey?: string) => {
     switch (framework) {
       case "Express":
-         return `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${apiKey}" });\n\n// 1. Request Handler (First)\napp.use(senzor.requestHandler());\n\n// ... your routes ...\n\n// 2. Error Handler (Last)\napp.use(senzor.errorHandler());`;
+        return `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${apiKey}" });\n\n// 1. Request Handler (First)\napp.use(senzor.requestHandler());\n\n// ... your routes ...\n\n// 2. Error Handler (Last)\napp.use(senzor.errorHandler());`;
       case "Next.js (App)":
         return `npm install @senzops/apm-node\n\n// app/api/route.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport const GET = Senzor.wrapNextRoute(async (req) => {\n  return Response.json({ ok: true });\n});`;
       case "Next.js (Pages)":
@@ -445,7 +447,7 @@ export const DashboardLayout = ({
         return `npm install @senzops/apm-node\n\n// main.ts\nimport {Senzor} from '@senzops/apm-node';\n\nasync function bootstrap() {\n  Senzor.init({ apiKey: "${apiKey}" });\n  const app = await NestFactory.create(AppModule);\n  app.use(Senzor.requestHandler());\n  await app.listen(3000);\n}`;
       case "Nuxt / Nitro":
         return `npm install @senzops/apm-node\n\n// server/middleware/senzor.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport default Senzor.wrapH3(defineEventHandler((event) => {\n  // Your logic\n}));`;
-      case "Nitro + CloudFlare worker": 
+      case "Nitro + CloudFlare worker":
         return `npm install @senzops/apm-worker\n\n// server/plugins/senzor.ts\nimport { Senzor } from "@senzops/apm-worker";\n\nexport default defineNitroPlugin((nitroApp) => {\n  Senzor.init({\n    apiKey: "${apiKey}",\n  });\n\n  Senzor.nitroPlugin(nitroApp);\n});`;
       default:
         return "";
@@ -555,6 +557,29 @@ export const DashboardLayout = ({
     }
   };
 
+  const handleRegisterDb = async () => {
+    if (!newName || !newUrl) return;
+    setIsRegisteringDb(true);
+    setDbError(null);
+    try {
+      await api.post("/database/register", {
+        name: newName,
+        type: newDbType,
+        uri: newUrl,
+        interval: Number(newInterval),
+      });
+      setNewName("");
+      setNewUrl("");
+      setIsDbModalOpen(false);
+      mutateDb();
+      toast.success("Database Connected & Monitored!");
+    } catch (e: any) {
+      setDbError(e.response?.data?.error || "Connection Failed");
+    } finally {
+      setIsRegisteringDb(false);
+    }
+  };
+
   const handleResendEmail = async () => {
     setIsResending(true);
     try {
@@ -572,10 +597,14 @@ export const DashboardLayout = ({
     setIsWebModalOpen(false);
     setIsMonitorModalOpen(false);
     setIsApmModalOpen(false);
+    setIsDbModalOpen(false);
     setNewCreds(null);
     setNewName("");
     setNewDomain("");
     setNewUrl("");
+    setSelectedFramework("Express");
+    setNewDbType("mongodb");
+    setNewInterval("5");
   };
 
   return (
@@ -607,6 +636,15 @@ export const DashboardLayout = ({
             linkPrefix="/dashboard/server"
             onAdd={!user.isDemo ? () => setIsServerModalOpen(true) : undefined}
           />
+          <SidebarSection
+            title="Databases"
+            items={dbList}
+            hrefPrefix="/dashboard/db"
+            linkPrefix="/dashboard/db"
+            onAdd={!user.isDemo ? () => setIsDbModalOpen(true) : undefined}
+            icon={<Database className="h-3 w-3 text-blue-500 shrink-0" />}
+          />
+
           <SidebarSection
             title="Websites"
             items={webList}
@@ -1091,7 +1129,7 @@ export const DashboardLayout = ({
             {/* FRAMEWORK SELECTOR */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Install & Configure</label>
-               <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
                 {[
                   "Express",
                   "Next.js (App)",
@@ -1200,6 +1238,113 @@ export const DashboardLayout = ({
                 </>
               ) : (
                 "Start Monitoring"
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* DATABASE MODAL */}
+      <Dialog
+        open={isDbModalOpen}
+        onClose={closeModal}
+        title="Connect Database"
+      >
+        <div className="space-y-4">
+          {dbError && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{dbError}</span>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Database Engine</label>
+            <Select
+              value={newDbType}
+              onChange={(e) => setNewDbType(e.target.value)}
+              disabled={isRegisteringDb}
+            >
+              <option value="mongodb">MongoDB</option>
+              <option value="postgresql" disabled>
+                PostgreSQL (Coming Soon)
+              </option>
+              <option value="mysql" disabled>
+                MySQL (Coming Soon)
+              </option>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Display Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none"
+              placeholder="e.g. Production Cluster"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              disabled={isRegisteringDb}
+            />
+          </div>
+
+          {/* UPGRADED URI INPUT WITH TOGGLE */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Connection URI</label>
+            <div className="relative">
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none font-mono pr-10"
+                placeholder="mongodb+srv://user:pass@cluster.net"
+                value={newUrl}
+                onChange={(e) => setNewUrl(e.target.value)}
+                disabled={isRegisteringDb}
+                type={showUri ? "text" : "password"}
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowUri(!showUri)}
+              >
+                {showUri ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Credentials are AES-256 encrypted. We recommend using a read-only
+              'clusterMonitor' user.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Monitoring Interval</label>
+            <Select
+              value={newInterval}
+              onChange={(e) => setNewInterval(e.target.value)}
+              disabled={isRegisteringDb}
+            >
+              <option value="1">Every 1 minute (High Detail)</option>
+              <option value="5">Every 5 minutes (Standard)</option>
+              <option value="15">Every 15 minutes (Low Footprint)</option>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="ghost"
+              onClick={closeModal}
+              disabled={isRegisteringDb}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRegisterDb}
+              disabled={isRegisteringDb}
+              className="min-w-[140px]"
+            >
+              {isRegisteringDb ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" /> Connecting...
+                </>
+              ) : (
+                "Connect & Save"
               )}
             </Button>
           </div>

@@ -17,6 +17,8 @@ import {
   Search,
   Box,
   ChartNoAxesCombined,
+  Database,
+  Settings,
 } from "lucide-react";
 import useSWR from "swr";
 import { api, useAuth } from "../../lib/auth";
@@ -30,6 +32,7 @@ import {
   CardHeader,
   CardTitle,
   cn,
+  DataError,
 } from "../Core";
 import { formatDistanceToNow } from "date-fns";
 import { useTheme } from "@/lib/theme";
@@ -41,29 +44,76 @@ const HEX_CLIP =
   "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 interface DashboardViewProps {
-  filterType?: "server" | "web" | "apm" | "monitor";
+  filterType?: "server" | "web" | "apm" | "monitor" | "database";
 }
 
 export default function DashboardView({ filterType }: DashboardViewProps) {
   const router = useRouter();
   const { token } = useAuth();
   const { defaultViewMode } = useTheme(); // Get Global Setting
-  
+
   // Initialize with global preference
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(defaultViewMode);
+  const [viewMode, setViewMode] = useState<"grid" | "list">(defaultViewMode);
   const [search, setSearch] = useState("");
 
-  const { data: serverList } = useSWR(token ? "/vps/list" : null, fetcher);
-  const { data: webList } = useSWR(token ? "/web/list" : null, fetcher);
-  const { data: monitorList } = useSWR(token ? "/uptime/list" : null, fetcher);
-  const { data: apmList } = useSWR(token ? "/apm/list" : null, fetcher);
+  const {
+    data: serverList,
+    error: serverErr,
+    mutate: mutateServer,
+  } = useSWR(token ? "/vps/list" : null, fetcher);
+  const {
+    data: webList,
+    error: webErr,
+    mutate: mutateWeb,
+  } = useSWR(token ? "/web/list" : null, fetcher);
+  const {
+    data: monitorList,
+    error: monitorErr,
+    mutate: mutateMonitor,
+  } = useSWR(token ? "/uptime/list" : null, fetcher);
+  const {
+    data: apmList,
+    error: apmErr,
+    mutate: mutateApm,
+  } = useSWR(token ? "/apm/list" : null, fetcher);
+  const {
+    data: dbList,
+    error: dbErr,
+    mutate: mutateDb,
+  } = useSWR(token ? "/database/list" : null, fetcher);
 
-  const isLoading = !serverList && !webList && !monitorList && !apmList;
-  const isEmpty = (serverList?.length || 0) === 0 && (webList?.length || 0) === 0 && (monitorList?.length || 0) === 0 && (apmList?.length || 0) === 0;
+  const hasError = serverErr || webErr || monitorErr || apmErr || dbErr;
+  const isLoading =
+    !serverList && !webList && !monitorList && !apmList && !dbList && !hasError;
 
-  useEffect(()=>{
+  const isEmpty =
+    (serverList?.length || 0) === 0 &&
+    (webList?.length || 0) === 0 &&
+    (monitorList?.length || 0) === 0 &&
+    (dbList?.length || 0) === 0 &&
+    (apmList?.length || 0) === 0;
+
+  useEffect(() => {
     setViewMode(defaultViewMode);
-  },[defaultViewMode])
+  }, [defaultViewMode]);
+
+  const handleRetryAll = () => {
+    mutateServer();
+    mutateWeb();
+    mutateMonitor();
+    mutateApm();
+    mutateDb();
+  };
+
+  if (hasError) {
+    return (
+      <DashboardLayout>
+        <div className="h-full flex items-center justify-center p-8">
+          <DataError onRetry={handleRetryAll} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -80,10 +130,19 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
       <DashboardLayout>
         <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
           <div className="h-24 w-24 bg-card rounded-full flex items-center content-center justify-center mb-6 border border-border shadow-lg p-2">
-            <img src="/logo.svg" alt="Logo" className="object-cover h-full w-full logo" />
+            <img
+              src="/logo.svg"
+              alt="Logo"
+              className="object-cover h-full w-full logo"
+            />
           </div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Welcome to Senzor</h2>
-          <p className="max-w-md text-center">Add a "Service" from the sidebar to start monitoring your infrastructure.</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">
+            Welcome to Senzor
+          </h2>
+          <p className="max-w-md text-center">
+            Add a "Service" from the sidebar to start monitoring your
+            infrastructure.
+          </p>
         </div>
       </DashboardLayout>
     );
@@ -91,6 +150,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
 
   let items = [
     ...(serverList || []).map((s: any) => ({ ...s, type: "server" })),
+    ...(dbList || []).map((d: any) => ({ ...d, type: "database", meta: `${d.type}` })),
     ...(webList || []).map((w: any) => ({ ...w, type: "web" })),
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
     ...(monitorList || []).map((m: any) => ({ ...m, type: "monitor" })),
@@ -107,6 +167,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     if (item.type === "server") return `/dashboard/server/${item._id}`;
     if (item.type === "web") return `/dashboard/web/${item._id}`;
     if (item.type === "apm") return `/dashboard/apm/${item._id}`;
+    if (item.type === "database") return `/dashboard/db/${item._id}`;
     return `/dashboard/monitor/${item._id}`;
   };
 
@@ -118,6 +179,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         </Badge>
       );
     if (item.type === "web")
+      return (
+        <Badge variant={item.status === "online" ? "success" : "destructive"}>
+          {item.status === "online" ? "ONLINE" : "OFFLINE"}
+        </Badge>
+      );
+    if (item.type === "database")
       return (
         <Badge
           variant="secondary"
@@ -172,6 +239,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         return <Globe className="h-5 w-5 text-blue-500" />;
       case "apm":
         return <Code className={`h-5 w-5 text-orange-500`} />;
+      case "database":
+        return <Database className={`h-5 w-5 text-emerald-500`} />;
       case "monitor":
         return (
           <Activity
@@ -204,6 +273,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           {item.framework && item.framework !== "unknown"
             ? item.framework
             : "APM"}
+        </>
+      );
+    if (item.type === "database")
+      return (
+        <>
+          <Settings className="h-3 w-3" /> {item.meta}
         </>
       );
     return (
@@ -304,6 +379,37 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                           <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
                             <Cpu className="h-3 w-3" />{" "}
                             {item.metadata?.os?.split(" ")[0] || "Linux"}
+                          </div>
+
+                          <Badge
+                            variant={
+                              item.status === "online"
+                                ? "success"
+                                : "destructive"
+                            }
+                            className="px-2 py-0 text-[10px]"
+                          >
+                            {item.status === "online" ? "ONLINE" : "OFFLINE"}
+                          </Badge>
+                        </>
+                      )}
+
+                      {item.type === "database" && (
+                        <>
+                          {/* Status Indicator Ring */}
+                          <div
+                            className={`mb-3 p-3 rounded-full transition-colors ${item.status === "online" ? "bg-emerald-500/10 text-emerald-500" : "bg-destructive/10 text-destructive"}`}
+                          >
+                            <Database className="h-6 w-6" />
+                          </div>
+
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">
+                            {item.name}
+                          </h3>
+
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
+                            <Settings className="h-3 w-3" />{" "}
+                            {item.meta}
                           </div>
 
                           <Badge
@@ -444,7 +550,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                           <div className="flex items-center gap-4">
                             <div
                               className={`p-2 rounded-lg ${
-                                item.type === "server"
+                                item.type === "server" || item.type === "database"
                                   ? "bg-emerald-500/5"
                                   : item.type === "apm"
                                     ? "bg-orange-500/5"
