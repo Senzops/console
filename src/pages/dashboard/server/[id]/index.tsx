@@ -416,14 +416,16 @@ export default function ServerDetail() {
           </ChartCard>
 
           <ChartCard title="Network Traffic (KB/s)">
-            <LineChart data={chartData}>
+            <AreaChart data={chartData}>
+              <defs><linearGradient id="colorNetRx" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#8b5cf6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#8b5cf6")} stopOpacity={0} /></linearGradient></defs>
+              <defs><linearGradient id="colorNetTx" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ec4899")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ec4899")} stopOpacity={0} /></linearGradient></defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit=" KB/s" />} />
-              <Line type="monotone" dataKey="netRx" stroke={getColor("#8b5cf6")} strokeWidth={2} dot={false} name="Rx" />
-              <Line type="monotone" dataKey="netTx" stroke={getColor("#ec4899")} strokeWidth={2} dot={false} name="Tx" />
-            </LineChart>
+              <Area type="monotone" dataKey="netRx" stroke={getColor("#8b5cf6")} strokeWidth={2} fill={"url(#colorNetRx)"} name="Rx" />
+              <Area type="monotone" dataKey="netTx" stroke={getColor("#ec4899")} strokeWidth={2} fill={"url(#colorNetTx)"} name="Tx" />
+            </AreaChart>
           </ChartCard>
 
           <ChartCard title={`Disk Usage (${latest.disk?.name || '/'})`}>

@@ -531,14 +531,16 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
            <ChartCard title="Latency Distribution (ms)">
               <div className="p-4 w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={formattedGraph.data}>
+                  <AreaChart data={formattedGraph.data}>
+                    <defs><linearGradient id="colorAvgLatency" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#3b82f6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#3b82f6")} stopOpacity={0} /></linearGradient></defs>
+                    <defs><linearGradient id="colorMaxLatency" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ef4444")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ef4444")} stopOpacity={0} /></linearGradient></defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                     <XAxis dataKey="rawTime" hide />
                     <YAxis hide />
                     <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit="ms" />} />
-                    <Line type="monotone" dataKey="avgLatency" stroke={getColor("#3b82f6")} strokeWidth={2} dot={false} name="Avg" />
-                    <Line type="monotone" dataKey="maxLatency" stroke={getColor("#ef4444")} strokeWidth={1} dot={false} strokeDasharray="5 5" name="Max" />
-                  </LineChart>
+                    <Area type="monotone" dataKey="avgLatency" stroke={getColor("#3b82f6")} fill={"url(#colorAvgLatency)"} strokeWidth={2} name="Avg" />
+                    <Area type="monotone" dataKey="maxLatency" stroke={getColor("#ef4444")} fill="transparent" strokeWidth={1} name="Max" strokeDasharray="4 4" />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
            </ChartCard>
@@ -561,7 +563,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                     {/* Render AreaChart for Errors (Red Gradient) */}
                     {statusChartMode === 'errors' ? (
                         <AreaChart data={formattedGraph.data}>
-                            {!isMono && <defs><linearGradient id="colorErr" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} /><stop offset="95%" stopColor="#ef4444" stopOpacity={0} /></linearGradient></defs>}
+                            <defs><linearGradient id="colorErr" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ef4444")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ef4444")} stopOpacity={0} /></linearGradient></defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                             <XAxis dataKey="rawTime" hide />
                             <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
