@@ -4,9 +4,9 @@ import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { DashboardLayout } from '../../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError, Input } from '../../../components/Core';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize } from 'lucide-react';
+import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize, Search } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
 
@@ -90,10 +90,87 @@ const StatCard = ({ title, value, subtext, icon: Icon, color }: any) => (
         <Icon className={`h-4 w-4 ${color}`} />
       </div>
       <div className="text-2xl font-bold text-foreground"><SmartAnimatedValue value={value} /></div>
-      {subtext && <div className="text-xs text-muted-foreground mt-1 font-medium"><SmartAnimatedValue value={subtext} /></div>}
+      {subtext && <div className="text-xs text-muted-foreground mt-1 font-medium truncate"><SmartAnimatedValue value={subtext} /></div>}
     </CardContent>
   </Card>
 );
+
+// --- Collections Table ---
+const CollectionsTable = ({ collections }: { collections: any[] }) => {
+  const [search, setSearch] = useState('');
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  if (!collections || collections.length === 0) return null;
+
+  const filtered = collections.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+  const displayed = isMaximized ? filtered : filtered.slice(0, 5);
+
+  const Content = (
+    <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-auto min-h-[300px]'}`}>
+       <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between h-16 space-y-0 shrink-0">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Top Collections</CardTitle>
+          <div className="flex items-center gap-2">
+             <div className="relative w-48">
+               <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+               <Input
+                 placeholder="Search collections..."
+                 className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-orange-500 outline-none"
+                 value={search}
+                 onChange={(e) => setSearch(e.target.value)}
+               />
+             </div>
+             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMaximized(!isMaximized)}>{isMaximized ? <X className="h-4 w-4 text-muted-foreground" /> : <Maximize className="h-4 w-4 text-muted-foreground" />}</Button>
+          </div>
+       </CardHeader>
+       <CardContent className="p-0 flex-1 overflow-auto">
+          <div className="min-w-full inline-block align-middle">
+             <table className="min-w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground bg-muted/30 uppercase font-medium sticky top-0 backdrop-blur z-10">
+                   <tr>
+                      <th className="px-5 py-3 whitespace-nowrap">Collection Name</th>
+                      <th className="px-5 py-3 text-right whitespace-nowrap">Documents</th>
+                      <th className="px-5 py-3 text-right whitespace-nowrap">Data Size</th>
+                      <th className="px-5 py-3 text-right whitespace-nowrap">Storage Size</th>
+                      <th className="px-5 py-3 text-right whitespace-nowrap">Index Size</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                   {displayed.map((c, i) => (
+                      <tr key={i} className="hover:bg-muted/30 transition-colors group">
+                         <td className="px-5 py-3 font-medium text-foreground break-all max-w-[200px]">{c.name}</td>
+                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={c.count.toLocaleString()}/></td>
+                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.size)}/></td>
+                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.storageSize)}/></td>
+                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.indexSize)}/></td>
+                      </tr>
+                   ))}
+                   {!isMaximized && filtered.length > 5 && (
+                      <tr 
+                         onClick={() => setIsMaximized(true)}
+                         className="hover:bg-muted/30 transition-colors cursor-pointer group"
+                      >
+                         <td colSpan={5} className="px-5 py-3.5 text-center text-xs text-muted-foreground group-hover:text-foreground font-medium">
+                            Show {filtered.length - 5} more...
+                         </td>
+                      </tr>
+                   )}
+                   {filtered.length === 0 && (
+                      <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">No collections match your search.</td></tr>
+                   )}
+                </tbody>
+             </table>
+          </div>
+       </CardContent>
+    </Card>
+  );
+
+  return (
+    <>
+      {isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}
+      {isMaximized ? createPortal(Content, document.body) : Content}
+    </>
+  );
+}
 
 export default function DatabaseDetail() {
   const router = useRouter();
@@ -133,7 +210,7 @@ export default function DatabaseDetail() {
   if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></DashboardLayout>;
     if (!data?.database) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load database.</div></div></DashboardLayout>;
 
-  const { database, latest } = data;
+  const { database, latest, history, collections } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
@@ -344,8 +421,10 @@ export default function DatabaseDetail() {
                  <Area type="monotone" dataKey="netRequests" stroke={getColor("#8b5cf6")} fill={ "url(#colorReq)"} name="Requests" strokeWidth={2} />
               </AreaChart>
            </ChartCard>
-
         </div>
+
+        {/* --- 5. Collections Table --- */}
+        <CollectionsTable collections={collections} />
       </div>
 
       <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="Remove Database?">
