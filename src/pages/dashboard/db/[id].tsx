@@ -492,7 +492,6 @@ export default function DatabaseDetail() {
                    key={i}
                    title={chart.title}
                    data={chartData}
-                   type={chart.type as any}
                    series={chart.series}
                    tooltipSuffix={chart.tooltipSuffix}
                    tooltipFormatter={chart.formatter}
