@@ -1265,6 +1265,7 @@ export const DashboardLayout = ({
               disabled={isRegisteringDb}
             >
               <option value="mongodb">MongoDB</option>
+              <option value="redis">Redis</option>
               <option value="postgresql" disabled>
                 PostgreSQL (Coming Soon)
               </option>
@@ -1276,21 +1277,27 @@ export const DashboardLayout = ({
           <div className="space-y-2">
             <label className="text-sm font-medium">Display Name</label>
             <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none"
-              placeholder="e.g. Production Cluster"
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+              placeholder={
+                newDbType === "redis"
+                  ? "e.g. Production Cache"
+                  : "e.g. Production Cluster"
+              }
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               disabled={isRegisteringDb}
             />
           </div>
-
-          {/* UPGRADED URI INPUT WITH TOGGLE */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Connection URI</label>
             <div className="relative">
               <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none font-mono pr-10"
-                placeholder="mongodb+srv://user:pass@cluster.net"
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono pr-10"
+                placeholder={
+                  newDbType === "redis"
+                    ? "redis://:password@host:6379/0"
+                    : "mongodb+srv://user:pass@cluster.net"
+                }
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
                 disabled={isRegisteringDb}
@@ -1309,11 +1316,9 @@ export const DashboardLayout = ({
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              Credentials are AES-256 encrypted. We recommend using a read-only
-              'clusterMonitor' user.
+              Credentials are AES-256 encrypted safely in our secure vault.
             </p>
           </div>
-
           <div className="space-y-2">
             <label className="text-sm font-medium">Monitoring Interval</label>
             <Select

@@ -95,8 +95,73 @@ const StatCard = ({ title, value, subtext, icon: Icon, color }: any) => (
   </Card>
 );
 
+// --- DRY Principle: Dynamic Chart Wrapper ---
+const DynamicChart = ({ title, className, data, type = 'area', series, tooltipSuffix, tooltipFormatter }: any) => {
+  const { isMono } = useTheme();
+  const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
+
+  return (
+    <ChartCard title={title} className={className}>
+       {type === 'area' ? (
+           <AreaChart data={data}>
+               <defs>
+                 {series.filter((s:any) => s.style !== 'transparent' && s.style !== 'solid').map((s:any) => (
+                     <linearGradient key={s.key} id={`color-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={getColor(s.color)} stopOpacity={s.opacity || 0.3} />
+                        <stop offset="95%" stopColor={getColor(s.color)} stopOpacity={0} />
+                     </linearGradient>
+                 ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <XAxis dataKey="time" hide />
+              <YAxis hide />
+              <Tooltip content={<CustomTooltip suffix={tooltipSuffix} formatter={tooltipFormatter} />} />
+              {series.map((s:any) => {
+                 const style = s.style || 'gradient';
+                 let fill = `url(#color-${s.key})`;
+                 if (style === 'transparent') fill = 'transparent';
+                 if (style === 'solid') fill = getColor(s.color);
+
+                 return (
+                     <Area 
+                        key={s.key}
+                        type="monotone" 
+                        dataKey={s.key} 
+                        stroke={getColor(s.color)} 
+                        fill={fill}
+                        fillOpacity={style === 'solid' ? (s.opacity || 0.6) : 0.6}
+                        name={s.name} 
+                        strokeWidth={2}
+                        stackId={s.stackId}
+                        strokeDasharray={s.dashed ? "4 4" : undefined}
+                     />
+                 )
+              })}
+           </AreaChart>
+       ) : (
+           <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <XAxis dataKey="time" hide />
+              <YAxis hide />
+              <Tooltip content={<CustomTooltip suffix={tooltipSuffix} formatter={tooltipFormatter} />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
+              {series.map((s:any) => (
+                 <Bar 
+                    key={s.key}
+                    dataKey={s.key} 
+                    fill={getColor(s.color)} 
+                    name={s.name} 
+                    stackId={s.stackId}
+                    radius={s.radius}
+                 />
+              ))}
+           </BarChart>
+       )}
+    </ChartCard>
+  );
+};
+
 // --- Collections Table ---
-const CollectionsTable = ({ collections }: { collections: any[] }) => {
+const CollectionsTable = ({ collections, type }: { collections: any[], type: string }) => {
   const [search, setSearch] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -104,16 +169,21 @@ const CollectionsTable = ({ collections }: { collections: any[] }) => {
 
   const filtered = collections.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
   const displayed = isMaximized ? filtered : filtered.slice(0, 5);
+  
+  const titleText = type === 'redis' ? 'Top Keyspaces' : 'Top Collections';
+  const nameLabel = type === 'redis' ? 'Database' : 'Collection Name';
+  const countLabel = type === 'redis' ? 'Total Keys' : 'Documents';
+  const indexLabel = type === 'redis' ? 'Expiring Keys' : 'Index Size';
 
   const Content = (
     <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-auto min-h-[300px]'}`}>
        <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between h-16 space-y-0 shrink-0">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Top Collections</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{titleText}</CardTitle>
           <div className="flex items-center gap-2">
              <div className="relative w-48">
                <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
                <Input
-                 placeholder="Search collections..."
+                 placeholder="Search..."
                  className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-xs focus:ring-1 focus:ring-orange-500 outline-none"
                  value={search}
                  onChange={(e) => setSearch(e.target.value)}
@@ -127,11 +197,11 @@ const CollectionsTable = ({ collections }: { collections: any[] }) => {
              <table className="min-w-full text-sm text-left">
                 <thead className="text-xs text-muted-foreground bg-muted/30 uppercase font-medium sticky top-0 backdrop-blur z-10">
                    <tr>
-                      <th className="px-5 py-3 whitespace-nowrap">Collection Name</th>
-                      <th className="px-5 py-3 text-right whitespace-nowrap">Documents</th>
-                      <th className="px-5 py-3 text-right whitespace-nowrap">Data Size</th>
-                      <th className="px-5 py-3 text-right whitespace-nowrap">Storage Size</th>
-                      <th className="px-5 py-3 text-right whitespace-nowrap">Index Size</th>
+                      <th className="px-5 py-3 whitespace-nowrap">{nameLabel}</th>
+                      <th className="px-5 py-3 text-right whitespace-nowrap">{countLabel}</th>
+                      {type === 'mongodb' && <th className="px-5 py-3 text-right whitespace-nowrap">Data Size</th>}
+                      {type === 'mongodb' && <th className="px-5 py-3 text-right whitespace-nowrap">Storage Size</th>}
+                      <th className="px-5 py-3 text-right whitespace-nowrap">{indexLabel}</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
@@ -139,9 +209,9 @@ const CollectionsTable = ({ collections }: { collections: any[] }) => {
                       <tr key={i} className="hover:bg-muted/30 transition-colors group">
                          <td className="px-5 py-3 font-medium text-foreground break-all max-w-[200px]">{c.name}</td>
                          <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={c.count.toLocaleString()}/></td>
-                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.size)}/></td>
-                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.storageSize)}/></td>
-                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.indexSize)}/></td>
+                         {type === 'mongodb' && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.size)}/></td>}
+                         {type === 'mongodb' && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.storageSize)}/></td>}
+                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={type === 'redis' ? c.indexSize.toLocaleString() : formatSize(c.indexSize)}/></td>
                       </tr>
                    ))}
                    {!isMaximized && filtered.length > 5 && (
@@ -149,13 +219,13 @@ const CollectionsTable = ({ collections }: { collections: any[] }) => {
                          onClick={() => setIsMaximized(true)}
                          className="hover:bg-muted/30 transition-colors cursor-pointer group"
                       >
-                         <td colSpan={5} className="px-5 py-3.5 text-center text-xs text-muted-foreground group-hover:text-foreground font-medium">
+                         <td colSpan={type==='redis'?3:5} className="px-5 py-3.5 text-center text-xs text-muted-foreground group-hover:text-foreground font-medium">
                             Show {filtered.length - 5} more...
                          </td>
                       </tr>
                    )}
                    {filtered.length === 0 && (
-                      <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">No collections match your search.</td></tr>
+                      <tr><td colSpan={type==='redis'?3:5} className="px-5 py-8 text-center text-muted-foreground text-sm">No collections match your search.</td></tr>
                    )}
                 </tbody>
              </table>
@@ -211,8 +281,101 @@ export default function DatabaseDetail() {
     if (!data?.database) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load database.</div></div></DashboardLayout>;
 
   const { database, latest, history, collections } = data;
+  const isRedis = database.type === 'redis';
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
-  const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
+
+  // --- Configuration Driven Chart Definitions ---
+  const gridCharts = isRedis ? [
+    {
+        title: "Ping Latency (ms)", tooltipSuffix: " ms",
+        series: [{ key: 'latencyPing', name: 'Ping Time', color: '#8b5cf6', style: 'gradient' }]
+    },
+    {
+        title: "Memory Allocation (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'redisMemPeak', name: 'Peak History', color: '#64748b', style: 'gradient', dashed: true },
+            { key: 'memResident', name: 'RSS (OS Memory)', color: '#ec4899', style: 'gradient' },
+            { key: 'memVirtual', name: 'Used Memory', color: '#06b6d4', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Keyspace Hits & Misses (ops/sec)", tooltipSuffix: " ops",
+        series: [
+            { key: 'redisMisses', name: 'Misses', color: '#ef4444', style: 'gradient', stackId: 1 },
+            { key: 'redisHits', name: 'Hits', color: '#10b981', style: 'gradient', stackId: 1 }
+        ]
+    },
+    {
+        title: "Evictions & Expirations (ops/sec)", tooltipSuffix: " ops",
+        series: [
+            { key: 'redisEvicted', name: 'Evicted (OOM)', color: '#f59e0b', style: 'gradient' },
+            { key: 'redisExpired', name: 'Expired (TTL)', color: '#8b5cf6', style: 'gradient' }
+        ]
+    }
+  ] : [
+    {
+        title: "Read Latency (ms)", tooltipSuffix: " ms",
+        series: [
+            { key: 'latencyReadMax', name: 'Max Read', color: '#c4b5fd', style: 'gradient', dashed: true },
+            { key: 'latencyReadAvg', name: 'Avg Read', color: '#8b5cf6', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Write Latency (ms)", tooltipSuffix: " ms",
+        series: [
+            { key: 'latencyWriteMax', name: 'Max Write', color: '#fcd34d', style: 'gradient', dashed: true },
+            { key: 'latencyWriteAvg', name: 'Avg Write', color: '#f59e0b', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Memory Allocation (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'memVirtual', name: 'Virtual', color: '#64748b', style: 'gradient' },
+            { key: 'memMapped', name: 'Mapped', color: '#06b6d4', style: 'gradient' },
+            { key: 'memResident', name: 'Resident (RSS)', color: '#ec4899', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Storage Size (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'storageData', name: 'Data Size', color: '#14b8a6', style: 'gradient' },
+            { key: 'storageIndex', name: 'Index Size', color: '#6366f1', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Database Scans", tooltipSuffix: " scans/sec",
+        series: [
+            { key: 'scansCollection', name: 'Collection Scans', color: '#ef4444', style: 'gradient' },
+            { key: 'scansIndex', name: 'Index Scans', color: '#10b981', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Global Locks", type: 'bar',
+        series: [
+            { key: 'locksAR', name: 'Active Readers', color: '#3b82f6', stackId: 'a', radius: [0, 0, 4, 4] },
+            { key: 'locksQR', name: 'Queued Readers', color: '#93c5fd', stackId: 'a', radius: [4, 4, 0, 0] },
+            { key: 'locksAW', name: 'Active Writers', color: '#f59e0b', stackId: 'b', radius: [0, 0, 4, 4] },
+            { key: 'locksQW', name: 'Queued Writers', color: '#fcd34d', stackId: 'b', radius: [4, 4, 0, 0] }
+        ]
+    }
+  ];
+
+  // Append Common Shared Charts
+  gridCharts.push(
+      {
+          title: "Network Traffic (KB/s)", tooltipSuffix: " KB/s",
+          series: [
+              { key: 'netOutKB', name: 'Bytes Out', color: '#10b981', style: 'gradient' },
+              { key: 'netInKB', name: 'Bytes In', color: '#3b82f6', style: 'gradient' }
+          ]
+      },
+      {
+          title: "Network Requests (Req/s)", tooltipSuffix: " req/s",
+          series: [
+              { key: 'netRequests', name: 'Requests', color: '#8b5cf6', style: 'gradient' }
+          ]
+      }
+  );
 
   return (
     <DashboardLayout>
@@ -231,8 +394,12 @@ export default function DatabaseDetail() {
                <span className="capitalize">{database.type} Engine</span>
                <span>•</span>
                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Polling {database.interval}m</span>
-               <span>•</span>
-               <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> {formatSize(latest.storage?.dataSize)} Data</span>
+               {!isRedis && (
+                 <>
+                   <span>•</span>
+                   <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> {formatSize(latest.storage?.dataSize)} Data</span>
+                 </>
+               )}
             </div>
           </div>
           
@@ -262,7 +429,7 @@ export default function DatabaseDetail() {
         )}
 
         {/* --- 2. Top-level Stats Cards --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <StatCard 
              title="Active Connections" 
              value={latest.connections?.current || 0} 
@@ -271,19 +438,29 @@ export default function DatabaseDetail() {
              color="text-blue-500" 
            />
            <StatCard 
-             title="Total Ops/sec" 
-             value={((latest.throughput?.read || 0) + (latest.throughput?.write || 0)).toFixed(1)} 
-             subtext="Reads & Writes combined"
+             title={isRedis ? "Operations/sec" : "Total Ops/sec"}
+             value={isRedis ? (latest.throughput?.total || 0).toFixed(1) : ((latest.throughput?.read || 0) + (latest.throughput?.write || 0)).toFixed(1)} 
+             subtext={isRedis ? "Commands processed" : "Reads & Writes combined"}
              icon={Zap} 
              color="text-emerald-500" 
            />
-           <StatCard 
-             title="Memory Used" 
-             value={formatSize(latest.memory?.resident)} 
-             subtext="Resident Set Size (RSS)"
-             icon={HardDrive} 
-             color="text-purple-500" 
-           />
+           {isRedis ? (
+              <StatCard 
+                 title="Cache Hit Rate" 
+                 value={`${(latest.redis?.hitRate || 0).toFixed(1)}%`} 
+                 subtext="Hits vs Misses"
+                 icon={Zap} 
+                 color="text-yellow-500" 
+              />
+           ) : (
+              <StatCard 
+                 title="Memory Used" 
+                 value={formatSize(latest.memory?.resident)} 
+                 subtext="Resident Set Size (RSS)"
+                 icon={HardDrive} 
+                 color="text-purple-500" 
+              />
+           )}
            <StatCard 
              title="DB Uptime" 
              value={formatUptime(latest.uptimeSeconds)} 
@@ -294,137 +471,37 @@ export default function DatabaseDetail() {
         </div>
 
         {/* --- 3. Full Width Throughput --- */}
-        <ChartCard title="Throughput (Operations / sec)" className="h-[350px]">
-           <AreaChart data={chartData}>
-              <defs>
-                 <linearGradient id="colorRead" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#10b981")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#10b981")} stopOpacity={0} /></linearGradient>
-                 <linearGradient id="colorWrite" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#3b82f6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#3b82f6")} stopOpacity={0} /></linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-              <XAxis dataKey="time" hide />
-              <YAxis hide />
-              <Tooltip content={<CustomTooltip suffix=" ops" />} />
-              <Area type="monotone" dataKey="throughputWrite" stroke={getColor("#3b82f6")} fill={"url(#colorWrite)"} name="Writes" strokeWidth={2} />
-              <Area type="monotone" dataKey="throughputRead" stroke={getColor("#10b981")} fill={ "url(#colorRead)"} name="Reads" strokeWidth={2} />
-           </AreaChart>
-        </ChartCard>
+        <DynamicChart 
+            title="Throughput (Operations / sec)"
+            className="h-[350px]"
+            data={chartData}
+            tooltipSuffix=" ops"
+            series={isRedis 
+                ? [{ key: 'throughputTotal', name: 'Commands', color: '#8b5cf6', style: 'gradient' }] 
+                : [
+                    { key: 'throughputWrite', name: 'Writes', color: '#3b82f6', style: 'gradient' }, 
+                    { key: 'throughputRead', name: 'Reads', color: '#10b981', style: 'gradient' }
+                  ]}
+        />
 
         {/* --- 4. Detailed Charts Grid --- */}
+        {/* --- 4. Detailed Charts Grid (Configuration Driven) --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           
-           {/* Latency: Read */}
-           <ChartCard title="Read Latency (ms)">
-              <AreaChart data={chartData}>
-                 <defs><linearGradient id="colorLatRead" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#8b5cf6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#8b5cf6")} stopOpacity={0} /></linearGradient></defs>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip suffix=" ms" />} />
-                 <Area type="monotone" dataKey="latencyReadMax" stroke={getColor("#c4b5fd")} strokeDasharray="4 4" fill="transparent" name="Max Read" strokeWidth={2} />
-                 <Area type="monotone" dataKey="latencyReadAvg" stroke={getColor("#8b5cf6")} fill={ "url(#colorLatRead)"} name="Avg Read" strokeWidth={2} />
-              </AreaChart>
-           </ChartCard>
-
-           {/* Latency: Write */}
-           <ChartCard title="Write Latency (ms)">
-              <AreaChart data={chartData}>
-                 <defs><linearGradient id="colorLatWrite" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#f59e0b")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#f59e0b")} stopOpacity={0} /></linearGradient></defs>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip suffix=" ms" />} />
-                 <Area type="monotone" dataKey="latencyWriteMax" stroke={getColor("#fcd34d")} strokeDasharray="4 4" fill="transparent" name="Max Write" strokeWidth={2} />
-                 <Area type="monotone" dataKey="latencyWriteAvg" stroke={getColor("#f59e0b")} fill={"url(#colorLatWrite)"} name="Avg Write" strokeWidth={2} />
-              </AreaChart>
-           </ChartCard>
-
-           {/* Memory Usage */}
-           <ChartCard title="Memory Allocation (MB)">
-              <AreaChart data={chartData}>
-              <defs><linearGradient id="colorMemVirtual" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#64748b")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#64748b")} stopOpacity={0} /></linearGradient></defs>
-              <defs><linearGradient id="colorMemMapped" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#06b6d4")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#06b6d4")} stopOpacity={0} /></linearGradient></defs>
-              <defs><linearGradient id="colorMemResident" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ec4899")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ec4899")} stopOpacity={0} /></linearGradient></defs>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip formatter={(val: number) => formatSize(val)} />} />
-                 <Area type="monotone" dataKey="memVirtual" stroke={getColor("#64748b")} fill={"url(#colorMemVirtual)"} name="Virtual" strokeWidth={2} />
-                 <Area type="monotone" dataKey="memMapped" stroke={getColor("#06b6d4")} fill={"url(#colorMemMapped)"} name="Mapped" strokeWidth={2} />
-                 <Area type="monotone" dataKey="memResident" stroke={getColor("#ec4899")} fill={"url(#colorMemResident)"} name="Resident (RSS)" strokeWidth={2} />
-              </AreaChart>
-           </ChartCard>
-
-           {/* Storage (Stacked Area) */}
-           <ChartCard title="Storage Size (MB)">
-              <AreaChart data={chartData}>
-              <defs><linearGradient id="colorStorageData" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#14b8a6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#14b8a6")} stopOpacity={0} /></linearGradient></defs>
-              <defs><linearGradient id="colorStorageIndex" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#6366f1")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#6366f1")} stopOpacity={0} /></linearGradient></defs>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip formatter={(val: number) => formatSize(val)} />} />
-                 <Area type="monotone" dataKey="storageData" stroke={getColor("#14b8a6")} fill={"url(#colorStorageData)"} fillOpacity={0.6} name="Data Size" />
-                 <Area type="monotone" dataKey="storageIndex" stroke={getColor("#6366f1")} fill={"url(#colorStorageIndex)"} fillOpacity={0.6} name="Index Size" />
-              </AreaChart>
-           </ChartCard>
-
-           {/* Index & Collection Scans */}
-           <ChartCard title="Database Scans">
-              <AreaChart data={chartData}>
-              <defs><linearGradient id="colorScansCollection" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ef4444")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ef4444")} stopOpacity={0} /></linearGradient></defs>
-              <defs><linearGradient id="colorScansIndex" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#10b981")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#10b981")} stopOpacity={0} /></linearGradient></defs>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip suffix=" scans/sec" />} />
-                 <Area type="monotone" dataKey="scansCollection" stroke={getColor("#ef4444")} fill={"url(#colorScansCollection)"} name="Collection Scans" strokeWidth={2} />
-                 <Area type="monotone" dataKey="scansIndex" stroke={getColor("#10b981")} fill={"url(#colorScansIndex)"} name="Index Scans" strokeWidth={2} />
-              </AreaChart>
-           </ChartCard>
-
-           {/* Locks (Bar Chart) */}
-           <ChartCard title="Global Locks">
-              <BarChart data={chartData}>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-                 <Bar dataKey="locksAR" fill={getColor("#3b82f6")} name="Active Readers" stackId="a" radius={[0, 0, 4, 4]} />
-                 <Bar dataKey="locksQR" fill={getColor("#93c5fd")} name="Queued Readers" stackId="a" radius={[4, 4, 0, 0]} />
-                 <Bar dataKey="locksAW" fill={getColor("#f59e0b")} name="Active Writers" stackId="b" radius={[0, 0, 4, 4]} />
-                 <Bar dataKey="locksQW" fill={getColor("#fcd34d")} name="Queued Writers" stackId="b" radius={[4, 4, 0, 0]} />
-              </BarChart>
-           </ChartCard>
-
-           {/* Network Data Rate (Multi-line Area) */}
-           <ChartCard title="Network Traffic (KB/s)">
-              <AreaChart data={chartData}>
-              <defs><linearGradient id="colorNetOutKB" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#10b981")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#10b981")} stopOpacity={0} /></linearGradient></defs>
-              <defs><linearGradient id="colorNetInKB" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#3b82f6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#3b82f6")} stopOpacity={0} /></linearGradient></defs>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip suffix=" KB/s" />} />
-                 <Area type="monotone" dataKey="netOutKB" stroke={getColor("#10b981")} fill={"url(#colorNetOutKB)"} name="Bytes Out" strokeWidth={2} />
-                 <Area type="monotone" dataKey="netInKB" stroke={getColor("#3b82f6")} fill={"url(#colorNetInKB)"} name="Bytes In" strokeWidth={2} />
-              </AreaChart>
-           </ChartCard>
-
-           {/* Network Requests Rate */}
-           <ChartCard title="Network Requests (Req/s)">
-              <AreaChart data={chartData}>
-                 <defs><linearGradient id="colorReq" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#8b5cf6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#8b5cf6")} stopOpacity={0} /></linearGradient></defs>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                 <XAxis dataKey="time" hide />
-                 <YAxis hide />
-                 <Tooltip content={<CustomTooltip suffix=" req/s" />} />
-                 <Area type="monotone" dataKey="netRequests" stroke={getColor("#8b5cf6")} fill={ "url(#colorReq)"} name="Requests" strokeWidth={2} />
-              </AreaChart>
-           </ChartCard>
+           {gridCharts.map((chart, i) => (
+               <DynamicChart 
+                   key={i}
+                   title={chart.title}
+                   data={chartData}
+                   type={chart.type as any}
+                   series={chart.series}
+                   tooltipSuffix={chart.tooltipSuffix}
+                   tooltipFormatter={chart.formatter}
+               />
+           ))}
         </div>
 
         {/* --- 5. Collections Table --- */}
-        <CollectionsTable collections={collections} />
+        <CollectionsTable collections={collections}  type={database.type} />
       </div>
 
       <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="Remove Database?">
