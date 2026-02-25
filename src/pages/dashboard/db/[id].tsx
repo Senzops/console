@@ -208,10 +208,10 @@ const CollectionsTable = ({ collections, type }: { collections: any[], type: str
                    {displayed.map((c, i) => (
                       <tr key={i} className="hover:bg-muted/30 transition-colors group">
                          <td className="px-5 py-3 font-medium text-foreground break-all max-w-[200px]">{c.name}</td>
-                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={c.count.toLocaleString()}/></td>
+                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={Number(c.count).toLocaleString('en-US')}/></td>
                          {type === 'mongodb' && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.size)}/></td>}
                          {type === 'mongodb' && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.storageSize)}/></td>}
-                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={type === 'redis' ? c.indexSize.toLocaleString() : formatSize(c.indexSize)}/></td>
+                         <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={type === 'redis' ? Number(c.indexSize).toLocaleString('en-US') : formatSize(c.indexSize)}/></td>
                       </tr>
                    ))}
                    {!isMaximized && filtered.length > 5 && (
@@ -439,7 +439,7 @@ export default function DatabaseDetail() {
            />
            <StatCard 
              title={isRedis ? "Operations/sec" : "Total Ops/sec"}
-             value={isRedis ? (latest.throughput?.total || 0).toFixed(1) : ((latest.throughput?.read || 0) + (latest.throughput?.write || 0)).toFixed(1)} 
+             value={isRedis ? (latest.throughput?.total || 0).toFixed(2) : ((latest.throughput?.read || 0) + (latest.throughput?.write || 0)).toFixed(2)} 
              subtext={isRedis ? "Commands processed" : "Reads & Writes combined"}
              icon={Zap} 
              color="text-emerald-500" 
@@ -447,7 +447,7 @@ export default function DatabaseDetail() {
            {isRedis ? (
               <StatCard 
                  title="Cache Hit Rate" 
-                 value={`${(latest.redis?.hitRate || 0).toFixed(1)}%`} 
+                 value={`${(latest.redis?.hitRate || 0).toFixed(2)}%`} 
                  subtext="Hits vs Misses"
                  icon={Zap} 
                  color="text-yellow-500" 
