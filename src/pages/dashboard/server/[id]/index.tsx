@@ -182,72 +182,39 @@ const DistributionTable = ({ data, router, id }: { data: any[], router: any, id:
 };
 
 // --- Uptime Strip (Unchanged logic) ---
-const UptimeStrip = ({ history, limit }: { history: any[], limit: number }) => {
+const UptimeStrip = ({ history, range }: { history: any[], range: string }) => {
   const blocks = useMemo(() => {
     if (!history || history.length === 0) return [];
-
-    // Sort Oldest -> Newest
-    const chrono = [...history].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    const result = [];
-
-    // 1. Process historical gaps
-    for (let i = 0; i < chrono.length - 1; i++) {
-      const t1 = new Date(chrono[i].createdAt).getTime();
-      const t2 = new Date(chrono[i + 1].createdAt).getTime();
-      const diffMins = (t2 - t1) / 1000 / 60;
-
-      // If gap > 2 mins → downtime starts at t1
-      if (diffMins > 2) {
-        result.push({ status: 'down', time: chrono[i].createdAt });
-      } else {
-        result.push({ status: 'up', time: chrono[i].createdAt });
-      }
-    }
-    const lastPoint = chrono[chrono.length - 1];
-    const lastTime = new Date(lastPoint.createdAt).getTime();
-    const now = new Date().getTime();
-    const gapToNow = (now - lastTime) / 1000 / 60;
-
-    // If no data for > 1.5 mins, we are currently DOWN
-    if (gapToNow > 2) {
-      result.push({ status: 'down', time: new Date().toISOString() });
-    } else {
-      result.push({ status: 'up', time: lastPoint.createdAt });
-    }
-
-    return result;
+    return history.map((run: any) => ({
+      status: run.isOnline === false ? 'down' : 'up',
+      time: run.createdAt
+    }));
   }, [history]);
 
-  // Calculate Availability %
   const uptimePct = useMemo(() => {
-    if (!blocks.length) return 0;
-    const downBlocks = blocks.filter(b => b.status === 'down').length;
-    // Simple approximation: (Total - Down) / Total
-    // For strict accuracy we'd calculate time durations, but for a visual strip this suffices
-    const total = blocks.length;
-    return Math.max(0, ((total - downBlocks) / total) * 100).toFixed(1);
+     if(!blocks.length) return 0;
+     const downBlocks = blocks.filter((b: any) => b.status === 'down').length;
+     const total = blocks.length;
+     return Math.max(0, ((total - downBlocks) / total) * 100).toFixed(1);
   }, [blocks]);
 
   return (
     <div className="space-y-2 bg-card/50 p-4 rounded-xl border">
       <div className="flex justify-between items-center text-xs">
-        <span className="font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-          <Activity className="h-3 w-3" /> Real-time Availability
-        </span>
-        <span className={Number(uptimePct) > 98 ? "text-emerald-500 font-mono" : "text-yellow-500 font-mono"}>{uptimePct}%</span>
+         <span className="font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <Activity className="h-3 w-3" /> Real-time Availability
+         </span>
+         <span className={Number(uptimePct) > 98 ? "text-emerald-500 font-mono" : "text-yellow-500 font-mono"}>{uptimePct}%</span>
       </div>
-      <div className="h-2 w-full flex gap-[2px] overflow-hidden rounded-full bg-secondary/50">
-        {Array.from({ length: 60 }).map((_, i) => {
-          const blockIndex = Math.floor((i / 60) * blocks.length);
-          const block = blocks[blockIndex];
-          if (!block) return <div key={i} className="flex-1 bg-secondary/30" />;
-          let color = "bg-emerald-500";
-          if (block.status === 'down') color = "bg-destructive";
-          return <div key={i} className={`flex-1 rounded-sm ${color}`} title={new Date(block.time).toLocaleTimeString()} />
+      <div className="h-2 w-full flex gap-[2px] overflow-hidden rounded-full">
+        {blocks.map((block: any, i: number) => {
+            let color = "bg-emerald-500";
+            if (block.status === 'down') color = "bg-destructive";
+            return <div key={i} className={`flex-1 rounded-sm ${color}`} title={new Date(block.time).toLocaleTimeString()} />
         })}
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-        <span>{limit}m ago</span>
+        <span>{range} ago</span>
         <span>Live</span>
       </div>
     </div>
@@ -260,13 +227,13 @@ export default function ServerDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme(); // Get Monochromatic state
 
-  const [timeLimit, setTimeLimit] = useState(60);
+  const [range, setRange] = useState('1h');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/vps/${id}/stats?limit=${timeLimit}` : null,
-    fetcher,
+    token && id ? `/vps/${id}/stats?range=${range}` : null, 
+    fetcher, 
     { refreshInterval: 60000 }
   );
 
@@ -342,12 +309,12 @@ export default function ServerDetail() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Select className="w-32 bg-background" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value))}>
-              <option value={60}>Last 1 Hour</option>
-              <option value={180}>Last 3 Hours</option>
-              <option value={360}>Last 6 Hours</option>
-              <option value={720}>Last 12 Hours</option>
-              <option value={1440}>Last 24 Hours</option>
+            <Select className="w-36 bg-background" value={range} onChange={(e) => setRange(e.target.value)}>
+                <option value="1h">Last 1 Hour</option>
+                <option value="3h">Last 3 Hours</option>
+                <option value="6h">Last 6 Hours</option>
+                <option value="12h">Last 12 Hours</option>
+                <option value="24h">Last 24 Hours</option>
             </Select>
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
@@ -358,7 +325,7 @@ export default function ServerDetail() {
           </div>
         </div>
 
-        <UptimeStrip history={history} limit={timeLimit} />
+        <UptimeStrip history={history} range={range} />
 
         {/* Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
