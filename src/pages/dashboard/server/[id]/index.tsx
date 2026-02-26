@@ -277,7 +277,9 @@ export default function ServerDetail() {
   if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></DashboardLayout>;
   if (!vps) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></DashboardLayout>;
 
-  const latest = history && history.length > 0 ? history[0].metrics : {};
+  // Find the last real online metric to prevent top cards from flashing 0 during downtime
+  const latestRun = history?.slice().reverse().find((h: any) => h.isOnline !== false) || history?.[history?.length - 1];
+  const latest = latestRun ? latestRun.metrics : {}; 
 
   // Helper to get color based on Mode
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
