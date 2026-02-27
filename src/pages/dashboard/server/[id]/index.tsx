@@ -182,10 +182,12 @@ const DistributionTable = ({ data, router, id }: { data: any[], router: any, id:
 };
 
 // --- Uptime Strip (Unchanged logic) ---
-const UptimeStrip = ({ history, range }: { history: any[], range: string }) => {
+const UptimeStrip = ({ history }: { history: any[] }) => {
   const blocks = useMemo(() => {
     if (!history || history.length === 0) return [];
-    return history.map((run: any) => ({
+    // Ensure we only ever map the last 60 minutes for visual readability
+    const recentHistory = history.slice(-60);
+    return recentHistory.map((run: any) => ({
       status: run.isOnline === false ? 'down' : 'up',
       time: run.createdAt
     }));
@@ -214,7 +216,7 @@ const UptimeStrip = ({ history, range }: { history: any[], range: string }) => {
         })}
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-        <span>{range} ago</span>
+        <span>1hr ago</span>
         <span>Live</span>
       </div>
     </div>
@@ -327,7 +329,7 @@ export default function ServerDetail() {
           </div>
         </div>
 
-        <UptimeStrip history={history} range={range} />
+        <UptimeStrip history={history} />
 
         {/* Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
