@@ -269,7 +269,12 @@ export default function DatabaseDetail() {
     if (!data?.history) return [];
     return data.history.map((point: any) => ({
         ...point,
-        time: new Date(point.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        time: new Date(point.time).toLocaleTimeString([], {
+          month: range !== '7d' ? undefined : 'short',
+          day: range !== '7d' ? undefined : 'numeric',
+          hour: 'numeric',
+          minute: range !== '7d' ? '2-digit' : undefined,
+        }),
         // Convert network from Bytes/s to KB/s for chart
         netInKB: point.netIn ? point.netIn / 1024 : 0,
         netOutKB: point.netOut ? point.netOut / 1024 : 0
