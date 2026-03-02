@@ -604,7 +604,7 @@ export const DashboardLayout = ({
     setNewUrl("");
     setSelectedFramework("Express");
     setNewDbType("mongodb");
-    setNewInterval("5");
+    setNewInterval("15");
   };
 
   return (
