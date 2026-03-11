@@ -31,6 +31,7 @@ import {
   Database,
   EyeOff,
   Eye,
+  AlertOctagon,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -659,6 +660,28 @@ export const DashboardLayout = ({
             linkPrefix="/dashboard/apm"
             onAdd={!user.isDemo ? () => setIsApmModalOpen(true) : undefined}
           />
+
+          {/* --- Error Tracking (Static Link) --- */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-2 mb-2 group">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 transition-colors">
+                Error Tracking
+              </span>
+            </div>
+            <Link href="/dashboard/errors">
+              <Button
+                variant={router.asPath.includes("/dashboard/errors") ? "secondary" : "ghost"}
+                className={cn(
+                  "w-full justify-start gap-2 mb-1 h-9",
+                  router.asPath.includes("/dashboard/errors") && "bg-secondary/80 font-semibold border border-border/50"
+                )}
+              >
+                <AlertOctagon className="h-3 w-3 shrink-0 text-destructive" />
+                <span className="truncate">Default</span>
+              </Button>
+            </Link>
+          </div>
+
           <SidebarSection
             title="Uptime"
             items={monitorList}

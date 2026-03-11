@@ -27,6 +27,7 @@ import { TraceWaterfall } from "../../../../../components/TraceWaterfall";
 import { formatDistanceToNow } from "date-fns";
 import { SmartAnimatedValue } from "@/components/Tween";
 import Link from "next/link";
+import { TraceErrors } from "@/components/TraceErrors";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -264,6 +265,9 @@ export default function TraceDetail() {
             totalDuration={trace.duration}
             childrenTraces={trace.children}
           />
+
+          {/* --- NEW ERROR COMPONENT --- */}
+          <TraceErrors apmId={id as string} traceId={trace.traceId as string} />
         </div>
       </div>
     </DashboardLayout>
