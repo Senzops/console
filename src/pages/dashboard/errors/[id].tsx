@@ -206,10 +206,24 @@ export default function ErrorDetailPage() {
     if (!data?.trend) return [];
     return data.trend.map((point: any) => {
       const d = new Date(point.time);
-      const timeStr =
-        range === "7d" || range === "30d"
-          ? d.toLocaleDateString([], { month: "short", day: "numeric" })
-          : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      let timeStr;
+      if (range === "7d" || range === "30d") {
+        timeStr = d.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+        });
+      } else if (range === "24h") {
+        timeStr = d.toLocaleDateString([], {
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      } else {
+        timeStr = d.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
       return { ...point, time: timeStr };
     });
   }, [data?.trend, range]);

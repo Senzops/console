@@ -271,7 +271,7 @@ export default function DatabaseDetail() {
         ...point,
         time: new Date(point.time).toLocaleTimeString([], {
           month: range !== '7d' ? undefined : 'short',
-          day: range !== '7d' ? undefined : 'numeric',
+          day: range === '1h' ? undefined : 'numeric',
           hour: 'numeric',
           minute: range !== '7d' ? '2-digit' : undefined,
         }),
