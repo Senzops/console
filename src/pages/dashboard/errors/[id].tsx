@@ -214,6 +214,7 @@ export default function ErrorDetailPage() {
         });
       } else if (range === "24h") {
         timeStr = d.toLocaleDateString([], {
+          month: "short",
           day: "numeric",
           hour: "2-digit",
           minute: "2-digit",

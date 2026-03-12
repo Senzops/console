@@ -270,7 +270,7 @@ export default function DatabaseDetail() {
     return data.history.map((point: any) => ({
         ...point,
         time: new Date(point.time).toLocaleTimeString([], {
-          month: range !== '7d' ? undefined : 'short',
+          month: range === '1h' ? undefined : 'short',
           day: range === '1h' ? undefined : 'numeric',
           hour: 'numeric',
           minute: range !== '7d' ? '2-digit' : undefined,
