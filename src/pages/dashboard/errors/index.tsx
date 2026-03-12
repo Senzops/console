@@ -40,6 +40,7 @@ import {
   Maximize,
 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { SmartAnimatedValue } from "@/components/Tween";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -143,10 +144,12 @@ const StatCard = ({ title, value, subtext, icon: Icon, color }: any) => (
         </p>
         <Icon className={`h-4 w-4 ${color}`} />
       </div>
-      <div className="text-2xl font-bold text-foreground">{value}</div>
+      <div className="text-2xl font-bold text-foreground">
+        <SmartAnimatedValue value={value} />
+      </div>
       {subtext && (
         <div className="text-xs text-muted-foreground mt-1 font-medium">
-          {subtext}
+          <SmartAnimatedValue value={subtext} />
         </div>
       )}
     </CardContent>
@@ -201,15 +204,19 @@ export default function GlobalErrorsDashboard() {
   if (!data && !error && isLoading)
     return (
       <DashboardLayout>
-        <div className="h-full flex items-center justify-center">
-          <Spinner className="h-8 w-8 text-primary" />
+        <div className="h-full flex flex-col items-center justify-center gap-4">
+          <Spinner className="h-8 w-8 text-emerald-500" />
+          <p className="text-muted-foreground">
+            Connecting to Error Trackers...
+          </p>
         </div>
       </DashboardLayout>
     );
+
   if (error)
     return (
       <DashboardLayout>
-        <div className="p-8">
+        <div className="h-full flex flex-col items-center justify-center gap-4">
           <DataError />
         </div>
       </DashboardLayout>
