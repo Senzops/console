@@ -32,6 +32,7 @@ import {
   EyeOff,
   Eye,
   AlertOctagon,
+  Workflow,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -312,6 +313,8 @@ const SidebarSection = ({
                 className={`h-3 w-3 shrink-0 ${item.status === "up" ? "text-emerald-500" : "text-destructive"}`}
               />
             );
+          else if (hrefPrefix.includes("task"))
+            Icon = <Workflow className="h-3 w-3 text-indigo-500 shrink-0" />;
           else
             Icon = (
               <div className={`h-2 w-2 rounded-full shrink-0 ${statusColor}`} />
@@ -397,11 +400,17 @@ export const DashboardLayout = ({
     fetcher,
   );
 
+  const { data: taskList, mutate: mutateTask } = useSWR(
+    token ? "/task/list" : null,
+    fetcher,
+  );
+
   // Modal States
   const [isServerModalOpen, setIsServerModalOpen] = useState(false);
   const [isWebModalOpen, setIsWebModalOpen] = useState(false);
   const [isMonitorModalOpen, setIsMonitorModalOpen] = useState(false);
   const [isApmModalOpen, setIsApmModalOpen] = useState(false);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [showUri, setShowUri] = useState(false);
 
@@ -414,6 +423,7 @@ export const DashboardLayout = ({
   const [isRegisteringWeb, setIsRegisteringWeb] = useState(false);
   const [isRegisteringMonitor, setIsRegisteringMonitor] = useState(false);
   const [isRegisteringApm, setIsRegisteringApm] = useState(false);
+  const [isRegisteringTask, setIsRegisteringTask] = useState(false);
   const [isRegisteringDb, setIsRegisteringDb] = useState(false);
 
   // Error States
@@ -421,6 +431,7 @@ export const DashboardLayout = ({
   const [webError, setWebError] = useState<string | null>(null);
   const [monitorError, setMonitorError] = useState<string | null>(null);
   const [apmError, setApmError] = useState<string | null>(null);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
   // Form State
@@ -453,6 +464,11 @@ export const DashboardLayout = ({
       default:
         return "";
     }
+  };
+
+  // Task Snippet
+  const getTaskSnippet = (apiKey?: string) => {
+    return `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\n// Initialize as early as possible in your worker entry file\nSenzor.init({\n  apiKey: "${apiKey}"\n});\n\n// BullMQ and Node-Cron are now automatically instrumented!`;
   };
 
   if (loading)
@@ -558,6 +574,26 @@ export const DashboardLayout = ({
     }
   };
 
+  // --- Handle Register Task ---
+  const handleRegisterTask = async () => {
+    if (!newName) return;
+    setIsRegisteringTask(true);
+    setTaskError(null);
+    try {
+      const res = await api.post("/task/register", { name: newName });
+      setNewCreds(res.data);
+      setNewName("");
+      mutateTask();
+      toast.success("Task Environment Registered!");
+    } catch (e: any) {
+      setTaskError(
+        e.response?.data?.error || "Failed to create task environment",
+      );
+    } finally {
+      setIsRegisteringTask(false);
+    }
+  };
+
   const handleRegisterDb = async () => {
     if (!newName || !newUrl) return;
     setIsRegisteringDb(true);
@@ -598,6 +634,7 @@ export const DashboardLayout = ({
     setIsWebModalOpen(false);
     setIsMonitorModalOpen(false);
     setIsApmModalOpen(false);
+    setIsTaskModalOpen(false);
     setIsDbModalOpen(false);
     setNewCreds(null);
     setNewName("");
@@ -661,6 +698,16 @@ export const DashboardLayout = ({
             onAdd={!user.isDemo ? () => setIsApmModalOpen(true) : undefined}
           />
 
+          {/* --- Background Tasks --- */}
+          <SidebarSection
+            title="Background Tasks"
+            items={taskList}
+            hrefPrefix="/dashboard/task"
+            linkPrefix="/dashboard/task"
+            onAdd={!user.isDemo ? () => setIsTaskModalOpen(true) : undefined}
+            icon={<Workflow className="h-3 w-3 text-indigo-500 shrink-0" />}
+          />
+
           {/* --- Error Tracking (Static Link) --- */}
           <div className="space-y-1">
             <div className="flex items-center justify-between px-2 mb-2 group">
@@ -670,10 +717,15 @@ export const DashboardLayout = ({
             </div>
             <Link href="/dashboard/errors">
               <Button
-                variant={router.asPath.includes("/dashboard/errors") ? "secondary" : "ghost"}
+                variant={
+                  router.asPath.includes("/dashboard/errors")
+                    ? "secondary"
+                    : "ghost"
+                }
                 className={cn(
                   "w-full justify-start gap-2 mb-1 h-9",
-                  router.asPath.includes("/dashboard/errors") && "bg-secondary/80 font-semibold border border-border/50"
+                  router.asPath.includes("/dashboard/errors") &&
+                    "bg-secondary/80 font-semibold border border-border/50",
                 )}
               >
                 <AlertOctagon className="h-3 w-3 shrink-0 text-destructive" />
@@ -1000,7 +1052,7 @@ export const DashboardLayout = ({
         )}
       </Dialog>
 
-      {/* --- WEB MODAL (Same as before) --- */}
+      {/* --- WEB MODAL --- */}
       <Dialog
         open={isWebModalOpen}
         onClose={closeModal}
@@ -1203,7 +1255,93 @@ export const DashboardLayout = ({
         )}
       </Dialog>
 
-      {/* --- MONITOR MODAL (New) --- */}
+      {/* --- TASK MODAL --- */}
+      <Dialog
+        open={isTaskModalOpen}
+        onClose={closeModal}
+        title="Connect Background Tasks"
+      >
+        {!newCreds ? (
+          <div className="space-y-4">
+            {taskError && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{taskError}</span>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Service Name</label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                placeholder="e.g. Production Background Workers"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                autoFocus
+                disabled={isRegisteringTask}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="ghost"
+                onClick={closeModal}
+                disabled={isRegisteringTask}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRegisterTask}
+                disabled={isRegisteringTask}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {isRegisteringTask ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" /> Generating...
+                  </>
+                ) : (
+                  "Generate Key"
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Key className="h-3 w-3" /> Service Key
+              </label>
+              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all text-indigo-500">
+                {newCreds.apiKey}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Install & Configure</label>
+              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
+                <pre className="text-xs font-mono text-indigo-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
+                  {getTaskSnippet(newCreds.apiKey)}
+                </pre>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      getTaskSnippet(newCreds.apiKey),
+                    );
+                    toast.success("Copied!");
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <Button className="w-full" onClick={closeModal} variant="outline">
+              Done
+            </Button>
+          </div>
+        )}
+      </Dialog>
+
+      {/* --- MONITOR MODAL --- */}
       <Dialog
         open={isMonitorModalOpen}
         onClose={closeModal}
