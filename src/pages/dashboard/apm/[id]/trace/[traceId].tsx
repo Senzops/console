@@ -172,7 +172,7 @@ export default function TraceDetail() {
             </div>
 
             {/* Right Side Metrics */}
-            <div className="flex items-center gap-6 border-t md:border-t-0 md:border-l border-border/50 pt-4 md:pt-0 md:pl-6">
+            <div className="flex items-center gap-6 border-t md:border-t-0 border-border/50 pt-4 md:pt-0 md:pl-6">
               <div>
                 <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
                   Duration
@@ -184,6 +184,7 @@ export default function TraceDetail() {
                   </span>
                 </div>
               </div>
+              <div className="h-10 w-px bg-border/60 hidden md:block"></div>
               <div>
                 <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
                   Status

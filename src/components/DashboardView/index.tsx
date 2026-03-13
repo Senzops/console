@@ -19,6 +19,7 @@ import {
   ChartNoAxesCombined,
   Database,
   Settings,
+  Workflow
 } from "lucide-react";
 import useSWR from "swr";
 import { api, useAuth } from "../../lib/auth";
@@ -44,7 +45,7 @@ const HEX_CLIP =
   "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 interface DashboardViewProps {
-  filterType?: "server" | "web" | "apm" | "monitor" | "database";
+  filterType?: "server" | "web" | "apm" | "monitor" | "database" | "task";
 }
 
 export default function DashboardView({ filterType }: DashboardViewProps) {
@@ -81,17 +82,23 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     error: dbErr,
     mutate: mutateDb,
   } = useSWR(token ? "/database/list" : null, fetcher);
+  const {
+    data: taskList,
+    error: taskErr,
+    mutate: mutateTask,
+  } = useSWR(token ? "/task/list" : null, fetcher);
 
-  const hasError = serverErr || webErr || monitorErr || apmErr || dbErr;
+  const hasError = serverErr || webErr || monitorErr || apmErr || dbErr || taskErr;
   const isLoading =
-    !serverList && !webList && !monitorList && !apmList && !dbList && !hasError;
+    !serverList && !webList && !monitorList && !apmList && !dbList && !taskList && !hasError;
 
   const isEmpty =
     (serverList?.length || 0) === 0 &&
     (webList?.length || 0) === 0 &&
     (monitorList?.length || 0) === 0 &&
     (dbList?.length || 0) === 0 &&
-    (apmList?.length || 0) === 0;
+    (apmList?.length || 0) === 0 &&
+    (taskList?.length || 0) === 0;
 
   useEffect(() => {
     setViewMode(defaultViewMode);
@@ -103,6 +110,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutateMonitor();
     mutateApm();
     mutateDb();
+    mutateTask();
   };
 
   if (hasError) {
@@ -153,6 +161,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     ...(dbList || []).map((d: any) => ({ ...d, type: "database", meta: `${d.type}` })),
     ...(webList || []).map((w: any) => ({ ...w, type: "web" })),
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
+    ...(taskList || []).map((t: any) => ({ ...t, type: "task" })),
     ...(monitorList || []).map((m: any) => ({ ...m, type: "monitor" })),
   ];
 
@@ -167,6 +176,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     if (item.type === "server") return `/dashboard/server/${item._id}`;
     if (item.type === "web") return `/dashboard/web/${item._id}`;
     if (item.type === "apm") return `/dashboard/apm/${item._id}`;
+    if (item.type === "task") return `/dashboard/task/${item._id}`;
     if (item.type === "database") return `/dashboard/db/${item._id}`;
     return `/dashboard/monitor/${item._id}`;
   };
@@ -225,6 +235,22 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         </span>
       );
     }
+    if (item.type === "task") {
+      const isTaskActive =
+        item.status === "online" || (item.lastSeen && new Date().getTime() - new Date(item.lastSeen).getTime() < 5 * 60 * 1000);
+      return isTaskActive ? (
+        <Badge
+          variant="outline"
+          className="text-indigo-500 border-indigo-500/30 bg-indigo-500/5"
+        >
+          ACTIVE
+        </Badge>
+      ) : (
+        <span className="text-xs text-muted-foreground font-mono">
+          Inactive
+        </span>
+      );
+    }
   };
 
   const getIcon = (type: string, status?: string) => {
@@ -239,6 +265,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         return <Globe className="h-5 w-5 text-blue-500" />;
       case "apm":
         return <Code className={`h-5 w-5 text-orange-500`} />;
+      case "task":
+        return <Workflow className={`h-5 w-5 text-indigo-500`} />;
       case "database":
         return <Database className={`h-5 w-5 text-emerald-500`} />;
       case "monitor":
@@ -275,6 +303,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
             : "APM"}
         </>
       );
+    if (item.type === "task")
+      return (
+        <>
+          <Workflow className="h-3 w-3" /> Background Jobs
+        </>
+      );
     if (item.type === "database")
       return (
         <>
@@ -291,7 +325,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
   const title = filterType
     ? filterType === "apm"
       ? "APM Services"
-      : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
+      : filterType === "task"
+        ? "Background Tasks"
+        : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
     : "Global Infra";
 
   return (
@@ -347,6 +383,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                   item.lastSeen &&
                   new Date().getTime() - new Date(item.lastSeen).getTime() <
                     5 * 60 * 1000;
+                    
+                // Logic for Task Active state
+                const isTaskActive = 
+                  item.type === "task" &&
+                  (item.status === 'online' || (item.lastSeen && new Date().getTime() - new Date(item.lastSeen).getTime() < 5 * 60 * 1000));
+
                 return (
                   <Link
                     href={getHref(item)}
@@ -478,6 +520,36 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                         </>
                       )}
 
+                      {item.type === "task" && (
+                        <>
+                          <div
+                            className={`mb-3 p-3 rounded-full transition-colors ${isTaskActive ? "bg-indigo-500/10 text-indigo-500" : "bg-secondary text-muted-foreground"}`}
+                          >
+                            <Workflow className="h-6 w-6" />
+                          </div>
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-4">
+                            {item.name}
+                          </h3>
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-80">
+                            <Workflow className="h-3 w-3" /> Background Jobs
+                          </div>
+                          {isTaskActive ? (
+                            <Badge
+                              variant="outline"
+                              className="px-2 py-0.5 text-[10px] text-indigo-500 border-indigo-500/30 bg-indigo-500/5"
+                            >
+                              ACTIVE
+                            </Badge>
+                          ) : (
+                            <span className="text-[9px] text-muted-foreground font-mono">
+                              {item.lastSeen
+                                ? formatDistanceToNow(new Date(item.lastSeen))
+                                : "Never"}
+                            </span>
+                          )}
+                        </>
+                      )}
+
                       {item.type === "monitor" && (
                         <>
                           {/* Status Indicator Ring */}
@@ -540,7 +612,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                   </thead>
                   <tbody className="divide-y divide-border/40 bg-card">
                     {items.map((item, i) => (
-                      // 2. Clickable Row
+                      // Clickable Row
                       <tr
                         key={i}
                         className="hover:bg-muted/30 transition-colors group cursor-pointer"
@@ -554,9 +626,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                                   ? "bg-emerald-500/5"
                                   : item.type === "apm"
                                     ? "bg-orange-500/5"
-                                    : item.type === "monitor"
-                                      ? "bg-emerald-500/5"
-                                      : "bg-blue-500/5"
+                                    : item.type === "task"
+                                      ? "bg-indigo-500/5"
+                                      : item.type === "monitor"
+                                        ? "bg-emerald-500/5"
+                                        : "bg-blue-500/5"
                               }`}
                             >
                               {getIcon(item.type, item.status)}
