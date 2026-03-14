@@ -37,6 +37,7 @@ import {
   X,
   MessageSquareWarning,
   Maximize,
+  Workflow,
 } from "lucide-react";
 import { ErrorEventList } from "../../../components/TraceErrors";
 import { createPortal } from "react-dom";
@@ -251,7 +252,24 @@ export default function ErrorDetailPage() {
     );
 
   const { group, events } = data;
-  const latestTraceId = events?.[0]?.traceId;
+
+  // DYNAMIC RESOLUTION: Derive source of truth from the latest event to bypass missing Group-level population
+  const latestEvent = events?.[0];
+  const latestTraceId = latestEvent?.traceId;
+  const isTask =
+    latestEvent?.serviceType === "task" || group.serviceType === "task";
+
+  // Safely extract the ID regardless of whether it's an object (_id) or a raw string
+  const serviceId = isTask
+    ? latestEvent?.taskServiceId?._id ||
+      latestEvent?.taskServiceId ||
+      group.taskServiceId
+    : latestEvent?.apmId?._id || latestEvent?.apmId || group.apmId?._id;
+
+  // Fallback service name (Mongoose doesn't populate taskServiceId by default on group currently)
+  const serviceName = isTask
+    ? "Task Service"
+    : group.apmId?.name || "Unknown Service";
 
   const getColor = (defaultColor: string) =>
     isMono ? "hsl(var(--chart-mono))" : defaultColor;
@@ -286,9 +304,14 @@ export default function ErrorDetailPage() {
               </h1>
             </div>
             <div className="text-xs text-muted-foreground font-mono flex flex-wrap items-center gap-4">
+              {/* Dynamic Service Icon & Name */}
               <span className="flex items-center gap-1.5 text-foreground">
-                <Box className="h-3.5 w-3.5 text-orange-500" />{" "}
-                {group.apmId?.name || "Unknown Service"}
+                {isTask ? (
+                  <Workflow className="h-3.5 w-3.5 text-indigo-500" />
+                ) : (
+                  <Box className="h-3.5 w-3.5 text-orange-500" />
+                )}
+                {serviceName}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
@@ -326,18 +349,22 @@ export default function ErrorDetailPage() {
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto">
-              {latestTraceId && (
+              {/* Dynamic Route & Label for Latest Button */}
+              {latestTraceId && serviceId && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-9 bg-background border-primary/30 text-primary hover:bg-primary/10 flex-1 md:flex-none"
                   onClick={() =>
                     router.push(
-                      `/dashboard/apm/${group.apmId._id}/trace/${latestTraceId}`,
+                      isTask
+                        ? `/dashboard/task/${serviceId}/run/${latestTraceId}`
+                        : `/dashboard/apm/${serviceId}/trace/${latestTraceId}`,
                     )
                   }
                 >
-                  Latest Trace <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                  {isTask ? "Latest Run" : "Latest Trace"}{" "}
+                  <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
                 </Button>
               )}
               {group.status !== "resolved" && (

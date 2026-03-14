@@ -65,6 +65,16 @@ export const ErrorEventList = ({
               )
             : [];
 
+          // DYNAMIC RESOLUTION: Resolve whether to link to APM Trace or Task Run
+          const isTask = err.serviceType === "task";
+          const routeServiceId = isTask
+            ? err.taskServiceId?._id || err.taskServiceId
+            : err.apmId?._id || err.apmId || apmId;
+          const traceUrl = isTask
+            ? `/dashboard/task/${routeServiceId}/run/${err.traceId}`
+            : `/dashboard/apm/${routeServiceId}/trace/${err.traceId}`;
+          const traceBtnLabel = isTask ? "View Run" : "View Trace";
+
           return (
             <div key={err._id} className="flex flex-col transition-colors">
               {/* Row Header (Clickable) */}
@@ -115,19 +125,18 @@ export const ErrorEventList = ({
                       View Group <ExternalLink className="h-3 w-3 ml-1.5" />
                     </Button>
                   )}
-                  {showTraceLink && err.traceId && apmId && (
+                  {showTraceLink && err.traceId && routeServiceId && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-7 text-xs bg-background text-primary border-primary/20 hover:bg-primary/10"
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(
-                          `/dashboard/apm/${apmId}/trace/${err.traceId}`,
-                        );
+                        router.push(traceUrl);
                       }}
                     >
-                      View Trace <ExternalLink className="h-3 w-3 ml-1.5" />
+                      {traceBtnLabel}{" "}
+                      <ExternalLink className="h-3 w-3 ml-1.5" />
                     </Button>
                   )}
                 </div>
@@ -251,7 +260,6 @@ export const TraceErrors = ({
           Exceptions Recorded ({data.errors.length})
         </h3>
       </div>
-      {/* We show the Group Link so developers can jump to the trend dashboard from the trace */}
       <ErrorEventList events={data.errors} apmId={apmId} showGroupLink={true} />
     </div>
   );
