@@ -44,6 +44,8 @@ import {
   Maximize,
   Filter,
   ArrowLeft,
+  CalendarClock,
+  AlertTriangle,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -288,9 +290,9 @@ const RecentRunsList = ({ runs, serviceId, onRefresh, isRefreshing }: any) => {
                   <div className="flex items-center gap-2 group/cell">
                     <Badge
                       variant="outline"
-                      className={`font-mono text-xs ${run.status === "success" ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/10" : "border-destructive/50 text-destructive bg-destructive/10"}`}
+                      className={`font-mono text-xs ${run.isDeadLetter ? "border-purple-500/50 text-purple-500 bg-purple-500/10" : run.status === "success" ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/10" : "border-destructive/50 text-destructive bg-destructive/10"}`}
                     >
-                      {run.status}
+                      {run.isDeadLetter ? "DEAD-LETTER" : run.status}
                     </Badge>
                     <button
                       onClick={(e) => handleFilterClick(e, run.status)}
@@ -422,7 +424,7 @@ export default function TaskEntityDetail() {
       </DashboardLayout>
     );
 
-  const { taskName: decodedTaskName, stats, recentRuns } = data;
+  const { taskName: decodedTaskName, signature, stats, recentRuns } = data;
   const getColor = (defaultColor: string) =>
     isMono ? "hsl(var(--chart-mono))" : defaultColor;
 
@@ -446,6 +448,25 @@ export default function TaskEntityDetail() {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Service
           </Button>
 
+          {/* Watchdog Anomaly Banner */}
+          {signature?.healthState === "missing" && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex items-start gap-4">
+              <div className="p-2 bg-destructive/20 text-destructive rounded-full">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-destructive font-bold text-lg">
+                  Watchdog Alert: Missing Execution
+                </h3>
+                <p className="text-destructive/80 text-sm mt-1">
+                  This job has missed its scheduled execution window according
+                  to its cron profile. It may be deadlocked, out of memory, or
+                  the worker node is offline.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
             <div className="min-w-0">
               <div className="flex items-center gap-3 mb-1">
@@ -457,9 +478,14 @@ export default function TaskEntityDetail() {
                   {decodedTaskName}
                 </h1>
               </div>
-              <div className="text-xs text-muted-foreground font-mono flex items-center gap-4 pl-9">
-                Task Entity Signature Profile
-              </div>
+              <div className="flex items-center gap-3 pl-9">
+                <Badge variant="outline" className="font-mono text-[10px] bg-muted/50 capitalize">{signature?.taskType || 'Task Entity Signature Profile'}</Badge>
+                {signature?.scheduleExpression && (
+                  <Badge variant="outline" className="font-mono text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20 flex items-center gap-1.5">
+                    <CalendarClock className="h-3 w-3" /> {signature.scheduleExpression}
+                  </Badge>
+                )}
+             </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Select

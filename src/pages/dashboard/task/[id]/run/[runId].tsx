@@ -30,6 +30,7 @@ import {
   Server,
   AlertOctagon,
   Braces,
+  Cpu,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -45,9 +46,23 @@ const formatDuration = (ms: number) => {
   return `${(ms / 60000).toFixed(2)}m`;
 };
 
+const formatBytes = (bytes: number) => {
+  if (bytes === 0) return "0 B";
+  const sign = bytes < 0 ? "-" : "+";
+  const absBytes = Math.abs(bytes);
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(absBytes) / Math.log(k));
+  return `${sign}${parseFloat((absBytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+};
+
+const formatCpuTime = (us: number) => {
+  if (us < 1000) return `${us}µs`;
+  return `${(us / 1000).toFixed(2)}ms`;
+};
+
 // --- COMPONENTS ---
 
-// Strictly mirrors the ApmView.tsx StatCard
 const StatCard = ({ title, value, sub, icon: Icon, color, isMono }: any) => {
   const iconClass = isMono ? "text-[hsl(var(--chart-mono))]" : color;
   return (
@@ -172,9 +187,9 @@ export default function TaskRunDetail() {
             <div className="flex items-center gap-3">
               <Badge
                 variant="outline"
-                className="font-mono text-[10px] px-2 py-0.5 border-indigo-500/30 text-indigo-500 bg-indigo-500/10 uppercase tracking-wider"
+                className={`font-mono text-[10px] px-2 py-0.5 uppercase tracking-wider ${run.isDeadLetter ? "border-purple-500/30 text-purple-500 bg-purple-500/10" : "border-indigo-500/30 text-indigo-500 bg-indigo-500/10"}`}
               >
-                {run.taskType}
+                {run.isDeadLetter ? "DEAD-LETTER" : run.taskType}
               </Badge>
               <h1
                 className="text-xl md:text-2xl font-bold text-foreground truncate max-w-[60vw]"
@@ -220,16 +235,27 @@ export default function TaskRunDetail() {
           </div>
         </div>
 
-        {/* --- Standardized Stat Grid --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            title="Execution Time"
-            value={formatDuration(run.duration)}
-            sub="Total processing duration"
-            icon={Timer}
-            color="text-emerald-500"
-            isMono={isMono}
-          />
+        {/* --- Context Cards --- */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
+          {run.resourceMetrics ? (
+            <StatCard
+              title="Hardware Cost"
+              value={formatBytes(run.resourceMetrics.memoryDeltaBytes)}
+              sub={`CPU: ${formatCpuTime(run.resourceMetrics.cpuUserUs + run.resourceMetrics.cpuSystemUs)}`}
+              icon={Cpu}
+              color="text-pink-500"
+              isMono={isMono}
+            />
+          ) : (
+            <StatCard
+              title="Execution Time"
+              value={formatDuration(run.duration)}
+              sub="Total processing duration"
+              icon={Timer}
+              color="text-emerald-500"
+              isMono={isMono}
+            />
+          )}
           <StatCard
             title="Queue Delay"
             value={formatDuration(run.queueDelay || 0)}
