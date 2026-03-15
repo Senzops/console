@@ -253,23 +253,11 @@ export default function ErrorDetailPage() {
 
   const { group, events } = data;
 
-  // DYNAMIC RESOLUTION: Derive source of truth from the latest event to bypass missing Group-level population
-  const latestEvent = events?.[0];
-  const latestTraceId = latestEvent?.traceId;
-  const isTask =
-    latestEvent?.serviceType === "task" || group.serviceType === "task";
-
-  // Safely extract the ID regardless of whether it's an object (_id) or a raw string
-  const serviceId = isTask
-    ? latestEvent?.taskServiceId?._id ||
-      latestEvent?.taskServiceId ||
-      group.taskServiceId
-    : latestEvent?.apmId?._id || latestEvent?.apmId || group.apmId?._id;
-
-  // Fallback service name (Mongoose doesn't populate taskServiceId by default on group currently)
-  const serviceName = isTask
-    ? "Task Service"
-    : group.apmId?.name || "Unknown Service";
+  // DYNAMIC RESOLUTION: Trust the unified backend DTO mapping!
+  const isTask = group.service?.type === "task";
+  const serviceId = group.service?._id;
+  const serviceName = group.service?.name || "Unknown Service";
+  const latestTraceId = events?.[0]?.traceId;
 
   const getColor = (defaultColor: string) =>
     isMono ? "hsl(var(--chart-mono))" : defaultColor;
@@ -506,7 +494,7 @@ export default function ErrorDetailPage() {
           {events.length > 0 ? (
             <ErrorEventList
               events={events}
-              apmId={group.apmId?._id}
+              apmId={serviceId} // Pass down resolved parent ID
               showTraceLink={true}
             />
           ) : (

@@ -38,6 +38,7 @@ import {
   X,
   ShieldAlert,
   Maximize,
+  Workflow, // NEW: For dynamic task icons
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { SmartAnimatedValue } from "@/components/Tween";
@@ -431,9 +432,14 @@ export default function GlobalErrorsDashboard() {
                     >
                       <td className="px-6 py-4 text-foreground whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <Box className="h-4 w-4 text-orange-500" />
+                          {/* DYNAMIC RESOLUTION: Check DTO service type */}
+                          {err.service?.type === "task" ? (
+                            <Workflow className="h-4 w-4 text-indigo-500" />
+                          ) : (
+                            <Box className="h-4 w-4 text-orange-500" />
+                          )}
                           <span className="font-medium">
-                            {err.apmId?.name || "Unknown Service"}
+                            {err.service?.name || "Unknown Service"}
                           </span>
                         </div>
                       </td>

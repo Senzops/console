@@ -24,10 +24,10 @@ import {
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
-// --- Shared Reusable Component for Error Occurrences ---
+// --- Shared Reusable Component for Universal Error Occurrences ---
 export const ErrorEventList = ({
   events,
-  apmId,
+  apmId, // Generic fallback parent ID
   showTraceLink = false,
   showGroupLink = false,
 }: {
@@ -65,11 +65,9 @@ export const ErrorEventList = ({
               )
             : [];
 
-          // DYNAMIC RESOLUTION: Resolve whether to link to APM Trace or Task Run
-          const isTask = err.serviceType === "task";
-          const routeServiceId = isTask
-            ? err.taskServiceId?._id || err.taskServiceId
-            : err.apmId?._id || err.apmId || apmId;
+          // DYNAMIC ROUTING: Based strictly on Polymorphic serviceModel
+          const isTask = err.serviceModel === "TaskService";
+          const routeServiceId = err.serviceId || apmId;
           const traceUrl = isTask
             ? `/dashboard/task/${routeServiceId}/run/${err.traceId}`
             : `/dashboard/apm/${routeServiceId}/trace/${err.traceId}`;
@@ -234,6 +232,7 @@ export const TraceErrors = ({
   traceId: string;
 }) => {
   const { token } = useAuth();
+  // Call the universal trace route on the backend
   const { data, error, isLoading } = useSWR(
     token && apmId && traceId ? `/apm/${apmId}/trace/${traceId}/errors` : null,
     fetcher,
