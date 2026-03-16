@@ -20,9 +20,79 @@ import {
   Info,
   Clock,
   ExternalLink,
+  Server,
+  Activity,
+  HardDrive,
 } from "lucide-react";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
+
+// --- Formatters ---
+const formatBytes = (bytes?: number) => {
+  if (bytes === undefined || bytes === null) return undefined;
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+};
+
+const formatUptime = (seconds?: number) => {
+  if (seconds === undefined || seconds === null) return undefined;
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor((seconds % (3600 * 24)) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+
+  const parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 && d === 0) parts.push(`${s}s`);
+
+  return parts.join(" ") || "< 1s";
+};
+
+// --- Reusable UI Context Blocks ---
+const ContextGroup = ({ title, icon: Icon, children, className = "" }: any) => {
+  // If all children evaluate to null (empty), don't render the group
+  let hasContent = false;
+  React.Children.forEach(children, (child) => {
+    if (child) hasContent = true;
+  });
+  if (!hasContent) return null;
+
+  return (
+    <div
+      className={`bg-background rounded-lg p-4 border border-border/40 shadow-sm flex flex-col ${className}`}
+    >
+      <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-3 border-b border-border/30 pb-2">
+        <Icon className="h-3.5 w-3.5" /> {title}
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>
+    </div>
+  );
+};
+
+const ContextItem = ({ label, value }: { label: string; value: any }) => {
+  if (value === undefined || value === null || value === "") return null;
+  return (
+    <div className="space-y-1 min-w-0">
+      <div
+        className="text-[10px] text-muted-foreground uppercase tracking-wider truncate"
+        title={label}
+      >
+        {label}
+      </div>
+      <div
+        className="text-xs font-mono text-foreground truncate"
+        title={String(value)}
+      >
+        {String(value)}
+      </div>
+    </div>
+  );
+};
 
 // --- Shared Reusable Component for Universal Error Occurrences ---
 export const ErrorEventList = ({
@@ -59,11 +129,6 @@ export const ErrorEventList = ({
       <div className="max-h-[600px] overflow-y-auto divide-y divide-border/40 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
         {events.map((err) => {
           const isExpanded = expandedIds[err._id];
-          const validContext = err.context
-            ? Object.entries(err.context).filter(
-                ([_, v]) => v !== undefined && v !== null && v !== "",
-              )
-            : [];
 
           // DYNAMIC ROUTING: Based strictly on Polymorphic serviceModel
           const isTask = err.serviceModel === "TaskService";
@@ -72,6 +137,19 @@ export const ErrorEventList = ({
             ? `/dashboard/task/${routeServiceId}/run/${err.traceId}`
             : `/dashboard/apm/${routeServiceId}/trace/${err.traceId}`;
           const traceBtnLabel = isTask ? "View Run" : "View Trace";
+
+          // ADVANCED CONTEXT PARSING
+          const ctx = err.context || {};
+          const {
+            runtime,
+            process: procInfo,
+            memory,
+            sdk,
+            ...flatContext
+          } = ctx;
+          const validFlatContext = Object.entries(flatContext).filter(
+            ([_, v]) => v !== undefined && v !== null && v !== "",
+          );
 
           return (
             <div key={err._id} className="flex flex-col transition-colors">
@@ -142,34 +220,93 @@ export const ErrorEventList = ({
 
               {/* Row Body (Expanded) */}
               {isExpanded && (
-                <div className="p-4 pl-11 border-t border-border/30 bg-muted/5 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                  {/* Context Grid */}
-                  {validContext.length > 0 && (
-                    <div className="bg-background rounded-lg p-3 border border-border/40 shadow-sm">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                        <Info className="h-3.5 w-3.5" /> Operational Context
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {validContext.map(([k, v]) => (
-                          <div key={k} className="space-y-1">
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                              {k}
-                            </div>
-                            <div
-                              className="text-xs font-mono text-foreground truncate"
-                              title={String(v)}
-                            >
-                              {String(v)}
-                            </div>
+                <div className="p-4 pl-11 border-t border-border/30 bg-muted/5 space-y-5 animate-in slide-in-from-top-2 duration-200">
+                  {/* --- ADVANCED FORENSIC CONTEXT --- */}
+                  {Object.keys(ctx).length > 0 && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* 1. Flat / Operational Context (Spans full width if present) */}
+                      {validFlatContext.length > 0 && (
+                        <div className="lg:col-span-3 bg-background rounded-lg p-4 border border-border/40 shadow-sm">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-3 border-b border-border/30 pb-2">
+                            <Info className="h-3.5 w-3.5" /> Event Context
                           </div>
-                        ))}
-                      </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {validFlatContext.map(([k, v]) => (
+                              <ContextItem key={k} label={k} value={v} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. Environment / SDK */}
+                      {(runtime || sdk) && (
+                        <ContextGroup title="Environment & SDK" icon={Server}>
+                          <ContextItem label="Runtime" value={runtime?.name} />
+                          <ContextItem
+                            label="Version"
+                            value={runtime?.version}
+                          />
+                          <ContextItem label="SDK" value={sdk?.name} />
+                          <ContextItem
+                            label="SDK Version"
+                            value={sdk?.version}
+                          />
+                        </ContextGroup>
+                      )}
+
+                      {/* 3. Process Health */}
+                      {procInfo && (
+                        <ContextGroup title="Process Profile" icon={Activity}>
+                          <ContextItem
+                            label="PID / PPID"
+                            value={
+                              procInfo.pid
+                                ? `${procInfo.pid} / ${procInfo.ppid || "-"}`
+                                : undefined
+                            }
+                          />
+                          <ContextItem
+                            label="Platform"
+                            value={procInfo.platform}
+                          />
+                          <ContextItem
+                            label="Environment"
+                            value={procInfo.env}
+                          />
+                          <ContextItem
+                            label="Uptime"
+                            value={formatUptime(procInfo.uptimeSec)}
+                          />
+                        </ContextGroup>
+                      )}
+
+                      {/* 4. Memory Allocation */}
+                      {memory && (
+                        <ContextGroup title="Memory State" icon={HardDrive}>
+                          <ContextItem
+                            label="RSS"
+                            value={formatBytes(memory.rss)}
+                          />
+                          <ContextItem
+                            label="Heap Total"
+                            value={formatBytes(memory.heapTotal)}
+                          />
+                          <ContextItem
+                            label="Heap Used"
+                            value={formatBytes(memory.heapUsed)}
+                          />
+                          <ContextItem
+                            label="External V8"
+                            value={formatBytes(memory.external)}
+                          />
+                        </ContextGroup>
+                      )}
                     </div>
                   )}
 
                   {/* Stack Trace Terminal */}
                   {err.stackTrace && (
-                    <div className="border border-border/60 rounded-lg overflow-hidden bg-[#0d1117] shadow-inner">
+                    <div className="border border-border/60 rounded-lg overflow-hidden bg-[#0d1117] shadow-inner mt-2">
                       <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-border/40">
                         <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                           <Terminal className="h-3.5 w-3.5" /> Stack Trace
@@ -191,7 +328,7 @@ export const ErrorEventList = ({
                         </Button>
                       </div>
 
-                      <div className="p-4 overflow-x-auto overflow-y-auto max-h-[300px] scrollbar-thin scrollbar-thumb-[#30363d] scrollbar-track-transparent">
+                      <div className="p-4 overflow-x-auto overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-[#30363d] scrollbar-track-transparent">
                         <pre className="text-[11.5px] leading-relaxed font-mono text-[#c9d1d9]">
                           {err.stackTrace
                             .split("\n")
