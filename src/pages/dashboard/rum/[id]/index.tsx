@@ -292,9 +292,7 @@ const PathsTable = ({ paths, router, serviceId }: any) => {
                 key={i}
                 className="border-b border-border hover:bg-muted/20 group cursor-pointer transition-colors"
                 onClick={() =>
-                  router.push(
-                    `/dashboard/rum/${serviceId}/${encodeURIComponent(r._id)}`,
-                  )
+                  router.push({ query: { ...router.query, path: r._id } })
                 }
               >
                 <td className="px-6 py-3 font-mono text-xs truncate max-w-[300px] text-foreground">
@@ -574,6 +572,7 @@ const computePathsFallback = (traces: any[]) => {
 export default function RumDashboard() {
   const router = useRouter();
   const { id } = router.query;
+  const pathFilter = router.query.path as string | undefined; // Reads path from query for dynamic filtering
   const { token } = useAuth();
   const { isMono } = useTheme();
 
@@ -581,7 +580,7 @@ export default function RumDashboard() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const endpoint = `/rum/${id}/dashboard?range=${range}`;
+  const endpoint = `/rum/${id}/dashboard?range=${range}` + (pathFilter ? `&path=${encodeURIComponent(pathFilter)}` : '');
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? endpoint : null,
     fetcher,
@@ -614,10 +613,10 @@ export default function RumDashboard() {
       if (!str) return "";
       const date = new Date(str);
       return date.toLocaleString(undefined, {
-        month: range === "1h" ? undefined : "short",
-        day: range === "1h" ? undefined : "numeric",
+        month: range === "24h" || range === "7d" || range === "30d" ? "short" : undefined,
+        day: range === "24h" || range === "7d" || range === "30d" ? "numeric" : undefined,
         hour: "numeric",
-        minute: range === "1h" ? "2-digit" : undefined,
+        minute: "2-digit",
       });
     },
     [range],
@@ -666,12 +665,34 @@ export default function RumDashboard() {
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         {/* 1. Header */}
         <div className="flex flex-col gap-4">
+          {pathFilter && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                const q = { ...router.query };
+                delete q.path;
+                router.push({ query: q });
+              }}
+              className="pl-0 w-fit hover:bg-transparent hover:text-pink-500 -ml-2"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Service
+            </Button>
+          )}
+
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <h1 className="text-2xl font-bold tracking-tight">
                   {service.name}
                 </h1>
+                {pathFilter && (
+                  <Badge
+                    variant="outline"
+                    className="border-pink-500/20 text-pink-500 bg-pink-500/10 font-mono text-xs"
+                  >
+                    {pathFilter}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2 text-xs">
                 {isActive ? (
@@ -808,7 +829,9 @@ export default function RumDashboard() {
         </ChartCard>
 
         {/* 4. Top Viewed Paths Chart/List (Full Wide) */}
-        <PathsTable paths={safePaths} router={router} serviceId={id} />
+        {!pathFilter && (
+          <PathsTable paths={safePaths} router={router} serviceId={id} />
+        )}
 
         {/* 5. Core Web Vitals Graph (Full Wide) */}
         <ChartCard title="Core Web Vitals Trend">

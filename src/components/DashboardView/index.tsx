@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "../Layout";
@@ -19,7 +20,8 @@ import {
   ChartNoAxesCombined,
   Database,
   Settings,
-  Workflow
+  Workflow,
+  MonitorSmartphone, // Added for RUM
 } from "lucide-react";
 import useSWR from "swr";
 import { api, useAuth } from "../../lib/auth";
@@ -45,7 +47,7 @@ const HEX_CLIP =
   "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 interface DashboardViewProps {
-  filterType?: "server" | "web" | "apm" | "monitor" | "database" | "task";
+  filterType?: "server" | "web" | "apm" | "monitor" | "database" | "task" | "rum";
 }
 
 export default function DashboardView({ filterType }: DashboardViewProps) {
@@ -87,10 +89,15 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     error: taskErr,
     mutate: mutateTask,
   } = useSWR(token ? "/task/list" : null, fetcher);
+  const {
+    data: rumList,
+    error: rumErr,
+    mutate: mutateRum,
+  } = useSWR(token ? "/rum/list" : null, fetcher); // NEW: RUM Fetching
 
-  const hasError = serverErr || webErr || monitorErr || apmErr || dbErr || taskErr;
+  const hasError = serverErr || webErr || monitorErr || apmErr || dbErr || taskErr || rumErr;
   const isLoading =
-    !serverList && !webList && !monitorList && !apmList && !dbList && !taskList && !hasError;
+    !serverList && !webList && !monitorList && !apmList && !dbList && !taskList && !rumList && !hasError;
 
   const isEmpty =
     (serverList?.length || 0) === 0 &&
@@ -98,7 +105,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     (monitorList?.length || 0) === 0 &&
     (dbList?.length || 0) === 0 &&
     (apmList?.length || 0) === 0 &&
-    (taskList?.length || 0) === 0;
+    (taskList?.length || 0) === 0 &&
+    (rumList?.length || 0) === 0;
 
   useEffect(() => {
     setViewMode(defaultViewMode);
@@ -111,6 +119,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutateApm();
     mutateDb();
     mutateTask();
+    mutateRum();
   };
 
   if (hasError) {
@@ -160,6 +169,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     ...(serverList || []).map((s: any) => ({ ...s, type: "server" })),
     ...(dbList || []).map((d: any) => ({ ...d, type: "database", meta: `${d.type}` })),
     ...(webList || []).map((w: any) => ({ ...w, type: "web" })),
+    ...(rumList || []).map((r: any) => ({ ...r, type: "rum" })), // NEW: RUM Items
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
     ...(taskList || []).map((t: any) => ({ ...t, type: "task" })),
     ...(monitorList || []).map((m: any) => ({ ...m, type: "monitor" })),
@@ -175,6 +185,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
   const getHref = (item: any) => {
     if (item.type === "server") return `/dashboard/server/${item._id}`;
     if (item.type === "web") return `/dashboard/web/${item._id}`;
+    if (item.type === "rum") return `/dashboard/rum/${item._id}`; // NEW
     if (item.type === "apm") return `/dashboard/apm/${item._id}`;
     if (item.type === "task") return `/dashboard/task/${item._id}`;
     if (item.type === "database") return `/dashboard/db/${item._id}`;
@@ -182,13 +193,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
   };
 
   const getStatusBadge = (item: any) => {
-    if (item.type === "server")
-      return (
-        <Badge variant={item.status === "online" ? "success" : "destructive"}>
-          {item.status === "online" ? "ONLINE" : "OFFLINE"}
-        </Badge>
-      );
-    if (item.type === "web")
+    if (item.type === "server" || item.type === "web")
       return (
         <Badge variant={item.status === "online" ? "success" : "destructive"}>
           {item.status === "online" ? "ONLINE" : "OFFLINE"}
@@ -235,6 +240,25 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         </span>
       );
     }
+    if (item.type === "rum") {
+      // RUM uses a 15-min threshold for 'LIVE'
+      const isRumActive =
+        item.lastSeen &&
+        new Date().getTime() - new Date(item.lastSeen).getTime() <
+          15 * 60 * 1000;
+      return isRumActive ? (
+        <Badge
+          variant="outline"
+          className="text-pink-500 border-pink-500/30 bg-pink-500/5"
+        >
+          LIVE
+        </Badge>
+      ) : (
+        <span className="text-xs text-muted-foreground font-mono">
+          Inactive
+        </span>
+      );
+    }
     if (item.type === "task") {
       const isTaskActive =
         item.status === "online" || (item.lastSeen && new Date().getTime() - new Date(item.lastSeen).getTime() < 5 * 60 * 1000);
@@ -263,6 +287,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         );
       case "web":
         return <Globe className="h-5 w-5 text-blue-500" />;
+      case "rum":
+        return <MonitorSmartphone className="h-5 w-5 text-pink-500" />;
       case "apm":
         return <Code className={`h-5 w-5 text-orange-500`} />;
       case "task":
@@ -292,6 +318,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
       return (
         <>
           <ChartNoAxesCombined className="h-3 w-3" /> Analytics
+        </>
+      );
+    if (item.type === "rum")
+      return (
+        <>
+          <MonitorSmartphone className="h-3 w-3" /> Web APM
         </>
       );
     if (item.type === "apm")
@@ -327,7 +359,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
       ? "APM Services"
       : filterType === "task"
         ? "Background Tasks"
-        : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
+        : filterType === "rum"
+          ? "Web APM Services"
+          : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
     : "Global Infra";
 
   return (
@@ -384,6 +418,13 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                   new Date().getTime() - new Date(item.lastSeen).getTime() <
                     5 * 60 * 1000;
                     
+                // Logic for RUM Active state (Last seen within 15 mins)
+                const isRumActive =
+                  item.type === "rum" &&
+                  item.lastSeen &&
+                  new Date().getTime() - new Date(item.lastSeen).getTime() <
+                    15 * 60 * 1000;
+                    
                 // Logic for Task Active state
                 const isTaskActive = 
                   item.type === "task" &&
@@ -438,7 +479,6 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
 
                       {item.type === "database" && (
                         <>
-                          {/* Status Indicator Ring */}
                           <div
                             className={`mb-3 p-3 rounded-full transition-colors ${item.status === "online" ? "bg-emerald-500/10 text-emerald-500" : "bg-destructive/10 text-destructive"}`}
                           >
@@ -469,7 +509,6 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
 
                       {item.type === "web" && (
                         <>
-                          {/* Status Indicator Ring */}
                           <div
                             className={`mb-3 p-3 rounded-full bg-blue-500/10 text-blue-500`}
                           >
@@ -484,6 +523,36 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                             <ChartNoAxesCombined className="h-3 w-3" />{" "}
                             Analytics
                           </div>
+                        </>
+                      )}
+
+                      {item.type === "rum" && (
+                        <>
+                          <div
+                            className={`mb-3 p-3 rounded-full transition-colors ${isRumActive ? "bg-pink-500/10 text-pink-500" : "bg-secondary text-muted-foreground"}`}
+                          >
+                            <MonitorSmartphone className="h-6 w-6" />
+                          </div>
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-4">
+                            {item.name}
+                          </h3>
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-80">
+                            <MonitorSmartphone className="h-3 w-3" /> Web APM
+                          </div>
+                          {isRumActive ? (
+                            <Badge
+                              variant="outline"
+                              className="px-2 py-0.5 text-[10px] text-pink-500 border-pink-500/30 bg-pink-500/5"
+                            >
+                              LIVE
+                            </Badge>
+                          ) : (
+                            <span className="text-[9px] text-muted-foreground font-mono">
+                              {item.lastSeen
+                                ? formatDistanceToNow(new Date(item.lastSeen))
+                                : "Never"}
+                            </span>
+                          )}
                         </>
                       )}
 
@@ -552,7 +621,6 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
 
                       {item.type === "monitor" && (
                         <>
-                          {/* Status Indicator Ring */}
                           <div
                             className={`mb-3 p-3 rounded-full transition-colors ${item.status === "up" ? "bg-emerald-500/10 text-emerald-500" : "bg-destructive/10 text-destructive"}`}
                           >
@@ -612,7 +680,6 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                   </thead>
                   <tbody className="divide-y divide-border/40 bg-card">
                     {items.map((item, i) => (
-                      // Clickable Row
                       <tr
                         key={i}
                         className="hover:bg-muted/30 transition-colors group cursor-pointer"
@@ -628,9 +695,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                                     ? "bg-orange-500/5"
                                     : item.type === "task"
                                       ? "bg-indigo-500/5"
-                                      : item.type === "monitor"
-                                        ? "bg-emerald-500/5"
-                                        : "bg-blue-500/5"
+                                      : item.type === "rum"
+                                        ? "bg-pink-500/5"
+                                        : item.type === "monitor"
+                                          ? "bg-emerald-500/5"
+                                          : "bg-blue-500/5"
                               }`}
                             >
                               {getIcon(item.type, item.status)}
