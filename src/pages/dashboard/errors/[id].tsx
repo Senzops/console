@@ -21,8 +21,8 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts";
 import {
   AlertOctagon,
@@ -33,11 +33,10 @@ import {
   Activity,
   Box,
   ExternalLink,
-  Maximize2,
   X,
-  MessageSquareWarning,
   Maximize,
   Workflow,
+  MonitorSmartphone, // NEW: Added RUM Icon
 } from "lucide-react";
 import { ErrorEventList } from "../../../components/TraceErrors";
 import { createPortal } from "react-dom";
@@ -253,8 +252,9 @@ export default function ErrorDetailPage() {
 
   const { group, events } = data;
 
-  // DYNAMIC RESOLUTION: Trust the unified backend DTO mapping!
+  // DYNAMIC RESOLUTION: Determine which service model spawned this error
   const isTask = group.service?.type === "task";
+  const isRum = group.service?.type === "rum";
   const serviceId = group.service?._id;
   const serviceName = group.service?.name || "Unknown Service";
   const latestTraceId = events?.[0]?.traceId;
@@ -282,8 +282,7 @@ export default function ErrorDetailPage() {
             >
               {group.errorClass}
             </Badge>
-            <div className="flex items-center gap-3 mb-2">
-              {/* Strictly truncated title in the header */}
+            <div className="flex items-center gap-3 mb-2 mt-2">
               <h1
                 className="text-xl md:text-2xl font-bold tracking-tight text-foreground truncate max-w-[60vw] md:max-w-lg"
                 title={group.message}
@@ -296,6 +295,8 @@ export default function ErrorDetailPage() {
               <span className="flex items-center gap-1.5 text-foreground">
                 {isTask ? (
                   <Workflow className="h-3.5 w-3.5 text-indigo-500" />
+                ) : isRum ? (
+                  <MonitorSmartphone className="h-3.5 w-3.5 text-pink-500" />
                 ) : (
                   <Box className="h-3.5 w-3.5 text-orange-500" />
                 )}
@@ -321,7 +322,7 @@ export default function ErrorDetailPage() {
           </div>
 
           <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto md:items-end mt-2 md:mt-0">
-            {/* Time Range Selector Moved to Header */}
+            {/* Time Range Selector */}
             <div className="flex items-center gap-2 w-full md:w-auto">
               <Select
                 className="w-full md:w-36 bg-background border-border/80 h-9 text-xs"
@@ -347,11 +348,17 @@ export default function ErrorDetailPage() {
                     router.push(
                       isTask
                         ? `/dashboard/task/${serviceId}/run/${latestTraceId}`
-                        : `/dashboard/apm/${serviceId}/trace/${latestTraceId}`,
+                        : isRum
+                          ? `/dashboard/rum/${serviceId}/trace/${latestTraceId}`
+                          : `/dashboard/apm/${serviceId}/trace/${latestTraceId}`,
                     )
                   }
                 >
-                  {isTask ? "Latest Run" : "Latest Trace"}{" "}
+                  {isTask
+                    ? "Latest Run"
+                    : isRum
+                      ? "Latest Page Trace"
+                      : "Latest Trace"}{" "}
                   <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
                 </Button>
               )}
@@ -494,8 +501,9 @@ export default function ErrorDetailPage() {
           {events.length > 0 ? (
             <ErrorEventList
               events={events}
-              apmId={serviceId} // Pass down resolved parent ID
+              apmId={serviceId}
               showTraceLink={true}
+              serviceType={group.service?.type} // Ensure TraceErrors knows it might be a RUM service
             />
           ) : (
             <div className="p-8 border border-border/60 rounded-xl bg-card text-center text-muted-foreground">

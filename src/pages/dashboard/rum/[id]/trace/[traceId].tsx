@@ -108,7 +108,7 @@ export default function RumTraceDetail() {
     return (
       <DashboardLayout>
         <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-pink-500" />
+          <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">
             Reconstructing Web Waterfall...
           </p>

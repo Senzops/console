@@ -23,6 +23,8 @@ import {
   Server,
   Activity,
   HardDrive,
+  MonitorSmartphone,
+  History,
 } from "lucide-react";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
@@ -75,7 +77,14 @@ const ContextGroup = ({ title, icon: Icon, children, className = "" }: any) => {
 };
 
 const ContextItem = ({ label, value }: { label: string; value: any }) => {
+  // Prevent rendering empty strings, nulls, or completely empty objects/arrays
   if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "object" && Object.keys(value).length === 0) return null;
+
+  // Safely parse nested objects so they don't show up as [object Object]
+  const displayValue =
+    typeof value === "object" ? JSON.stringify(value) : String(value);
+
   return (
     <div className="space-y-1 min-w-0">
       <div
@@ -86,9 +95,9 @@ const ContextItem = ({ label, value }: { label: string; value: any }) => {
       </div>
       <div
         className="text-xs font-mono text-foreground truncate"
-        title={String(value)}
+        title={displayValue}
       >
-        {String(value)}
+        {displayValue}
       </div>
     </div>
   );
@@ -100,11 +109,13 @@ export const ErrorEventList = ({
   apmId, // Generic fallback parent ID
   showTraceLink = false,
   showGroupLink = false,
+  serviceType, // Allows explicitly passing the service type
 }: {
   events: any[];
   apmId?: string;
   showTraceLink?: boolean;
   showGroupLink?: boolean;
+  serviceType?: string;
 }) => {
   const router = useRouter();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -130,25 +141,59 @@ export const ErrorEventList = ({
         {events.map((err) => {
           const isExpanded = expandedIds[err._id];
 
-          // DYNAMIC ROUTING: Based strictly on Polymorphic serviceModel
-          const isTask = err.serviceModel === "TaskService";
+          // DYNAMIC ROUTING: Resolves exact model for correct links
+          const actualServiceModel =
+            err.serviceModel ||
+            (serviceType === "task"
+              ? "TaskService"
+              : serviceType === "rum"
+                ? "RumService"
+                : "ApmService");
+
+          const isTask = actualServiceModel === "TaskService";
+          const isRum = actualServiceModel === "RumService";
           const routeServiceId = err.serviceId || apmId;
+
           const traceUrl = isTask
             ? `/dashboard/task/${routeServiceId}/run/${err.traceId}`
-            : `/dashboard/apm/${routeServiceId}/trace/${err.traceId}`;
-          const traceBtnLabel = isTask ? "View Run" : "View Trace";
+            : isRum
+              ? `/dashboard/rum/${routeServiceId}/trace/${err.traceId}`
+              : `/dashboard/apm/${routeServiceId}/trace/${err.traceId}`;
+
+          const traceBtnLabel = isTask
+            ? "View Run"
+            : isRum
+              ? "View Page Trace"
+              : "View Trace";
 
           // ADVANCED CONTEXT PARSING
           const ctx = err.context || {};
+
+          // We cleanly extract Backend vs Frontend fields so they map cleanly to groups
           const {
+            // Node/Backend Context
             runtime,
             process: procInfo,
             memory,
             sdk,
+            // Browser/RUM Context
+            breadcrumbs,
+            browser,
+            os,
+            device,
+            url,
+            userAgent,
+            viewport,
+            // Catch-all for extra custom tags
             ...flatContext
           } = ctx;
+
           const validFlatContext = Object.entries(flatContext).filter(
-            ([_, v]) => v !== undefined && v !== null && v !== "",
+            ([_, v]) =>
+              v !== undefined &&
+              v !== null &&
+              v !== "" &&
+              !(typeof v === "object" && Object.keys(v).length === 0),
           );
 
           return (
@@ -224,6 +269,55 @@ export const ErrorEventList = ({
                   {/* --- ADVANCED FORENSIC CONTEXT --- */}
                   {Object.keys(ctx).length > 0 && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* RUM: Breadcrumbs Timeline */}
+                      {breadcrumbs &&
+                        Array.isArray(breadcrumbs) &&
+                        breadcrumbs.length > 0 && (
+                          <div className="lg:col-span-3 bg-background rounded-lg p-4 border border-border/40 shadow-sm">
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-3 border-b border-border/30 pb-2">
+                              <History className="h-3.5 w-3.5" /> User
+                              Breadcrumbs
+                            </div>
+                            <div className="space-y-4 pl-2.5 border-l-2 border-border/60 ml-2 mt-4">
+                              {breadcrumbs.map((crumb: any, idx: number) => (
+                                <div key={idx} className="relative pl-5">
+                                  {/* Timeline node marker */}
+                                  <div className="absolute -left-[15.5px] top-1 h-2.5 w-2.5 rounded-full bg-muted-foreground ring-4 ring-background" />
+                                  <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+                                    <div className="text-xs font-semibold text-foreground flex items-center gap-2">
+                                      <Badge
+                                        variant="secondary"
+                                        className="px-1.5 py-0 h-4 text-[9px] uppercase font-mono tracking-wider bg-secondary border-border/50 text-muted-foreground"
+                                      >
+                                        {crumb.category ||
+                                          crumb.type ||
+                                          "Action"}
+                                      </Badge>
+                                      {crumb.message ||
+                                        crumb.name ||
+                                        "Event Registered"}
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground font-mono bg-muted/30 px-1.5 py-0.5 rounded">
+                                      {crumb.time
+                                        ? new Date(
+                                            crumb.time,
+                                          ).toLocaleTimeString()
+                                        : "-"}
+                                    </div>
+                                  </div>
+                                  {/* Breadcrumb extra metadata */}
+                                  {crumb.data &&
+                                    Object.keys(crumb.data).length > 0 && (
+                                      <div className="text-[10px] font-mono text-muted-foreground bg-muted/30 p-2 rounded-md border border-border/30 overflow-x-auto">
+                                        {JSON.stringify(crumb.data)}
+                                      </div>
+                                    )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                       {/* 1. Flat / Operational Context (Spans full width if present) */}
                       {validFlatContext.length > 0 && (
                         <div className="lg:col-span-3 bg-background rounded-lg p-4 border border-border/40 shadow-sm">
@@ -238,7 +332,27 @@ export const ErrorEventList = ({
                         </div>
                       )}
 
-                      {/* 2. Environment / SDK */}
+                      {/* 2A. Client Environment (RUM) */}
+                      {(browser ||
+                        os ||
+                        device ||
+                        url ||
+                        viewport ||
+                        userAgent) && (
+                        <ContextGroup
+                          title="Client Environment"
+                          icon={MonitorSmartphone}
+                        >
+                          <ContextItem label="URL" value={url} />
+                          <ContextItem label="Browser" value={browser} />
+                          <ContextItem label="OS" value={os} />
+                          <ContextItem label="Device" value={device} />
+                          <ContextItem label="Viewport" value={viewport} />
+                          <ContextItem label="User Agent" value={userAgent} />
+                        </ContextGroup>
+                      )}
+
+                      {/* 2B. Environment / SDK (Node/Task) */}
                       {(runtime || sdk) && (
                         <ContextGroup title="Environment & SDK" icon={Server}>
                           <ContextItem label="Runtime" value={runtime?.name} />
@@ -254,7 +368,7 @@ export const ErrorEventList = ({
                         </ContextGroup>
                       )}
 
-                      {/* 3. Process Health */}
+                      {/* 3. Process Health (Node/Task) */}
                       {procInfo && (
                         <ContextGroup title="Process Profile" icon={Activity}>
                           <ContextItem
@@ -280,7 +394,7 @@ export const ErrorEventList = ({
                         </ContextGroup>
                       )}
 
-                      {/* 4. Memory Allocation */}
+                      {/* 4. Memory Allocation (Node/Task) */}
                       {memory && (
                         <ContextGroup title="Memory State" icon={HardDrive}>
                           <ContextItem
@@ -360,7 +474,7 @@ export const ErrorEventList = ({
   );
 };
 
-// --- Fetcher Wrapper for the APM Trace Detail Page ---
+// --- Fetcher Wrapper for the Trace Detail Pages ---
 export const TraceErrors = ({
   apmId,
   traceId,
@@ -369,6 +483,7 @@ export const TraceErrors = ({
   traceId: string;
 }) => {
   const { token } = useAuth();
+
   // Call the universal trace route on the backend
   const { data, error, isLoading } = useSWR(
     token && apmId && traceId ? `/apm/${apmId}/trace/${traceId}/errors` : null,

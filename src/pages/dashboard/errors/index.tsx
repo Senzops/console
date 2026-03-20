@@ -22,7 +22,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
@@ -34,11 +33,11 @@ import {
   Activity,
   Clock,
   Box,
-  Maximize2,
   X,
   ShieldAlert,
   Maximize,
-  Workflow, // NEW: For dynamic task icons
+  Workflow,
+  MonitorSmartphone, // NEW: Added RUM Icon
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { SmartAnimatedValue } from "@/components/Tween";
@@ -432,9 +431,11 @@ export default function GlobalErrorsDashboard() {
                     >
                       <td className="px-6 py-4 text-foreground whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          {/* DYNAMIC RESOLUTION: Check DTO service type */}
+                          {/* DYNAMIC RESOLUTION: Task vs RUM vs APM */}
                           {err.service?.type === "task" ? (
                             <Workflow className="h-4 w-4 text-indigo-500" />
+                          ) : err.service?.type === "rum" ? (
+                            <MonitorSmartphone className="h-4 w-4 text-pink-500" />
                           ) : (
                             <Box className="h-4 w-4 text-orange-500" />
                           )}
