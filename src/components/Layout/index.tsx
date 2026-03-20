@@ -33,6 +33,7 @@ import {
   Eye,
   AlertOctagon,
   Workflow,
+  MonitorSmartphone, // Added for RUM
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -75,7 +76,6 @@ export const Navbar = () => {
         {/* Auth Buttons */}
         <div className="flex items-center gap-4">
           {loading ? (
-            // Loading State for Auth Check
             <Button variant="ghost" disabled className="opacity-70">
               <Spinner className="mr-2 h-4 w-4" /> Initializing...
             </Button>
@@ -305,6 +305,10 @@ const SidebarSection = ({
         if (!Icon) {
           if (hrefPrefix.includes("web"))
             Icon = <Globe className="h-3 w-3 text-blue-500 shrink-0" />;
+          else if (hrefPrefix.includes("rum"))
+            Icon = (
+              <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
+            );
           else if (hrefPrefix.includes("apm"))
             Icon = <Box className="h-3 w-3 text-orange-500 shrink-0" />;
           else if (hrefPrefix.includes("monitor"))
@@ -394,16 +398,18 @@ export const DashboardLayout = ({
     token ? "/apm/list" : null,
     fetcher,
   );
-
   const { data: dbList, mutate: mutateDb } = useSWR(
     token ? "/database/list" : null,
     fetcher,
   );
-
   const { data: taskList, mutate: mutateTask } = useSWR(
     token ? "/task/list" : null,
     fetcher,
   );
+  const { data: rumList, mutate: mutateRum } = useSWR(
+    token ? "/rum/list" : null,
+    fetcher,
+  ); // NEW
 
   // Modal States
   const [isServerModalOpen, setIsServerModalOpen] = useState(false);
@@ -412,11 +418,12 @@ export const DashboardLayout = ({
   const [isApmModalOpen, setIsApmModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
+  const [isRumModalOpen, setIsRumModalOpen] = useState(false); // NEW
   const [showUri, setShowUri] = useState(false);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
-  const [isResending, setIsResending] = useState(false); // For email resend
+  const [isResending, setIsResending] = useState(false);
 
   // Loading States for Actions
   const [isRegisteringServer, setIsRegisteringServer] = useState(false);
@@ -425,6 +432,7 @@ export const DashboardLayout = ({
   const [isRegisteringApm, setIsRegisteringApm] = useState(false);
   const [isRegisteringTask, setIsRegisteringTask] = useState(false);
   const [isRegisteringDb, setIsRegisteringDb] = useState(false);
+  const [isRegisteringRum, setIsRegisteringRum] = useState(false); // NEW
 
   // Error States
   const [serverError, setServerError] = useState<string | null>(null);
@@ -433,6 +441,7 @@ export const DashboardLayout = ({
   const [apmError, setApmError] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [rumError, setRumError] = useState<string | null>(null); // NEW
 
   // Form State
   const [newName, setNewName] = useState("");
@@ -496,7 +505,6 @@ export const DashboardLayout = ({
       setNewName("");
       mutateServers();
     } catch (e: any) {
-      console.error(e);
       setServerError(
         extractErrorMessage(e, "Failed to register server. Please try again."),
       );
@@ -519,7 +527,6 @@ export const DashboardLayout = ({
       setNewDomain("");
       mutateWeb();
     } catch (e: any) {
-      console.error(e);
       setWebError(
         extractErrorMessage(
           e,
@@ -528,6 +535,28 @@ export const DashboardLayout = ({
       );
     } finally {
       setIsRegisteringWeb(false);
+    }
+  };
+
+  const handleRegisterRum = async () => {
+    if (!newName || !newDomain) return;
+    setIsRegisteringRum(true);
+    setRumError(null);
+    try {
+      const res = await api.post("/rum/register", {
+        name: newName,
+        domain: newDomain,
+      });
+      setNewCreds(res.data);
+      setNewName("");
+      setNewDomain("");
+      mutateRum();
+    } catch (e: any) {
+      setRumError(
+        extractErrorMessage(e, "Failed to register RUM. Check domain format."),
+      );
+    } finally {
+      setIsRegisteringRum(false);
     }
   };
 
@@ -546,7 +575,6 @@ export const DashboardLayout = ({
       setIsMonitorModalOpen(false);
       mutateMonitors();
     } catch (e: any) {
-      console.error(e);
       setMonitorError(
         extractErrorMessage(
           e,
@@ -574,7 +602,6 @@ export const DashboardLayout = ({
     }
   };
 
-  // --- Handle Register Task ---
   const handleRegisterTask = async () => {
     if (!newName) return;
     setIsRegisteringTask(true);
@@ -636,6 +663,7 @@ export const DashboardLayout = ({
     setIsApmModalOpen(false);
     setIsTaskModalOpen(false);
     setIsDbModalOpen(false);
+    setIsRumModalOpen(false); // NEW
     setNewCreds(null);
     setNewName("");
     setNewDomain("");
@@ -684,12 +712,25 @@ export const DashboardLayout = ({
           />
 
           <SidebarSection
-            title="Websites"
+            title="Web Analytics"
             items={webList}
             hrefPrefix="/dashboard/web"
             linkPrefix="/dashboard/web"
             onAdd={!user.isDemo ? () => setIsWebModalOpen(true) : undefined}
           />
+
+          {/* --- NEW RUM SECTION --- */}
+          <SidebarSection
+            title="Web APM (RUM)"
+            items={rumList}
+            hrefPrefix="/dashboard/rum"
+            linkPrefix="/dashboard/rum"
+            onAdd={!user.isDemo ? () => setIsRumModalOpen(true) : undefined}
+            icon={
+              <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
+            }
+          />
+
           <SidebarSection
             title="APM Services"
             items={apmList}
@@ -698,7 +739,6 @@ export const DashboardLayout = ({
             onAdd={!user.isDemo ? () => setIsApmModalOpen(true) : undefined}
           />
 
-          {/* --- Background Tasks --- */}
           <SidebarSection
             title="Background Tasks"
             items={taskList}
@@ -708,7 +748,7 @@ export const DashboardLayout = ({
             icon={<Workflow className="h-3 w-3 text-indigo-500 shrink-0" />}
           />
 
-          {/* --- Error Tracking (Static Link) --- */}
+          {/* --- Error Tracking --- */}
           <div className="space-y-1">
             <div className="flex items-center justify-between px-2 mb-2 group">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 transition-colors">
@@ -1139,6 +1179,120 @@ export const DashboardLayout = ({
             <div className="bg-blue-500/10 border border-blue-500/20 text-blue-500 text-xs p-3 rounded-md">
               Tip: You can also use our NPM package <code>@senzops/web</code>{" "}
               for React/Vue apps.
+            </div>
+            <Button className="w-full" onClick={closeModal}>
+              Done
+            </Button>
+          </div>
+        )}
+      </Dialog>
+
+      {/* --- RUM MODAL (NEW) --- */}
+      <Dialog
+        open={isRumModalOpen}
+        onClose={closeModal}
+        title="Connect Web APM (RUM)"
+      >
+        {!newCreds ? (
+          <div className="space-y-4">
+            {rumError && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{rumError}</span>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Application Name</label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none transition-all"
+                placeholder="e.g. Frontend - Production"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Domain (For CORS validation)
+              </label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none transition-all"
+                placeholder="e.g. app.senzor.dev"
+                value={newDomain}
+                onChange={(e) => setNewDomain(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="ghost" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRegisterRum}
+                disabled={isRegisteringRum}
+                className="bg-pink-600 hover:bg-pink-700 text-white"
+              >
+                {isRegisteringRum ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" /> Creating...
+                  </>
+                ) : (
+                  "Generate SDK Key"
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Key className="h-3 w-3" /> RUM API Key
+              </label>
+              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all text-pink-500">
+                {newCreds.apiKey}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Add to your frontend application
+              </label>
+              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
+                <p className="text-xs font-mono text-pink-300 break-all pr-8 leading-relaxed">
+                  &lt;script
+                  src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"&gt;&lt;/script&gt;
+                  <br />
+                  &lt;script&gt;
+                  <br />
+                  &nbsp;&nbsp;window.Senzor.initRum(&#123;
+                  <br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;apiKey: "{newCreds.apiKey}",
+                  <br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;sampleRate: 0.1, // 10% Tracing
+                  <br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;allowedOrigins:
+                  ["https://api.yourbackend.com"]
+                  <br />
+                  &nbsp;&nbsp;&#125;);
+                  <br />
+                  &lt;/script&gt;
+                </p>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.initRum({\n    apiKey: "${newCreds.apiKey}",\n    sampleRate: 0.1,\n    allowedOrigins: ["https://api.yourbackend.com"]\n  });\n</script>`,
+                    );
+                    toast.success("Copied to clipboard!");
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <div className="bg-pink-500/10 border border-pink-500/20 text-pink-500 text-xs p-3 rounded-md">
+              Tip: Ensure `allowedOrigins` matches your backend API to enable
+              full Distributed Tracing!
             </div>
             <Button className="w-full" onClick={closeModal}>
               Done
