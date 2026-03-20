@@ -1,4 +1,4 @@
-import React, { useState, useMemo, createContext } from "react";
+import React, { useState, useMemo, createContext, useEffect } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../lib/auth";
@@ -37,7 +37,7 @@ import {
   ShieldAlert,
   Maximize,
   Workflow,
-  MonitorSmartphone, // NEW: Added RUM Icon
+  MonitorSmartphone,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { SmartAnimatedValue } from "@/components/Tween";
@@ -65,7 +65,7 @@ const ChartCard = ({ title, children, actions }: any) => {
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 text-muted-foreground"
+        className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
         onClick={toggle}
       >
         {isMaximized ? (
@@ -163,23 +163,42 @@ export default function GlobalErrorsDashboard() {
 
   const [range, setRange] = useState("24h");
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("unresolved");
+  const [serviceFilter, setServiceFilter] = useState("all");
+
+  // Search State
+  const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
-  const { data, error, isLoading } = useSWR(
-    token
-      ? `/errors?range=${range}&page=${page}&limit=15&search=${search}&status=${statusFilter}`
-      : null,
-    fetcher,
-    { keepPreviousData: true },
-  );
+  // Debounce Search Input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (search !== searchInput) {
+        setSearch(searchInput);
+        setPage(1); // Reset to page 1 on new search
+      }
+    }, 400); // 400ms debounce
+    return () => clearTimeout(handler);
+  }, [searchInput, search]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearch(searchInput);
-    setPage(1);
-  };
+  // Fetch Available Services to populate the dropdown
+  const { data: apmList } = useSWR(token ? "/apm/list" : null, fetcher);
+  const { data: taskList } = useSWR(token ? "/task/list" : null, fetcher);
+  const { data: rumList } = useSWR(token ? "/rum/list" : null, fetcher);
+
+  const allServices = useMemo(() => {
+    return [
+      ...(apmList || []).map((s: any) => ({ ...s, type: "apm" })),
+      ...(taskList || []).map((s: any) => ({ ...s, type: "task" })),
+      ...(rumList || []).map((s: any) => ({ ...s, type: "rum" })),
+    ].sort((a, b) => a.name.localeCompare(b.name));
+  }, [apmList, taskList, rumList]);
+
+  // Fetch Global Errors
+  const endpoint = `/errors?range=${range}&page=${page}&limit=15&search=${search}&status=${statusFilter}${serviceFilter !== "all" ? `&serviceId=${serviceFilter}` : ""}`;
+  const { data, error, isLoading } = useSWR(token ? endpoint : null, fetcher, {
+    keepPreviousData: true,
+  });
 
   const getStatusColor = (status: string) => {
     if (status === "resolved")
@@ -366,32 +385,59 @@ export default function GlobalErrorsDashboard() {
 
         {/* --- Error Table --- */}
         <Card className="border-border/60 shadow-sm flex flex-col">
-          <CardHeader className="p-4 border-b border-border/40 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50">
-            <form
-              onSubmit={handleSearch}
-              className="relative w-full md:w-[350px]"
-            >
+          <CardHeader className="p-4 border-b border-border/40 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-card/50">
+            {/* Search as you type */}
+            <div className="relative w-full lg:w-[350px] shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by error class or message..."
-                className="pl-9 h-9 w-full bg-background border-border/80"
+                className="pl-9 pr-9 h-9 w-full bg-background border-border/80 transition-colors"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
-            </form>
-            <Select
-              className="w-full md:w-[180px] h-9 bg-background border-border/80"
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="unresolved">Status: Unresolved</option>
-              <option value="resolved">Status: Resolved</option>
-              <option value="ignored">Status: Ignored</option>
-              <option value="all">Status: All</option>
-            </Select>
+              {searchInput && (
+                <button
+                  onClick={() => setSearchInput("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+              {/* Dynamic Service Filter */}
+              <Select
+                className="w-full sm:w-[220px] h-9 bg-background border-border/80"
+                value={serviceFilter}
+                onChange={(e) => {
+                  setServiceFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Services</option>
+                {allServices.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name} ({s.type.toUpperCase()})
+                  </option>
+                ))}
+              </Select>
+
+              {/* Status Filter */}
+              <Select
+                className="w-full sm:w-[180px] h-9 bg-background border-border/80"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="unresolved">Status: Unresolved</option>
+                <option value="resolved">Status: Resolved</option>
+                <option value="ignored">Status: Ignored</option>
+                <option value="all">Status: All</option>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent className="p-0 overflow-auto bg-card">
             <table className="w-full text-sm text-left whitespace-nowrap">
@@ -431,7 +477,7 @@ export default function GlobalErrorsDashboard() {
                     >
                       <td className="px-6 py-4 text-foreground whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          {/* DYNAMIC RESOLUTION: Task vs RUM vs APM */}
+                          {/* DYNAMIC RESOLUTION: Check DTO service type */}
                           {err.service?.type === "task" ? (
                             <Workflow className="h-4 w-4 text-indigo-500" />
                           ) : err.service?.type === "rum" ? (
