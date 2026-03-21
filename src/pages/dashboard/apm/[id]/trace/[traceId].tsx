@@ -123,7 +123,11 @@ export default function TraceDetail() {
             {/* Upstream Link */}
             {trace.parent && (
               <Link
-                href={`/dashboard/apm/${trace.parent.serviceId}/trace/${trace.parent._id}`}
+                href={
+                  trace.parent.type === "rum"
+                    ? `/dashboard/rum/${trace.parent.serviceId}/trace/${trace.parent.traceId}`
+                    : `/dashboard/apm/${trace.parent.serviceId}/trace/${trace.parent._id}`
+                }
               >
                 <Button
                   variant="outline"

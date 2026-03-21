@@ -127,7 +127,7 @@ export default function RumTraceDetail() {
       </DashboardLayout>
     );
 
-  const { trace, errors } = data;
+  const { trace, childrenTraces } = data;
 
   return (
     <DashboardLayout>
@@ -317,7 +317,7 @@ export default function RumTraceDetail() {
           <TraceWaterfall
             spans={trace.spans}
             totalDuration={trace.duration}
-            childrenTraces={[]}
+            childrenTraces={childrenTraces || []}
           />
         </div>
 
