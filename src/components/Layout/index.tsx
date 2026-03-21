@@ -446,6 +446,7 @@ export const DashboardLayout = ({
   // Form State
   const [newName, setNewName] = useState("");
   const [newDomain, setNewDomain] = useState("");
+  const [newDomains, setNewDomains] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [newInterval, setNewInterval] = useState("15");
   const [newDbType, setNewDbType] = useState("mongodb");
@@ -539,17 +540,18 @@ export const DashboardLayout = ({
   };
 
   const handleRegisterRum = async () => {
-    if (!newName || !newDomain) return;
+    if (!newName || !newDomains) return;
     setIsRegisteringRum(true);
     setRumError(null);
     try {
+      // Pass the comma-separated domains string directly to the backend
       const res = await api.post("/rum/register", {
         name: newName,
-        domain: newDomain,
+        domains: newDomains,
       });
       setNewCreds(res.data);
       setNewName("");
-      setNewDomain("");
+      setNewDomains("");
       mutateRum();
     } catch (e: any) {
       setRumError(
@@ -667,6 +669,7 @@ export const DashboardLayout = ({
     setNewCreds(null);
     setNewName("");
     setNewDomain("");
+    setNewDomains("");
     setNewUrl("");
     setSelectedFramework("Express");
     setNewDbType("mongodb");
@@ -1212,15 +1215,22 @@ export const DashboardLayout = ({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Domain (For CORS validation)
+              <label className="text-sm font-medium flex items-center justify-between">
+                Allowed Domains{" "}
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  Comma separated
+                </span>
               </label>
               <input
                 className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none transition-all"
-                placeholder="e.g. app.senzor.dev"
-                value={newDomain}
-                onChange={(e) => setNewDomain(e.target.value)}
+                placeholder="e.g. senzor.dev, senzor.com"
+                value={newDomains}
+                onChange={(e) => setNewDomains(e.target.value)}
               />
+              <p className="text-[10px] text-muted-foreground">
+                We strictly reject telemetry from unknown domains. Subdomains
+                are automatically included.
+              </p>
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="ghost" onClick={closeModal}>
@@ -1266,7 +1276,7 @@ export const DashboardLayout = ({
                   <br />
                   &nbsp;&nbsp;&nbsp;&nbsp;apiKey: "{newCreds.apiKey}",
                   <br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;sampleRate: 0.1, // 10% Tracing
+                  &nbsp;&nbsp;&nbsp;&nbsp;sampleRate: 1.0,
                   <br />
                   &nbsp;&nbsp;&nbsp;&nbsp;allowedOrigins:
                   ["https://api.yourbackend.com"]
@@ -1281,7 +1291,7 @@ export const DashboardLayout = ({
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.initRum({\n    apiKey: "${newCreds.apiKey}",\n    sampleRate: 0.1,\n    allowedOrigins: ["https://api.yourbackend.com"]\n  });\n</script>`,
+                      `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.initRum({\n    apiKey: "${newCreds.apiKey}",\n    sampleRate: 1.0,\n    allowedOrigins: ["https://api.yourbackend.com"]\n  });\n</script>`,
                     );
                     toast.success("Copied to clipboard!");
                   }}

@@ -121,7 +121,12 @@ const CustomTooltip = ({
             className="flex items-center gap-2"
             style={{ color: entry.color || entry.stroke || entry.fill }}
           >
-            <div className="w-2.5 h-2.5 rounded-[2.5px]" style={{ backgroundColor: entry.color || entry.stroke || entry.fill }} />
+            <div
+              className="w-2.5 h-2.5 rounded-[2.5px]"
+              style={{
+                backgroundColor: entry.color || entry.stroke || entry.fill,
+              }}
+            />
             <span className="capitalize text-muted-foreground">
               {entry.name.replace("code_", "")}
             </span>
@@ -581,7 +586,9 @@ export default function RumDashboard() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const endpoint = `/rum/${id}/dashboard?range=${range}` + (pathFilter ? `&path=${encodeURIComponent(pathFilter)}` : '');
+  const endpoint =
+    `/rum/${id}/dashboard?range=${range}` +
+    (pathFilter ? `&path=${encodeURIComponent(pathFilter)}` : "");
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? endpoint : null,
     fetcher,
@@ -614,8 +621,14 @@ export default function RumDashboard() {
       if (!str) return "";
       const date = new Date(str);
       return date.toLocaleString(undefined, {
-        month: range === "24h" || range === "7d" || range === "30d" ? "short" : undefined,
-        day: range === "24h" || range === "7d" || range === "30d" ? "numeric" : undefined,
+        month:
+          range === "24h" || range === "7d" || range === "30d"
+            ? "short"
+            : undefined,
+        day:
+          range === "24h" || range === "7d" || range === "30d"
+            ? "numeric"
+            : undefined,
         hour: "numeric",
         minute: "2-digit",
       });
@@ -707,6 +720,20 @@ export default function RumDashboard() {
                     Inactive
                   </div>
                 )}
+
+                {/* NEW: Multi-domain display logic */}
+                <div className="flex items-center gap-1 text-muted-foreground font-mono ml-2 border border-border/40 bg-muted/20 px-2 py-0.5 rounded truncate max-w-[250px]">
+                  <Globe className="h-3 w-3 shrink-0" />
+                  <span
+                    className="truncate"
+                    title={service.domains?.join(", ")}
+                  >
+                    {service.domains?.length > 1
+                      ? `${service.domains[0]} +${service.domains.length - 1}`
+                      : service.domains?.[0] || "Unknown Domain"}
+                  </span>
+                </div>
+                
                 <span className="text-muted-foreground font-mono ml-2">
                   Last Seen:{" "}
                   {service.lastSeen
@@ -1057,8 +1084,7 @@ export default function RumDashboard() {
               <span className="font-bold block mb-1">
                 Warning: Irreversible Action
               </span>
-              This will delete <strong>{service.name}</strong> and
-              all traces.
+              This will delete <strong>{service.name}</strong> and all traces.
             </div>
           </div>
           <div className="flex justify-end gap-2">
