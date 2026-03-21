@@ -119,12 +119,13 @@ const CustomTooltip = ({
           <div
             key={idx}
             className="flex items-center gap-2"
-            style={{ color: entry.fill || entry.stroke || entry.color }}
+            style={{ color: entry.color || entry.stroke || entry.fill }}
           >
-            <span className="capitalize">
-              {entry.name.replace("code_", "")}:
+            <div className="w-2.5 h-2.5 rounded-[2.5px]" style={{ backgroundColor: entry.color || entry.stroke || entry.fill }} />
+            <span className="capitalize text-muted-foreground">
+              {entry.name.replace("code_", "")}
             </span>
-            <span className="font-mono">
+            <span className="font-mono text-foreground">
               {entry.name.includes("LCP")
                 ? formatSec(entry.value)
                 : entry.name.includes("INP")

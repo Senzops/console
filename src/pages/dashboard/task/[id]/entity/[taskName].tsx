@@ -86,7 +86,7 @@ const CustomTooltip = ({
           <div
             key={idx}
             className="flex items-center gap-2"
-            style={{ color: entry.fill || entry.stroke || entry.color }}
+            style={{ color: entry.color || entry.stroke || entry.fill }}
           >
             <span className="capitalize">{entry.name}:</span>
             <span className="font-mono">

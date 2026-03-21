@@ -34,8 +34,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           hour: 'numeric',
           minute: '2-digit'
         })}</p>
-        <div className="flex items-center gap-2 text-emerald-500">
-          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+        <div className="flex items-center gap-2" style={{ color: payload[0].color || payload[0].stroke || payload[0].fill }}>
+          <div className="w-2 h-2 rounded-full" style={{
+                backgroundColor: payload[0].color || payload[0].stroke || payload[0].fill,
+              }} />
           <span>Latency: <span className="font-mono">{payload[0].value}ms</span></span>
         </div>
       </div>

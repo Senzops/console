@@ -40,8 +40,10 @@ export const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
         <p className="font-semibold text-foreground mb-1">{label}</p>
         {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" style={{ color: entry.stroke || entry.fill || entry.color }}>
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke || entry.fill || entry.color || entry.stroke }} />
+          <div key={idx} className="flex items-center gap-2" style={{ color: entry.color || entry.stroke || entry.fill }}>
+            <div className="w-2 h-2 rounded-full" style={{
+                backgroundColor: entry.color || entry.stroke || entry.fill,
+              }} />
             <span className="capitalize">{entry.name}:</span>
             <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
           </div>

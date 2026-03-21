@@ -62,7 +62,8 @@ const CustomTooltip = ({ active, payload, label, unit = '', labelFormatter }: an
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
         <p className="font-semibold text-foreground mb-1">{labelFormatter ? labelFormatter(label) : label}</p>
         {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" style={{ color: entry.fill || entry.stroke || entry.color }}>
+          <div key={idx} className="flex items-center gap-2" 
+            style={{ color: entry.color || entry.stroke || entry.fill }}>
             {/* If detailed mode, name is like "code_200", clean it up */}
             <span className="capitalize">{entry.name.replace('code_', '')}:</span>
             <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
