@@ -22,7 +22,7 @@ export default function App({ Component, pageProps }: AppProps) {
     if (process.env.NEXT_PUBLIC_SENZOR_RUM_ID) {
       Senzor.initRum({
         apiKey: process.env.NEXT_PUBLIC_SENZOR_RUM_ID,
-        sampleRate: 0.1,
+        sampleRate: 1.0,
         allowedOrigins: ["https://api.senzor.dev"],
       });
     }
