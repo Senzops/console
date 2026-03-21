@@ -457,7 +457,7 @@ const RecentTracesList = ({
                   <div className="flex items-center gap-2 group/cell">
                     <Badge
                       variant="outline"
-                      className={`font-mono text-[10px] px-2 py-0.5 border-0 ${trace.traceType === "initial_load" ? "bg-blue-500/10 text-blue-500" : "bg-purple-500/10 text-purple-500"}`}
+                      className={`font-mono text-[10px] px-2 py-0.5 border-0 truncate ${trace.traceType === "initial_load" ? "bg-blue-500/10 text-blue-500" : "bg-purple-500/10 text-purple-500"}`}
                     >
                       {trace.traceType === "initial_load"
                         ? "HARD LOAD"
@@ -478,11 +478,11 @@ const RecentTracesList = ({
                   </div>
                 </td>
                 <td className="px-6 py-3">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5">
                     {trace.vitals?.lcp ? (
                       <Badge
                         variant="outline"
-                        className={`font-mono text-[10px] px-1.5 py-0 border-border/50 ${getVitalColor("lcp", trace.vitals.lcp).replace("text-", "bg-").replace("500", "500/10")} ${getVitalColor("lcp", trace.vitals.lcp)}`}
+                        className={`font-mono text-[10px] px-1.5 py-0 border-border/50 truncate ${getVitalColor("lcp", trace.vitals.lcp).replace("text-", "bg-").replace("500", "500/10")} ${getVitalColor("lcp", trace.vitals.lcp)}`}
                       >
                         LCP {formatSec(trace.vitals.lcp)}
                       </Badge>
@@ -490,7 +490,7 @@ const RecentTracesList = ({
                     {trace.vitals?.inp ? (
                       <Badge
                         variant="outline"
-                        className={`font-mono text-[10px] px-1.5 py-0 border-border/50 ${getVitalColor("inp", trace.vitals.inp).replace("text-", "bg-").replace("500", "500/10")} ${getVitalColor("inp", trace.vitals.inp)}`}
+                        className={`font-mono text-[10px] px-1.5 py-0 border-border/50 truncate ${getVitalColor("inp", trace.vitals.inp).replace("text-", "bg-").replace("500", "500/10")} ${getVitalColor("inp", trace.vitals.inp)}`}
                       >
                         INP {formatMs(trace.vitals.inp)}
                       </Badge>
@@ -498,7 +498,7 @@ const RecentTracesList = ({
                     {trace.vitals?.cls ? (
                       <Badge
                         variant="outline"
-                        className={`font-mono text-[10px] px-1.5 py-0 border-border/50 ${getVitalColor("cls", trace.vitals.cls).replace("text-", "bg-").replace("500", "500/10")} ${getVitalColor("cls", trace.vitals.cls)}`}
+                        className={`font-mono text-[10px] px-1.5 py-0 border-border/50 truncate ${getVitalColor("cls", trace.vitals.cls).replace("text-", "bg-").replace("500", "500/10")} ${getVitalColor("cls", trace.vitals.cls)}`}
                       >
                         CLS {formatScore(trace.vitals.cls)}
                       </Badge>
@@ -512,7 +512,7 @@ const RecentTracesList = ({
                       )}
                   </div>
                 </td>
-                <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono">
+                <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono truncate">
                   {formatDistanceToNow(new Date(trace.timestamp))} ago
                 </td>
               </tr>
@@ -702,7 +702,7 @@ export default function RumDashboard() {
                 {pathFilter && (
                   <Badge
                     variant="outline"
-                    className="border-pink-500/20 text-pink-500 bg-pink-500/10 font-mono text-xs"
+                    className="border-pink-500/20 text-pink-500 bg-pink-500/10 font-mono text-xs truncate"
                   >
                     {pathFilter}
                   </Badge>

@@ -150,7 +150,7 @@ export default function RumTraceDetail() {
               <div className="flex items-center gap-3 mb-1.5">
                 <Badge
                   variant="outline"
-                  className={`font-mono text-xs px-2 py-0.5 border ${
+                  className={`font-mono text-xs px-2 py-0.5 border truncate ${
                     trace.traceType === "initial_load"
                       ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
                       : "bg-purple-500/10 text-purple-500 border-purple-500/20"
