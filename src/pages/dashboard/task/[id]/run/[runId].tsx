@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { TraceLogs } from "@/components/TraceLogs";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -329,6 +330,12 @@ export default function TaskRunDetail() {
             <ErrorEventList events={errors} showGroupLink={true} />
           </div>
         )}
+
+        <TraceLogs
+          serviceId={id as string}
+          traceId={run.runId}
+          serviceType="task"
+        />
       </div>
     </DashboardLayout>
   );

@@ -33,7 +33,8 @@ import {
   Eye,
   AlertOctagon,
   Workflow,
-  MonitorSmartphone, // Added for RUM
+  MonitorSmartphone,
+  Terminal, // Added for RUM
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -773,6 +774,32 @@ export const DashboardLayout = ({
               >
                 <AlertOctagon className="h-3 w-3 shrink-0 text-destructive" />
                 <span className="truncate">Default</span>
+              </Button>
+            </Link>
+          </div>
+
+          {/* --- NEW: Log Management --- */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-2 mb-2 group">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 transition-colors">
+                Log Management
+              </span>
+            </div>
+            <Link href="/dashboard/logs">
+              <Button
+                variant={
+                  router.asPath.includes("/dashboard/logs")
+                    ? "secondary"
+                    : "ghost"
+                }
+                className={cn(
+                  "w-full justify-start gap-2 mb-1 h-9",
+                  router.asPath.includes("/dashboard/logs") &&
+                    "bg-secondary/80 font-semibold border border-border/50",
+                )}
+              >
+                <Terminal className="h-3 w-3 shrink-0 text-blue-500" />
+                <span className="truncate">Log Explorer</span>
               </Button>
             </Link>
           </div>

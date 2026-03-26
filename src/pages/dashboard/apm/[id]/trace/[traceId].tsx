@@ -28,6 +28,7 @@ import { formatDistanceToNow } from "date-fns";
 import { SmartAnimatedValue } from "@/components/Tween";
 import Link from "next/link";
 import { TraceErrors } from "@/components/TraceErrors";
+import { TraceLogs } from "@/components/TraceLogs";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -273,6 +274,12 @@ export default function TraceDetail() {
 
           {/* --- NEW ERROR COMPONENT --- */}
           <TraceErrors apmId={id as string} traceId={trace.traceId as string} />
+
+          <TraceLogs
+            serviceId={id as string}
+            traceId={trace.traceId}
+            serviceType="apm"
+          />
         </div>
       </div>
     </DashboardLayout>
