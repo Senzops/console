@@ -832,58 +832,54 @@ export default function GlobalLogsDashboard() {
                       {viewMode === "formatted" ? (
                         <div className="bg-[#0d1117] border border-border/60 rounded-lg p-4 overflow-x-auto shadow-inner">
                           <pre className="text-xs font-mono leading-loose whitespace-pre-wrap break-words">
-                            <div className="mb-4 space-y-1 border-b border-border/40 pb-4">
-                              <div className="flex items-start">
-                                <span className="text-[#79c0ff] mr-2">
-                                  message:
-                                </span>
-                                <span className="text-[#a5d6ff]">
-                                  {selectedLog.message}
-                                </span>
-                              </div>
-                              <div className="flex items-start">
-                                <span className="text-[#79c0ff] mr-2">
-                                  level:
-                                </span>
-                                <span className="text-[#a5d6ff]">
-                                  {selectedLog.level}
-                                </span>
-                              </div>
-                              <div className="flex items-start">
-                                <span className="text-[#79c0ff] mr-2">
-                                  timestamp:
-                                </span>
-                                <span className="text-[#a5d6ff]">
-                                  {selectedLog.timestamp}
-                                </span>
-                              </div>
+                            <div className="flex items-start">
+                              <span className="text-[#79c0ff] mr-2">
+                                message:
+                              </span>
+                              <span className="text-[#a5d6ff]">
+                                {selectedLog.message}
+                              </span>
+                            </div>
+                            <div className="flex items-start">
+                              <span className="text-[#79c0ff] mr-2">
+                                level:
+                              </span>
+                              <span className="text-[#a5d6ff]">
+                                {selectedLog.level}
+                              </span>
+                            </div>
+                            <div className="flex items-start">
+                              <span className="text-[#79c0ff] mr-2">
+                                timestamp:
+                              </span>
+                              <span className="text-[#a5d6ff]">
+                                {selectedLog.timestamp}
+                              </span>
                             </div>
 
                             {/* Render Destructured Attributes block-style, explicitly without string quotes */}
-                            <div className="space-y-1">
-                              {Object.entries(selectedLog.attributes || {}).map(
-                                ([key, val]) => (
-                                  <div key={key} className="flex items-start">
-                                    <span className="text-[#79c0ff] mr-2">
-                                      {key}:
-                                    </span>
-                                    <span
-                                      className={
-                                        typeof val === "number"
-                                          ? "text-[#79c0ff]"
-                                          : typeof val === "boolean"
-                                            ? "text-[#ff7b72]"
-                                            : "text-[#a5d6ff]"
-                                      }
-                                    >
-                                      {typeof val === "object"
-                                        ? JSON.stringify(val, null, 2)
-                                        : String(val)}
-                                    </span>
-                                  </div>
-                                ),
-                              )}
-                            </div>
+                            {Object.entries(selectedLog.attributes || {}).map(
+                              ([key, val]) => (
+                                <div key={key} className="flex items-start">
+                                  <span className="text-[#79c0ff] mr-2">
+                                    {key}:
+                                  </span>
+                                  <span
+                                    className={
+                                      typeof val === "number"
+                                        ? "text-[#79c0ff]"
+                                        : typeof val === "boolean"
+                                          ? "text-[#ff7b72]"
+                                          : "text-[#a5d6ff]"
+                                    }
+                                  >
+                                    {typeof val === "object"
+                                      ? JSON.stringify(val, null, 2)
+                                      : String(val)}
+                                  </span>
+                                </div>
+                              ),
+                            )}
                           </pre>
                         </div>
                       ) : (
