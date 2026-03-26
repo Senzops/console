@@ -367,7 +367,7 @@ export default function GlobalLogsDashboard() {
     }
   };
 
-  const getTraceLink = (log: any) => {
+  const getTraceLink: any = (log: any) => {
     if (!log.traceId || !log.serviceId) return null;
     if (log.serviceModel === "TaskService")
       return `/dashboard/task/${log.serviceId._id || log.serviceId}/run/${log.traceId}`;
