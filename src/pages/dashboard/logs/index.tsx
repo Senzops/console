@@ -215,7 +215,7 @@ export default function GlobalLogsDashboard() {
   const initSearch = router.query.search as string | undefined;
 
   // Local State
-  const [range, setRange] = useState("24h");
+  const [range, setRange] = useState("1h");
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState(initSearch || "");
   const [debouncedSearch, setDebouncedSearch] = useState("");
