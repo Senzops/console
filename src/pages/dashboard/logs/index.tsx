@@ -4,7 +4,6 @@ import React, {
   useEffect,
   useCallback,
   createContext,
-  useContext,
 } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
@@ -223,7 +222,7 @@ export default function GlobalLogsDashboard() {
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
 
-  // Multiple copy states for distinct buttons
+  // Copy states
   const [copiedRaw, setCopiedRaw] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
@@ -252,10 +251,11 @@ export default function GlobalLogsDashboard() {
     fetcher,
   );
 
-  // Fallback Single Log Fetch (Handles hard refreshes or direct links)
-  const { data: singleLogData, isValidating: isSingleLoading } = useSWR(
+  // Fallback Single Log Fetch (Handles hard refreshes or when log shifts off current page)
+  const { data: singleLogData, isLoading: isSingleLoading } = useSWR(
     token && logId ? `/logs/${logId}` : null,
     fetcher,
+    { revalidateOnFocus: false },
   );
 
   // Stats Calculations
@@ -316,14 +316,14 @@ export default function GlobalLogsDashboard() {
   // Drawer Management: Resolves from table data FIRST, falls back to direct API lookup
   const selectedLog = useMemo(() => {
     if (!logId) return null;
-    return (
-      data?.logs?.find((l: any) => l._id === logId) ||
-      singleLogData?.log ||
-      null
-    );
+    // Fast path: find in currently loaded table
+    const fromTable = data?.logs?.find((l: any) => l._id === logId);
+    if (fromTable) return fromTable;
+    // Fallback path: use the specific /api/logs/:id endpoint response
+    return singleLogData?.log || null;
   }, [logId, data?.logs, singleLogData]);
 
-  // Prev/Next Navigation Logic
+  // Prev/Next Navigation Logic (Requires log to be present in currently loaded page data)
   const currentIndex = useMemo(() => {
     if (!logId || !data?.logs) return -1;
     return data.logs.findIndex((l: any) => l._id === logId);
@@ -728,7 +728,7 @@ export default function GlobalLogsDashboard() {
                 </div>
               ) : selectedLog ? (
                 <>
-                  {/* RESTORED: Distinct Message Block */}
+                  {/* Distinct Message Block */}
                   <div className="relative group/message bg-background border border-border/60 rounded-lg p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                       <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -831,55 +831,59 @@ export default function GlobalLogsDashboard() {
 
                       {viewMode === "formatted" ? (
                         <div className="bg-[#0d1117] border border-border/60 rounded-lg p-4 overflow-x-auto shadow-inner">
-                          <pre className="text-xs font-mono leading-loose whitespace-pre-wrap word-break">
-                            <div className="flex items-start">
-                              <span className="text-[#79c0ff] mr-2">
-                                message:
-                              </span>
-                              <span className="text-[#a5d6ff]">
-                                {selectedLog.message}
-                              </span>
-                            </div>
-                            <div className="flex items-start">
-                              <span className="text-[#79c0ff] mr-2">
-                                level:
-                              </span>
-                              <span className="text-[#a5d6ff]">
-                                {selectedLog.level}
-                              </span>
-                            </div>
-                            <div className="flex items-start mb-2">
-                              <span className="text-[#79c0ff] mr-2">
-                                timestamp:
-                              </span>
-                              <span className="text-[#a5d6ff]">
-                                {selectedLog.timestamp}
-                              </span>
+                          <pre className="text-xs font-mono leading-loose whitespace-pre-wrap break-words">
+                            <div className="mb-4 space-y-1 border-b border-border/40 pb-4">
+                              <div className="flex items-start">
+                                <span className="text-[#79c0ff] mr-2">
+                                  message:
+                                </span>
+                                <span className="text-[#a5d6ff]">
+                                  {selectedLog.message}
+                                </span>
+                              </div>
+                              <div className="flex items-start">
+                                <span className="text-[#79c0ff] mr-2">
+                                  level:
+                                </span>
+                                <span className="text-[#a5d6ff]">
+                                  {selectedLog.level}
+                                </span>
+                              </div>
+                              <div className="flex items-start">
+                                <span className="text-[#79c0ff] mr-2">
+                                  timestamp:
+                                </span>
+                                <span className="text-[#a5d6ff]">
+                                  {selectedLog.timestamp}
+                                </span>
+                              </div>
                             </div>
 
-                            {/* Render Destructured Attributes securely without forcing explicit string quotes */}
-                            {Object.entries(selectedLog.attributes || {}).map(
-                              ([key, val]) => (
-                                <div key={key} className="flex items-start">
-                                  <span className="text-[#79c0ff] mr-2">
-                                    {key}:
-                                  </span>
-                                  <span
-                                    className={
-                                      typeof val === "number"
-                                        ? "text-[#79c0ff]"
-                                        : typeof val === "boolean"
-                                          ? "text-[#ff7b72]"
-                                          : "text-[#a5d6ff]"
-                                    }
-                                  >
-                                    {typeof val === "object"
-                                      ? JSON.stringify(val, null, 2)
-                                      : String(val)}
-                                  </span>
-                                </div>
-                              ),
-                            )}
+                            {/* Render Destructured Attributes block-style, explicitly without string quotes */}
+                            <div className="space-y-1">
+                              {Object.entries(selectedLog.attributes || {}).map(
+                                ([key, val]) => (
+                                  <div key={key} className="flex items-start">
+                                    <span className="text-[#79c0ff] mr-2">
+                                      {key}:
+                                    </span>
+                                    <span
+                                      className={
+                                        typeof val === "number"
+                                          ? "text-[#79c0ff]"
+                                          : typeof val === "boolean"
+                                            ? "text-[#ff7b72]"
+                                            : "text-[#a5d6ff]"
+                                      }
+                                    >
+                                      {typeof val === "object"
+                                        ? JSON.stringify(val, null, 2)
+                                        : String(val)}
+                                    </span>
+                                  </div>
+                                ),
+                              )}
+                            </div>
                           </pre>
                         </div>
                       ) : (
