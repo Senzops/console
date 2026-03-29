@@ -24,7 +24,7 @@ const formatUptime = (seconds: number) => {
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
 
-  const parts = [];
+  const parts: string[] = [];
   if (y > 0) parts.push(`${y}y`);
   if (mo > 0) parts.push(`${mo}mo`);
   if (d > 0) parts.push(`${d}d`);
