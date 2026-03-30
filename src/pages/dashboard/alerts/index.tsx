@@ -62,6 +62,7 @@ const PoliciesTable = ({
   isValidating,
   mutate,
 }: any) => {
+  const router = useRouter();
   const [isMaximized, setIsMaximized] = useState(false);
   const toggle = () => setIsMaximized(!isMaximized);
   const [filter, setFilter] = useState("");
@@ -143,9 +144,7 @@ const PoliciesTable = ({
               >
                 <td
                   className="px-6 py-4 cursor-pointer"
-                  onClick={() =>
-                    (window.location.href = `/dashboard/alerts/${policy._id}`)
-                  }
+                  onClick={() => router.push(`/dashboard/alerts/${policy._id}`)}
                 >
                   <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
                     {policy.name}
