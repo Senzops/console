@@ -36,7 +36,8 @@ import {
   MonitorSmartphone,
   Terminal,
   Bot,
-  BellRing, // Added for RUM
+  BellRing,
+  LayoutTemplate, // Added for RUM
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -412,7 +413,11 @@ export const DashboardLayout = ({
   const { data: rumList, mutate: mutateRum } = useSWR(
     token ? "/rum/list" : null,
     fetcher,
-  ); // NEW
+  );
+  const { data: viewsList, mutate: mutateViews } = useSWR(
+    token ? "/views" : null,
+    fetcher,
+  ); // SAVED VIEWS
 
   // Modal States
   const [isServerModalOpen, setIsServerModalOpen] = useState(false);
@@ -422,6 +427,7 @@ export const DashboardLayout = ({
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [isRumModalOpen, setIsRumModalOpen] = useState(false); // NEW
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false); // SAVED VIEWS
   const [showUri, setShowUri] = useState(false);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -436,6 +442,7 @@ export const DashboardLayout = ({
   const [isRegisteringTask, setIsRegisteringTask] = useState(false);
   const [isRegisteringDb, setIsRegisteringDb] = useState(false);
   const [isRegisteringRum, setIsRegisteringRum] = useState(false); // NEW
+  const [isRegisteringView, setIsRegisteringView] = useState(false); // SAVED VIEWS
 
   // Error States
   const [serverError, setServerError] = useState<string | null>(null);
@@ -445,9 +452,11 @@ export const DashboardLayout = ({
   const [taskError, setTaskError] = useState<string | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
   const [rumError, setRumError] = useState<string | null>(null); // NEW
+  const [viewError, setViewError] = useState<string | null>(null); // SAVED VIEWS
 
   // Form State
   const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState(""); // Used for views
   const [newDomain, setNewDomain] = useState("");
   const [newDomains, setNewDomains] = useState("");
   const [newUrl, setNewUrl] = useState("");
@@ -649,6 +658,29 @@ export const DashboardLayout = ({
     }
   };
 
+  // --- Saved View Handler ---
+  const handleRegisterView = async () => {
+    if (!newName) return;
+    setIsRegisteringView(true);
+    setViewError(null);
+    try {
+      const res = await api.post("/views", {
+        name: newName,
+        description: newDescription,
+      });
+      setNewName("");
+      setNewDescription("");
+      setIsViewModalOpen(false);
+      mutateViews();
+      toast.success("Dashboard created!");
+      router.push(`/dashboard/views/${res.data.view._id}`);
+    } catch (e: any) {
+      setViewError(e.response?.data?.error || "Failed to create view");
+    } finally {
+      setIsRegisteringView(false);
+    }
+  };
+
   const handleResendEmail = async () => {
     setIsResending(true);
     try {
@@ -669,8 +701,10 @@ export const DashboardLayout = ({
     setIsTaskModalOpen(false);
     setIsDbModalOpen(false);
     setIsRumModalOpen(false); // NEW
+    setIsViewModalOpen(false); 
     setNewCreds(null);
     setNewName("");
+    setNewDescription("");
     setNewDomain("");
     setNewDomains("");
     setNewUrl("");
@@ -701,6 +735,14 @@ export const DashboardLayout = ({
 
         {/* Scrollable Nav Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <SidebarSection
+            title="Saved Views"
+            items={viewsList?.views}
+            hrefPrefix="/dashboard/views"
+            linkPrefix="/dashboard/views"
+            onAdd={!user.isDemo ? () => setIsViewModalOpen(true) : undefined}
+            icon={<LayoutTemplate className="h-3 w-3 text-teal-500 shrink-0" />}
+          />
           <SidebarSection
             title="Servers"
             items={serverList}
@@ -935,6 +977,53 @@ export const DashboardLayout = ({
       <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-background">
         {children}
       </main>
+
+      {/* --- SAVED VIEW MODAL --- */}
+      <Dialog
+        open={isViewModalOpen}
+        onClose={closeModal}
+        title="Create Custom Dashboard"
+      >
+        <div className="space-y-4">
+          {viewError && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{viewError}</span>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Dashboard Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none transition-all"
+              placeholder="e.g. Master Production Overview"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(Optional)</span></label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none transition-all"
+              placeholder="Describe the purpose of this view..."
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" onClick={closeModal} disabled={isRegisteringView}>
+              Cancel
+            </Button>
+            <Button onClick={handleRegisterView} disabled={isRegisteringView} className="bg-teal-600 hover:bg-teal-700 text-white">
+              {isRegisteringView ? (
+                <><Spinner className="mr-2 h-4 w-4" /> Creating...</>
+              ) : (
+                "Create Canvas"
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* --- VERIFY EMAIL MODAL --- */}
       <Dialog

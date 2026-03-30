@@ -21,7 +21,8 @@ import {
   Database,
   Settings,
   Workflow,
-  MonitorSmartphone, // Added for RUM
+  MonitorSmartphone,
+  LayoutTemplate,
 } from "lucide-react";
 import useSWR from "swr";
 import { api, useAuth } from "../../lib/auth";
@@ -47,7 +48,15 @@ const HEX_CLIP =
   "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 interface DashboardViewProps {
-  filterType?: "server" | "web" | "apm" | "monitor" | "database" | "task" | "rum";
+  filterType?:
+    | "server"
+    | "web"
+    | "apm"
+    | "monitor"
+    | "database"
+    | "task"
+    | "rum"
+    | "view";
 }
 
 export default function DashboardView({ filterType }: DashboardViewProps) {
@@ -93,11 +102,32 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     data: rumList,
     error: rumErr,
     mutate: mutateRum,
-  } = useSWR(token ? "/rum/list" : null, fetcher); // NEW: RUM Fetching
+  } = useSWR(token ? "/rum/list" : null, fetcher);
+  const {
+    data: viewsData,
+    error: viewsErr,
+    mutate: mutateViews,
+  } = useSWR(token ? "/views" : null, fetcher);
 
-  const hasError = serverErr || webErr || monitorErr || apmErr || dbErr || taskErr || rumErr;
+  const hasError =
+    serverErr ||
+    webErr ||
+    monitorErr ||
+    apmErr ||
+    dbErr ||
+    taskErr ||
+    rumErr ||
+    viewsErr;
   const isLoading =
-    !serverList && !webList && !monitorList && !apmList && !dbList && !taskList && !rumList && !hasError;
+    !serverList &&
+    !webList &&
+    !monitorList &&
+    !apmList &&
+    !dbList &&
+    !taskList &&
+    !rumList &&
+    !viewsData &&
+    !hasError;
 
   const isEmpty =
     (serverList?.length || 0) === 0 &&
@@ -106,7 +136,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     (dbList?.length || 0) === 0 &&
     (apmList?.length || 0) === 0 &&
     (taskList?.length || 0) === 0 &&
-    (rumList?.length || 0) === 0;
+    (rumList?.length || 0) === 0 &&
+    (viewsData?.views?.length || 0) === 0;
 
   useEffect(() => {
     setViewMode(defaultViewMode);
@@ -120,6 +151,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutateDb();
     mutateTask();
     mutateRum();
+    mutateViews();
   };
 
   if (hasError) {
@@ -165,11 +197,17 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     );
   }
 
+  // --- HIERARCHY FIX: Aligned perfectly with Sidebar ---
   let items = [
+    ...(viewsData?.views || []).map((v: any) => ({ ...v, type: "view" })), // Saved Views First
     ...(serverList || []).map((s: any) => ({ ...s, type: "server" })),
-    ...(dbList || []).map((d: any) => ({ ...d, type: "database", meta: `${d.type}` })),
+    ...(dbList || []).map((d: any) => ({
+      ...d,
+      type: "database",
+      meta: `${d.type}`,
+    })),
     ...(webList || []).map((w: any) => ({ ...w, type: "web" })),
-    ...(rumList || []).map((r: any) => ({ ...r, type: "rum" })), // NEW: RUM Items
+    ...(rumList || []).map((r: any) => ({ ...r, type: "rum" })),
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
     ...(taskList || []).map((t: any) => ({ ...t, type: "task" })),
     ...(monitorList || []).map((m: any) => ({ ...m, type: "monitor" })),
@@ -185,10 +223,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
   const getHref = (item: any) => {
     if (item.type === "server") return `/dashboard/server/${item._id}`;
     if (item.type === "web") return `/dashboard/web/${item._id}`;
-    if (item.type === "rum") return `/dashboard/rum/${item._id}`; // NEW
+    if (item.type === "rum") return `/dashboard/rum/${item._id}`;
     if (item.type === "apm") return `/dashboard/apm/${item._id}`;
     if (item.type === "task") return `/dashboard/task/${item._id}`;
     if (item.type === "database") return `/dashboard/db/${item._id}`;
+    if (item.type === "view") return `/dashboard/views/${item._id}`;
     return `/dashboard/monitor/${item._id}`;
   };
 
@@ -222,6 +261,15 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           {item.status.toUpperCase()}
         </Badge>
       );
+    if (item.type === "view")
+      return (
+        <Badge
+          variant="outline"
+          className="text-teal-500 border-teal-500/30 bg-teal-500/5"
+        >
+          CUSTOM
+        </Badge>
+      );
     if (item.type === "apm") {
       const isApmActive =
         item.lastSeen &&
@@ -241,7 +289,6 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
       );
     }
     if (item.type === "rum") {
-      // RUM uses a 15-min threshold for 'LIVE'
       const isRumActive =
         item.lastSeen &&
         new Date().getTime() - new Date(item.lastSeen).getTime() <
@@ -261,7 +308,10 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     }
     if (item.type === "task") {
       const isTaskActive =
-        item.status === "online" || (item.lastSeen && new Date().getTime() - new Date(item.lastSeen).getTime() < 5 * 60 * 1000);
+        item.status === "online" ||
+        (item.lastSeen &&
+          new Date().getTime() - new Date(item.lastSeen).getTime() <
+            5 * 60 * 1000);
       return isTaskActive ? (
         <Badge
           variant="outline"
@@ -295,6 +345,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         return <Workflow className={`h-5 w-5 text-indigo-500`} />;
       case "database":
         return <Database className={`h-5 w-5 text-emerald-500`} />;
+      case "view":
+        return <LayoutTemplate className={`h-5 w-5 text-teal-500`} />;
       case "monitor":
         return (
           <Activity
@@ -347,6 +399,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           <Settings className="h-3 w-3" /> {item.meta}
         </>
       );
+    if (item.type === "view")
+      return (
+        <>
+          <LayoutGrid className="h-3 w-3" /> {item.widgetCount || 0} Widgets
+        </>
+      );
     return (
       <>
         <Timer className="h-3 w-3" /> {item.interval}m Check
@@ -361,7 +419,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         ? "Background Tasks"
         : filterType === "rum"
           ? "Web APM Services"
-          : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
+          : filterType === "view"
+            ? "Saved Views"
+            : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
     : "Global Infra";
 
   return (
@@ -411,24 +471,24 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           {items.length > 0 && viewMode === "grid" ? (
             <div className="flex flex-wrap justify-center gap-y-4 px-8 max-w-7xl">
               {items.map((item, i) => {
-                // Logic for APM Active state (Last seen within 5 mins)
                 const isApmActive =
                   item.type === "apm" &&
                   item.lastSeen &&
                   new Date().getTime() - new Date(item.lastSeen).getTime() <
                     5 * 60 * 1000;
-                    
-                // Logic for RUM Active state (Last seen within 15 mins)
+
                 const isRumActive =
                   item.type === "rum" &&
                   item.lastSeen &&
                   new Date().getTime() - new Date(item.lastSeen).getTime() <
                     15 * 60 * 1000;
-                    
-                // Logic for Task Active state
-                const isTaskActive = 
+
+                const isTaskActive =
                   item.type === "task" &&
-                  (item.status === 'online' || (item.lastSeen && new Date().getTime() - new Date(item.lastSeen).getTime() < 5 * 60 * 1000));
+                  (item.status === "online" ||
+                    (item.lastSeen &&
+                      new Date().getTime() - new Date(item.lastSeen).getTime() <
+                        5 * 60 * 1000));
 
                 return (
                   <Link
@@ -490,8 +550,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                           </h3>
 
                           <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
-                            <Settings className="h-3 w-3" />{" "}
-                            {item.meta}
+                            <Settings className="h-3 w-3" /> {item.meta}
                           </div>
 
                           <Badge
@@ -619,6 +678,25 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                         </>
                       )}
 
+                      {item.type === "view" && (
+                        <>
+                          <div
+                            className={`mb-3 p-3 rounded-full bg-teal-500/10 text-teal-500`}
+                          >
+                            <LayoutTemplate className="h-6 w-6" />
+                          </div>
+
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">
+                            {item.name}
+                          </h3>
+
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
+                            <LayoutGrid className="h-3 w-3" />{" "}
+                            {item.widgetCount || 0} Widgets
+                          </div>
+                        </>
+                      )}
+
                       {item.type === "monitor" && (
                         <>
                           <div
@@ -689,7 +767,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                           <div className="flex items-center gap-4">
                             <div
                               className={`p-2 rounded-lg ${
-                                item.type === "server" || item.type === "database"
+                                item.type === "server" ||
+                                item.type === "database"
                                   ? "bg-emerald-500/5"
                                   : item.type === "apm"
                                     ? "bg-orange-500/5"
@@ -699,7 +778,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                                         ? "bg-pink-500/5"
                                         : item.type === "monitor"
                                           ? "bg-emerald-500/5"
-                                          : "bg-blue-500/5"
+                                          : item.type === "view"
+                                            ? "bg-teal-500/5"
+                                            : "bg-blue-500/5"
                               }`}
                             >
                               {getIcon(item.type, item.status)}
