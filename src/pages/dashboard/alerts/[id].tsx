@@ -840,7 +840,11 @@ export default function AlertPolicyDetail() {
                         <Editor
                           height="100%"
                           defaultLanguage="json"
-                          theme={theme === "dark" ? "vs-dark" : "vs-dark"}
+                          theme={
+                            theme === "light" || theme === "latte"
+                              ? "light"
+                              : "vs-dark"
+                          }
                           value={conditionForm.queryStr}
                           onChange={(val) =>
                             setConditionForm({
