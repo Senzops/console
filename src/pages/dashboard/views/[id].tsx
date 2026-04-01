@@ -532,16 +532,16 @@ export default function CustomDashboardView() {
 
       {/* --- FLOATING EDIT MODE DOCK --- */}
       {isEditing ? (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 md:left-[calc(50vw+8rem)] bg-card/95 backdrop-blur-md border border-border/80 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] px-6 py-3 rounded-full flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
-           <div className="flex items-center gap-2 pr-4 border-r border-border/40">
+        <div className="fixed bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 md:left-[calc(50vw+8rem)] w-[calc(100%-2rem)] max-w-fit bg-card/95 backdrop-blur-md border border-border/80 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] px-3 py-2.5 md:px-6 md:py-3 rounded-full flex items-center justify-center gap-2 md:gap-6 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 overflow-x-auto no-scrollbar">
+           <div className="flex items-center gap-2 md:pr-4 md:border-r border-border/40 shrink-0">
              <div className="h-2 w-2 rounded-full bg-teal-500 animate-pulse" />
-             <span className="text-xs font-bold uppercase tracking-wider text-foreground">Edit Mode</span>
+             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-foreground hidden sm:block">Edit Mode</span>
            </div>
-           <div className="flex items-center gap-2">
-             <Button onClick={openCreateWidget} variant="secondary" className="h-9 rounded-full px-5 shadow-sm font-semibold border-none"><Plus className="h-4 w-4 mr-2" /> Add Widget</Button>
-             <Button variant="ghost" onClick={() => { setIsEditing(false); setLocalLayout([...(data?.view?.layout || [])]); }} disabled={isSaving} className="h-9 rounded-full px-5 hover:bg-destructive/10 hover:text-destructive font-medium">Cancel</Button>
-             <Button onClick={toggleEditMode} disabled={isSaving} className="h-9 shadow-md bg-primary text-primary-foreground rounded-full px-6 font-semibold transition-all">
-               {isSaving ? <Spinner className="h-4 w-4" /> : <><Save className="h-4 w-4 mr-2" /> Save Layout</>}
+           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+             <Button onClick={openCreateWidget} variant="secondary" className="h-8 md:h-9 rounded-full px-3 md:px-5 shadow-sm font-semibold border-none text-xs"><Plus className="h-3.5 w-3.5 mr-1 sm:mr-1.5" /> <span className="hidden sm:inline">Add Widget</span><span className="sm:hidden">Add</span></Button>
+             <Button variant="ghost" onClick={() => { setIsEditing(false); setLocalLayout([...(data?.view?.layout || [])]); }} disabled={isSaving} className="h-8 md:h-9 rounded-full px-3 md:px-5 hover:bg-destructive/10 hover:text-destructive font-medium text-xs">Cancel</Button>
+             <Button onClick={toggleEditMode} disabled={isSaving} className="h-8 md:h-9 shadow-md bg-primary text-primary-foreground rounded-full px-4 md:px-6 font-semibold transition-all text-xs">
+               {isSaving ? <Spinner className="h-3.5 w-3.5" /> : <><Save className="h-3.5 w-3.5 mr-1 sm:mr-1.5" /> <span className="hidden sm:inline">Save Layout</span><span className="sm:hidden">Save</span></>}
              </Button>
            </div>
         </div>
