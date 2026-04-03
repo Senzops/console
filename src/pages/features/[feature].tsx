@@ -30,25 +30,13 @@ export default function FeaturePage() {
   // Find the requested feature from our Single Source of Truth
   const feature = FEATURES_DATA.find((f) => f.id === featureParam);
 
-  // If the router isn't ready or hydrating, show a clean state
-  if (!isMounted || !router.isReady) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <Navbar />
-        <main className="flex-grow flex items-center justify-center">
-          <Activity className="w-8 h-8 text-primary animate-pulse" />
-        </main>
-        <Footer />
-      </div>
-    );
-  }
 
   // 404 State if feature doesn't exist
   if (!feature) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Navbar />
-        <main className="flex-grow flex flex-col items-center justify-center text-center px-4">
+        <main className="flex-grow flex flex-col items-center justify-center text-center px-4 h-screen">
           <Box className="w-16 h-16 text-muted-foreground opacity-20 mb-6" />
           <h1 className="text-4xl font-bold tracking-tight text-foreground mb-4">
             Feature Not Found

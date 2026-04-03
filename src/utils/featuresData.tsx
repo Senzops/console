@@ -625,7 +625,8 @@ const DiagramMcp = () => (
   >
     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--fuchsia-500)/0.05)_0%,transparent_70%)]" />
 
-    <div className="absolute w-48 h-48 border border-fuchsia-500/20 rounded-full flex items-center justify-center border-dashed">
+    {/* Corrected: Removed absolute, letting flex naturally center the main node */}
+    <div className="relative w-48 h-48 border border-fuchsia-500/20 rounded-full flex items-center justify-center border-dashed">
       <div className="w-32 h-32 border border-fuchsia-500/30 rounded-full flex items-center justify-center">
         <div className="w-16 h-16 bg-gradient-to-br from-fuchsia-600 to-indigo-600 border border-indigo-400 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 z-10">
           <Bot className="w-7 h-7 text-white" />
@@ -633,7 +634,7 @@ const DiagramMcp = () => (
       </div>
     </div>
 
-    {/* Orbiting Nodes (Added icons representing the full suite) */}
+    {/* Orbiting Nodes (Absolute positioned against the TiltedCard wrapper) */}
     <div className="absolute top-[15%] left-[20%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
       <Database className="w-3.5 h-3.5 text-blue-500" />
     </div>
@@ -660,7 +661,6 @@ const DiagramMcp = () => (
     </div>
   </TiltedCard>
 );
-
 export const renderDiagram = (id: string) => {
   switch (id) {
     case "views":
@@ -735,7 +735,7 @@ export const FEATURES_DATA = [
     colorClasses: "text-orange-500 bg-orange-500/10 border-orange-500/20",
   },
   {
-    id: "otel",
+    id: "opentelemetry",
     title: "Native OpenTelemetry Support",
     subtitle: "Vendor-neutral telemetry ingestion.",
     description:
@@ -751,7 +751,7 @@ export const FEATURES_DATA = [
     colorClasses: "text-blue-500 bg-blue-500/10 border-blue-500/20",
   },
   {
-    id: "infrastructure",
+    id: "server",
     title: "Infrastructure Monitoring",
     subtitle: "Complete visibility into your compute fleet.",
     description:

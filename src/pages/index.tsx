@@ -119,11 +119,10 @@ export default function Home() {
     <div className="min-h-screen bg-background flex flex-col selection:bg-primary/20 selection:text-primary">
       <Navbar />
 
-      <main className="flex-grow">
+      <main className="flex-grow  overflow-x-hidden">
         {/* --- HERO SECTION --- */}
-        <section className="relative px-4 pt-32 pb-24 w-full flex flex-col items-center justify-center min-h-[75vh] border-b border-border/30">
+        <section className="relative px-4 pt-32 pb-24 w-full flex flex-col items-center justify-center min-h-[75vh] border-b border-border/30 overflow-hidden">
           <AnimatedBackground />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10" />
           <div className="relative z-10 text-center max-w-4xl mx-auto space-y-8 mt-12">
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.1]">
               Unified Visibility.
