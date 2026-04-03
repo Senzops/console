@@ -1,272 +1,293 @@
-import { Footer, Navbar } from '../components/Layout';
-import { Button, Badge } from '../components/Core';
-import { Zap, Activity, Lock, Server, Globe, Terminal, CheckCircle2, BarChart3, Code, Timer } from 'lucide-react';
-import Link from 'next/link';
-import { useAuth } from '../lib/auth';
-import { useRouter } from 'next/router';
-import { AnimatedBackground } from '@/components/AnimatedBackground';
+import React from "react";
+import Link from "next/link";
+import { Navbar, Footer } from "../components/Layout";
+import { Button, cn } from "../components/Core";
+import { AnimatedBackground } from "../components/AnimatedBackground";
+import { FEATURES_DATA, renderDiagram } from "../utils/featuresData";
+import { ArrowRight, Check, ChevronRight } from "lucide-react";
+
+// ============================================================================
+// LAYERED ARCHITECTURE MAPPING DIAGRAM (Redesigned Enterprise Flow)
+// ============================================================================
+const ArchitectureFlowDiagram = () => (
+  <div className="w-full max-w-6xl mx-auto my-16 border border-border/40 rounded-2xl bg-card overflow-hidden relative flex flex-col shadow-sm">
+    {/* Subtle Grid Background */}
+    <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+
+    <div className="relative z-10 p-8 md:p-12">
+      <div className="flex flex-col md:flex-row gap-6 md:gap-12 items-center justify-between">
+        {/* Phase 1: Edge & Client */}
+        <div className="flex-1 w-full bg-blue-500/5 border border-blue-500/20 p-6 rounded-xl relative group">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-4 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500"></div> Edge &
+            Client
+          </div>
+          <div className="space-y-3">
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
+              Web Analytics
+            </div>
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
+              Real User Monitoring (RUM)
+            </div>
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
+              Synthetic Uptime Checks
+            </div>
+          </div>
+          {/* Connecting line to middle */}
+          <div className="hidden md:block absolute top-1/2 -right-12 w-12 h-px bg-border">
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rotate-45 border-t border-r border-border"></div>
+          </div>
+        </div>
+
+        {/* Phase 2: Application Core */}
+        <div className="flex-1 w-full bg-orange-500/5 border border-orange-500/20 p-6 rounded-xl relative">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-orange-500 mb-4 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-orange-500"></div>{" "}
+            Application Core
+          </div>
+          <div className="space-y-3">
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm flex justify-between">
+              APM Traces{" "}
+              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 rounded flex items-center">
+                OTLP
+              </span>
+            </div>
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
+              Global Error Tracking
+            </div>
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm flex justify-between">
+              Background Tasks{" "}
+              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 rounded flex items-center">
+                OTLP
+              </span>
+            </div>
+          </div>
+          {/* Connecting line to right */}
+          <div className="hidden md:block absolute top-1/2 -right-12 w-12 h-px bg-border">
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rotate-45 border-t border-r border-border"></div>
+          </div>
+        </div>
+
+        {/* Phase 3: Infrastructure */}
+        <div className="flex-1 w-full bg-emerald-500/5 border border-emerald-500/20 p-6 rounded-xl relative">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 mb-4 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>{" "}
+            Infrastructure
+          </div>
+          <div className="space-y-3">
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
+              Server / VPS Monitoring
+            </div>
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
+              Database Telemetry
+            </div>
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm text-muted-foreground border-dashed">
+              3rd Party Integrations
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Platform Foundation (Cross-cutting) */}
+    <div className="relative z-10 bg-muted/20 border-t border-border/40 p-6 px-8 md:px-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+        Senzor Platform Foundation
+      </div>
+      <div className="flex flex-wrap items-center gap-4 text-sm font-medium">
+        <span className="text-foreground">Log Management</span>
+        <span className="text-muted-foreground">•</span>
+        <span className="text-foreground">Dashboards</span>
+        <span className="text-muted-foreground">•</span>
+        <span className="text-foreground">Alerts</span>
+        <span className="text-muted-foreground">•</span>
+        <span className="text-foreground">MCP AI Server</span>
+      </div>
+    </div>
+  </div>
+);
+
+// ============================================================================
+// MAIN PAGE COMPONENT
+// ============================================================================
 
 export default function Home() {
-  const { user } = useAuth();
-  const router = useRouter();
-
-  const handleCtaClick = () => {
-    if (user) {
-      router.push('/dashboard');
-    } else {
-      router.push('/login');
-    }
-  };
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen bg-background flex flex-col selection:bg-primary/20 selection:text-primary">
       <Navbar />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden pt-32 pb-24 lg:pt-48 lg:pb-32">
-        <AnimatedBackground />
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <Badge variant="outline" className="mb-6 px-4 py-1.5 text-sm border-emerald-500/30 text-emerald-500 bg-emerald-500/5 backdrop-blur inline-flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            v1.0 is Live
-          </Badge>
+      <main className="flex-grow">
+        {/* --- HERO SECTION --- */}
+        <section className="relative px-4 pt-32 pb-24 w-full flex flex-col items-center justify-center min-h-[75vh] border-b border-border/30">
+          <AnimatedBackground />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10" />
+          <div className="relative z-10 text-center max-w-4xl mx-auto space-y-8 mt-12">
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.1]">
+              Unified Visibility.
+              <br />
+              Uncompromised Control.
+            </h1>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-8 leading-tight">
-            Infrastructure Monitoring <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-cyan-500 to-blue-500">
-              Without the Bloat.
-            </span>
-          </h1>
-
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            Monitor your <strong>Servers</strong>, track <strong>Web Analytics</strong>, and ensure <strong>Global Uptime</strong>.
-            All from a single, lightweight dashboard designed for modern developers.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button
-              size="lg"
-              onClick={handleCtaClick}
-              className="h-14 px-8 text-lg rounded-full shadow-emerald-500/20 shadow-lg hover:shadow-emerald-500/30 transition-all flex items-center justify-center">
-              Start Monitoring
-            </Button>
-            <Link href="/demo" target="_blank">
-              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-border bg-card/50 backdrop-blur hover:bg-border hover:text-foreground">
-                View Demo
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="relative overflow-hidden pt-32 pb-24 lg:pt-48 lg:pb-32">
-        <div className="max-w-3xl mx-auto rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-xl shadow-2xl text-left">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
-            <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-500/50" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-              <div className="w-3 h-3 rounded-full bg-green-500/50" />
-            </div>
-            <div className="text-xs text-muted-foreground font-mono ml-4 flex items-center gap-2">
-              <Terminal className="h-3 w-3" /> bash
-            </div>
-          </div>
-          <div className="p-6 font-mono text-xs sm:text-sm space-y-4 overflow-x-auto">
-            <div className="text-blue-500 select-none">
-              <pre>
-                {`   _____                               
-  / ____| ___ _ __  ____ ___  _ __ 
- | (___  / _ \\ '_ \\|_  // _ \\| '__|
-  \\___ \\|  __/ | | |/ /| (_) | |   
- |_____/ \\___|_| |_/___|\\___/|_|   `}
-              </pre>
-            </div>
-            <div className="text-muted-foreground">
-              <span className="text-emerald-500">root@server:~$</span> curl -sL https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh | sudo -E bash -
-            </div>
-            <div className="text-muted-foreground space-y-1">
-              <div>[Senzor] <span className="text-blue-400">i</span> Detecting OS... Linux (Ubuntu 22.04 LTS)</div>
-              <div>[Senzor] <span className="text-blue-400">i</span> Pulling image ghcr.io/senzops/server-agent:latest...</div>
-              <div>[Senzor] <span className="text-blue-400">i</span> Verifying API Key... <span className="text-emerald-500">OK</span></div>
-              <div>[Senzor] <span className="text-emerald-500">✔ Agent installed and running successfully!</span></div>
-              <div className="text-muted-foreground/50">Logs: docker logs -f senzor</div>
-            </div>
-            <div className="flex gap-2 animate-pulse">
-              <span className="text-emerald-500">root@server:~$</span>
-              <span className="w-2 h-5 bg-muted-foreground/50 block" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Preview */}
-      <section className="container mx-auto px-4 mb-32">
-        <div className="rounded-xl border border-border bg-card/50 backdrop-blur shadow-2xl overflow-hidden max-w-5xl mx-auto">
-          <div className="border-b bg-muted/50 p-4 flex gap-2 items-center">
-            <div className="h-3 w-3 rounded-full bg-red-500/50" />
-            <div className="h-3 w-3 rounded-full bg-yellow-500/50" />
-            <div className="h-3 w-3 rounded-full bg-green-500/50" />
-          </div>
-          <div className="p-8 grid md:grid-cols-3 gap-8">
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">Real-time CPU</div>
-              <div className="text-3xl font-mono font-bold text-emerald-400">12.4%</div>
-              <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 w-[12%]" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">Memory Load</div>
-              <div className="text-3xl font-mono font-bold text-blue-400">4.2 GB</div>
-              <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 w-[45%]" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">Docker Containers</div>
-              <div className="text-3xl font-mono font-bold text-purple-400">8 Active</div>
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <div key={i} className="h-2 w-2 rounded-sm bg-purple-500" />)}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="container mx-auto px-4 py-24">
-        <div className="grid md:grid-cols-3 gap-8">
-
-          {/* Server */}
-          <div className="group relative p-8 rounded-3xl border border-border bg-card  transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-3xl pointer-events-none" />
-            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Server className="h-6 w-6 text-emerald-500" />
-            </div>
-            <h3 className="text-2xl font-bold mb-3 text-foreground">Server Telemetry</h3>
-            <p className="text-muted-foreground leading-relaxed mb-6">
-              Granular CPU, Memory, Disk, and Docker metrics. Our agent runs in a container with minimal footprint ({'<'}50MB RAM).
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Gain complete observability into your microservices,
+              infrastructure, and user experience. One cohesive control plane to
+              monitor, troubleshoot, and scale your engineering operations
+              securely.
             </p>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Real-time process stats</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Docker container deep-dive</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Zero firewall config needed</li>
-            </ul>
-          </div>
 
-          {/* Web */}
-          <div className="group relative p-8 rounded-3xl border border-border bg-card  transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent rounded-3xl pointer-events-none" />
-            <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Globe className="h-6 w-6 text-blue-500" />
-            </div>
-            <h3 className="text-2xl font-bold mb-3 text-foreground">Web Analytics</h3>
-            <p className="text-muted-foreground leading-relaxed mb-6">
-              Privacy-first traffic analysis. Track unique visitors, bounce rates, and user journeys without invasive cookies.
-            </p>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-blue-500" /> Lightweight (2KB) Script</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-blue-500" /> Real-time Heatmaps</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-blue-500" /> Country & Device breakdown</li>
-            </ul>
-          </div>
-
-          {/* Uptime */}
-          <div className="group relative p-8 rounded-3xl border border-border bg-card  transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent rounded-3xl pointer-events-none" />
-            <div className="h-12 w-12 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Activity className="h-6 w-6 text-purple-500" />
-            </div>
-            <h3 className="text-2xl font-bold mb-3 text-foreground">Global Uptime</h3>
-            <p className="text-muted-foreground leading-relaxed mb-6">
-              Monitor your endpoints from distributed workers. Track latency and status codes with automated checks.
-            </p>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Multi-region checks</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Latency history graphs</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-purple-500" /> 1-minute check intervals</li>
-            </ul>
-          </div>
-
-        </div>
-      </section>
-
-      {/* --- FEATURE GRID --- */}
-      <section className="bg-card/40 py-32 border-y border-border">
-        <div className="container mx-auto px-4">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl font-bold mb-4 text-foreground">Why Developers Switch to Senzor</h2>
-            <p className="text-muted-foreground">Traditional monitoring tools are bloated, expensive, and hard to manage. We built the alternative.</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <FeatureCard
-              icon={Zap}
-              title="Lightning Fast"
-              desc="Our agent uses Go-like concurrency patterns in Node.js to ensure minimal CPU usage on your host."
-            />
-            <FeatureCard
-              icon={Lock}
-              title="Secure by Design"
-              desc="Outbound-only connections. We never ask you to open SSH ports or firewall rules."
-            />
-            <FeatureCard
-              icon={BarChart3}
-              title="Granular History"
-              desc="We store raw telemetry for 24 hours and aggregated trends for 30 days."
-            />
-            <FeatureCard
-              icon={Code}
-              title="Developer API"
-              desc="Everything you see in the dashboard is available via our REST API."
-            />
-            <FeatureCard
-              icon={Timer}
-              title="Health Badges"
-              desc="Visual indicators for System Health, classifying uptime as Excellent, Good, or Degraded."
-            />
-            <FeatureCard
-              icon={Terminal}
-              title="Open Source"
-              desc="Our agents are 100% open source. Audit the code, build it yourself, trust the process."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* --- CTA --- */}
-      <section className="relative py-32">
-        <AnimatedBackground />
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-4xl mx-auto bg-gradient-to-b from-card to-background border border-border p-12 rounded-3xl relative overflow-hidden shadow-2xl">
-            {/* Decor */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
-
-            <h2 className="text-4xl font-bold mb-6 relative z-10 text-foreground">Ready to visualize your infrastructure?</h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto relative z-10">
-              Join thousands of developers who trust Senzor for their monitoring needs.
-              Get started for free today.
-            </p>
-            <div className="flex justify-center gap-4 relative z-10">
-              <Button size="lg"
-                onClick={handleCtaClick} className="h-12 px-8 rounded-full shadow-lg hover:shadow-emerald-500/20">Create Free Account</Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <Link href="/register">
+                <Button
+                  size="lg"
+                  className="h-12 px-8 font-semibold text-base shadow-sm"
+                >
+                  Start for free
+                </Button>
+              </Link>
+              <Link href="/demo">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-12 px-8 font-semibold text-base bg-background/50 backdrop-blur-sm border-border/60"
+                >
+                  View Live Demo
+                </Button>
+              </Link>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* --- LIFECYCLE ARCHITECTURE MAPPING --- */}
+        <section className="px-4 py-24 border-b border-border/30 bg-muted/5 relative overflow-hidden">
+          <div className="text-center max-w-3xl mx-auto mb-8 relative z-10">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-foreground">
+              Full-Stack Observability Across the Development Lifecycle
+            </h2>
+            <p className="text-muted-foreground text-lg leading-relaxed">
+              From the client's browser to the deepest database query, Senzor
+              provides native instrumentation and seamless data correlation.
+            </p>
+          </div>
+          <ArchitectureFlowDiagram />
+        </section>
+
+        {/* --- FEATURES & SERVICES (JSON DRIVEN) --- */}
+        <section className="py-32 bg-background relative overflow-hidden">
+          <div className="max-w-6xl mx-auto px-4 md:px-8 space-y-40 relative z-10">
+            {FEATURES_DATA.map((feature, index) => {
+              const isReversed = index % 2 !== 0;
+              // Extract text color from feature config to colorize text areas semantically
+              const textColor =
+                feature.colorClasses
+                  ?.split(" ")
+                  .find((c) => c.startsWith("text-")) || "text-primary";
+
+              return (
+                <div
+                  key={feature.id}
+                  className={cn(
+                    "flex flex-col lg:flex-row items-center gap-12 lg:gap-24",
+                    isReversed ? "lg:flex-row-reverse" : "",
+                  )}
+                >
+                  {/* Text Content */}
+                  <div className="flex-1 space-y-6">
+                    <div
+                      className={cn(
+                        "w-12 h-12 rounded-lg border flex items-center justify-center mb-6 shadow-sm",
+                        feature.colorClasses,
+                      )}
+                    >
+                      {/* Rendering the icon through string-mapping assumes icon is available, but here it's omitted in JSON for cleanliness. We rely strictly on the diagram for visual. */}
+                      <div className={cn("w-5 h-5", textColor)}>
+                        <Check className="w-full h-full" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">
+                        {feature.title}
+                      </h3>
+                      <p className="text-lg font-medium text-foreground/80 mb-4">
+                        {feature.subtitle}
+                      </p>
+                      <p className="text-muted-foreground leading-relaxed mb-8">
+                        {feature.description}
+                      </p>
+                    </div>
+
+                    <ul className="space-y-4">
+                      {feature.points.map((point, ptIdx) => (
+                        <li
+                          key={ptIdx}
+                          className="flex items-start gap-3 text-sm font-medium text-muted-foreground"
+                        >
+                          <Check
+                            className={cn("w-5 h-5 shrink-0", textColor)}
+                          />
+                          <span className="mt-0.5">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="pt-6">
+                      <Link
+                        href={feature.href}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 text-sm font-bold transition-colors group hover:opacity-80",
+                          textColor,
+                        )}
+                      >
+                        Explore {feature.title}{" "}
+                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Abstract Diagram UI Payload */}
+                  <div className="flex-1 w-full lg:w-auto h-[360px] relative">
+                    <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full transform translate-y-8 pointer-events-none z-0"></div>
+                    <div className="relative z-10 w-full h-full">
+                      {renderDiagram(feature.diagramId)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* --- PROFESSIONAL OUTRO SECTION --- */}
+        <section className="relative px-4 py-32 w-full flex flex-col items-center justify-center border-t border-border/30 overflow-hidden">
+          <AnimatedBackground />
+          <div className="absolute inset-0 bg-background/80 z-0"></div>
+
+          <div className="relative z-10 text-center max-w-3xl mx-auto space-y-6">
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+              Ready to gain full visibility?
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Join engineering teams who trust Senzor to monitor their
+              production environments. Integration takes minutes with native
+              OpenTelemetry support.
+            </p>
+            <div className="pt-6">
+              <Link href="/register">
+                <Button
+                  size="lg"
+                  className="h-14 px-10 font-bold text-base shadow-sm hover:scale-105 transition-transform duration-300"
+                >
+                  Start Monitoring Now <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
+            <p className="pt-4 text-xs text-muted-foreground font-mono uppercase tracking-widest opacity-70">
+              Secure Cloud Infrastructure
+            </p>
+          </div>
+        </section>
+      </main>
 
       <Footer />
     </div>
   );
 }
-
-const FeatureCard = ({ icon: Icon, title, desc }: any) => (
-  <div className="p-6 rounded-2xl bg-card border border-border hover:border-emerald-500/30 transition-colors group shadow-sm hover:shadow-md duration-300">
-    <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center mb-4 group-hover:bg-emerald-500/10 transition-colors duration-300">
-      <Icon className="h-5 w-5 text-foreground group-hover:text-emerald-500 transition-colors duration-300" />
-    </div>
-    <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-foreground">{title}</h3>
-    <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
-  </div>
-);
