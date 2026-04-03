@@ -5,6 +5,7 @@ import { Button, cn } from "../components/Core";
 import { AnimatedBackground } from "../components/AnimatedBackground";
 import { FEATURES_DATA, renderDiagram } from "../utils/featuresData";
 import { ArrowRight, Check, ChevronRight } from "lucide-react";
+import { useAuth } from "../lib/auth";
 
 // ============================================================================
 // LAYERED ARCHITECTURE MAPPING DIAGRAM (Redesigned Enterprise Flow)
@@ -112,6 +113,8 @@ const ArchitectureFlowDiagram = () => (
 // ============================================================================
 
 export default function Home() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-background flex flex-col selection:bg-primary/20 selection:text-primary">
       <Navbar />
@@ -135,22 +138,22 @@ export default function Home() {
               securely.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Link href="/register">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
+              <Link href={user ? "/dashboard" : "/login"}>
                 <Button
                   size="lg"
-                  className="h-12 px-8 font-semibold text-base shadow-sm"
+                  className="h-14 px-8 text-lg rounded-full shadow-primary/20 shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center"
                 >
-                  Start for free
+                  {user ? "Go to Dashboard" : "Start for free"}
                 </Button>
               </Link>
-              <Link href="/demo">
+              <Link href="/demo" target="_blank">
                 <Button
-                  size="lg"
                   variant="outline"
-                  className="h-12 px-8 font-semibold text-base bg-background/50 backdrop-blur-sm border-border/60"
+                  size="lg"
+                  className="h-14 px-8 text-lg rounded-full border-border bg-card/50 backdrop-blur hover:bg-muted/50 hover:text-foreground"
                 >
-                  View Live Demo
+                  View Demo
                 </Button>
               </Link>
             </div>
@@ -192,17 +195,6 @@ export default function Home() {
                 >
                   {/* Text Content */}
                   <div className="flex-1 space-y-6">
-                    <div
-                      className={cn(
-                        "w-12 h-12 rounded-lg border flex items-center justify-center mb-6 shadow-sm",
-                        feature.colorClasses,
-                      )}
-                    >
-                      {/* Rendering the icon through string-mapping assumes icon is available, but here it's omitted in JSON for cleanliness. We rely strictly on the diagram for visual. */}
-                      <div className={cn("w-5 h-5", textColor)}>
-                        <Check className="w-full h-full" />
-                      </div>
-                    </div>
                     <div>
                       <h3 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">
                         {feature.title}
@@ -271,12 +263,13 @@ export default function Home() {
               OpenTelemetry support.
             </p>
             <div className="pt-6">
-              <Link href="/register">
+              <Link href={user ? "/dashboard" : "/login"}>
                 <Button
                   size="lg"
                   className="h-14 px-10 font-bold text-base shadow-sm hover:scale-105 transition-transform duration-300"
                 >
-                  Start Monitoring Now <ArrowRight className="ml-2 w-5 h-5" />
+                  {user ? "Go to Dashboard" : "Start Monitoring Now"}{" "}
+                  <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
             </div>
