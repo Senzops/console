@@ -3,9 +3,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { Navbar, Footer } from "../components/Layout";
 import { Button, Card, CardContent } from "../components/Core";
-import { AnimatedBackground } from "../components/AnimatedBackground";
+import { NetworkBackground } from "../components/NetworkBackground";
 import { useAuth } from "../lib/auth";
-import { ArrowLeft, Home, LayoutGrid, Terminal } from "lucide-react";
 
 export default function Custom404() {
   const router = useRouter();
@@ -28,10 +27,7 @@ export default function Custom404() {
       <Navbar />
 
       <main className="flex-grow flex flex-col items-center justify-center relative px-4 py-24 overflow-hidden border-b border-border/30">
-        <AnimatedBackground />
-
-        {/* Subtle Error Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-destructive/5 rounded-full blur-[150px] pointer-events-none -z-10" />
+        <NetworkBackground />
 
         <div className="relative z-10 w-full max-w-2xl text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {/* 404 Typography */}
@@ -57,7 +53,8 @@ export default function Custom404() {
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
               </div>
               <div className="ml-2 flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-                <Terminal className="w-3 h-3" /> System Log
+                {" "}
+                System Log
               </div>
             </div>
             <CardContent className="p-5 font-mono text-xs leading-loose text-[#8b949e]">
