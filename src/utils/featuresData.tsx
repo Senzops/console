@@ -720,7 +720,7 @@ export const renderDiagram = (id: string) => {
 export const FEATURES_DATA = [
   {
     id: "views",
-    title: "Saved Views & Dashboards",
+    title: "Saved Views",
     subtitle: "Your operational data, perfectly organized.",
     description:
       "Construct bespoke control panels by aggregating metrics, logs, and traces across your entire stack. Drag, drop, and resize visualizations in a unified canvas.",
@@ -733,38 +733,6 @@ export const FEATURES_DATA = [
     diagramId: "views",
     href: "/features/views",
     colorClasses: "text-teal-500 bg-teal-500/10 border-teal-500/20",
-  },
-  {
-    id: "apm",
-    title: "Application Performance Monitoring",
-    subtitle: "Trace requests across distributed architectures.",
-    description:
-      "Follow every request as it traverses your microservices. Identify latency bottlenecks, analyze upstream dependencies, and optimize your backend logic.",
-    points: [
-      "Zero-configuration distributed tracing",
-      "End-to-end trace waterfall visualizations",
-      "Automatic framework instrumentation",
-      "Database and external API profiling",
-    ],
-    diagramId: "apm",
-    href: "/features/apm",
-    colorClasses: "text-orange-500 bg-orange-500/10 border-orange-500/20",
-  },
-  {
-    id: "opentelemetry",
-    title: "Native OpenTelemetry Support",
-    subtitle: "Vendor-neutral telemetry ingestion.",
-    description:
-      "Stream traces and metrics directly from your Go, Java, Python, or Rust applications without proprietary agents. We natively translate OTLP payloads into our specialized dashboard schemas.",
-    points: [
-      "OTLP HTTP compatible endpoints",
-      "Automatic trace and log translation",
-      "Zero-config APM & Task monitoring",
-      "Standard Semantic Conventions support",
-    ],
-    diagramId: "otel",
-    href: "/features/opentelemetry",
-    colorClasses: "text-blue-500 bg-blue-500/10 border-blue-500/20",
   },
   {
     id: "server",
@@ -797,6 +765,54 @@ export const FEATURES_DATA = [
     diagramId: "database",
     href: "/features/database",
     colorClasses: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+  },
+  {
+    id: "web-analytics",
+    title: "Web Analytics",
+    subtitle: "Privacy-first traffic insights.",
+    description:
+      "Understand your audience without compromising their privacy. Track page views, unique visitors, referrers, and geographic distribution with zero cookies.",
+    points: [
+      "Cookie-less, GDPR-compliant tracking",
+      "Real-time visitor analytics",
+      "Geographic and device breakdowns",
+      "Referrer and acquisition mapping",
+    ],
+    diagramId: "web",
+    href: "/features/web-analytics",
+    colorClasses: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
+  },
+  {
+    id: "rum",
+    title: "Real User Monitoring",
+    subtitle: "Measure exactly what your users experience.",
+    description:
+      "Capture client-side performance bottlenecks. Monitor Core Web Vitals, network call latency, and frontend JavaScript exceptions directly from the browser.",
+    points: [
+      "Core Web Vitals (LCP, FID, CLS)",
+      "Global geographic latency mapping",
+      "Frontend JavaScript error tracking",
+      "Rage click & UX frustration metrics",
+    ],
+    diagramId: "rum",
+    href: "/features/rum",
+    colorClasses: "text-pink-500 bg-pink-500/10 border-pink-500/20",
+  },
+  {
+    id: "apm",
+    title: "Application Performance Monitoring",
+    subtitle: "Trace requests across distributed architectures.",
+    description:
+      "Follow every request as it traverses your microservices. Identify latency bottlenecks, analyze upstream dependencies, and optimize your backend logic.",
+    points: [
+      "Zero-configuration distributed tracing",
+      "End-to-end trace waterfall visualizations",
+      "Automatic framework instrumentation",
+      "Database and external API profiling",
+    ],
+    diagramId: "apm",
+    href: "/features/apm",
+    colorClasses: "text-orange-500 bg-orange-500/10 border-orange-500/20",
   },
   {
     id: "tasks",
@@ -847,38 +863,6 @@ export const FEATURES_DATA = [
     colorClasses: "text-slate-500 bg-slate-500/10 border-slate-500/20",
   },
   {
-    id: "rum",
-    title: "Real User Monitoring (RUM)",
-    subtitle: "Measure exactly what your users experience.",
-    description:
-      "Capture client-side performance bottlenecks. Monitor Core Web Vitals, network call latency, and frontend JavaScript exceptions directly from the browser.",
-    points: [
-      "Core Web Vitals (LCP, FID, CLS)",
-      "Global geographic latency mapping",
-      "Frontend JavaScript error tracking",
-      "Rage click & UX frustration metrics",
-    ],
-    diagramId: "rum",
-    href: "/features/rum",
-    colorClasses: "text-pink-500 bg-pink-500/10 border-pink-500/20",
-  },
-  {
-    id: "web-analytics",
-    title: "Web Analytics",
-    subtitle: "Privacy-first traffic insights.",
-    description:
-      "Understand your audience without compromising their privacy. Track page views, unique visitors, referrers, and geographic distribution with zero cookies.",
-    points: [
-      "Cookie-less, GDPR-compliant tracking",
-      "Real-time visitor analytics",
-      "Geographic and device breakdowns",
-      "Referrer and acquisition mapping",
-    ],
-    diagramId: "web",
-    href: "/features/web-analytics",
-    colorClasses: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
-  },
-  {
     id: "uptime",
     title: "Uptime Monitoring",
     subtitle: "Verify external availability.",
@@ -893,6 +877,22 @@ export const FEATURES_DATA = [
     diagramId: "uptime",
     href: "/features/uptime",
     colorClasses: "text-green-500 bg-green-500/10 border-green-500/20",
+  },
+  {
+    id: "mcp",
+    title: "MCP Server",
+    subtitle: "AI-driven operational intelligence.",
+    description:
+      "Seamlessly integrate your telemetry data with advanced Large Language Models. Use the Model Context Protocol to query, summarize, and analyze incidents using natural language.",
+    points: [
+      "Secure Model Context Protocol integration",
+      "Natural language telemetry querying",
+      "Automated incident summarization",
+      "Granular API key access controls",
+    ],
+    diagramId: "mcp",
+    href: "/features/mcp",
+    colorClasses: "text-fuchsia-500 bg-fuchsia-500/10 border-fuchsia-500/20",
   },
   {
     id: "alerts",
@@ -911,19 +911,19 @@ export const FEATURES_DATA = [
     colorClasses: "text-rose-500 bg-rose-500/10 border-rose-500/20",
   },
   {
-    id: "mcp",
-    title: "MCP Server",
-    subtitle: "AI-driven operational intelligence.",
+    id: "opentelemetry",
+    title: "Native OpenTelemetry Support",
+    subtitle: "Vendor-neutral telemetry ingestion.",
     description:
-      "Seamlessly integrate your telemetry data with advanced Large Language Models. Use the Model Context Protocol to query, summarize, and analyze incidents using natural language.",
+      "Stream traces and metrics directly from your Go, Java, Python, or Rust applications without proprietary agents. We natively translate OTLP payloads into our specialized dashboard schemas.",
     points: [
-      "Secure Model Context Protocol integration",
-      "Natural language telemetry querying",
-      "Automated incident summarization",
-      "Granular API key access controls",
+      "OTLP HTTP compatible endpoints",
+      "Automatic trace and log translation",
+      "Zero-config APM & Task monitoring",
+      "Standard Semantic Conventions support",
     ],
-    diagramId: "mcp",
-    href: "/features/mcp",
-    colorClasses: "text-fuchsia-500 bg-fuchsia-500/10 border-fuchsia-500/20",
+    diagramId: "otel",
+    href: "/features/opentelemetry",
+    colorClasses: "text-blue-500 bg-blue-500/10 border-blue-500/20",
   },
 ];

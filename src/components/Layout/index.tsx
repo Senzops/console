@@ -37,13 +37,18 @@ import {
   Terminal,
   Bot,
   BellRing,
-  LayoutTemplate, // Added for RUM
+  LayoutTemplate,
+  ShieldCheck,
+  Cookie,
+  Shield,
+  Scale, // Added for RUM
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
 import md5 from "md5";
 import { extractErrorMessage } from "@/utils/axiosError";
 import { toast } from "sonner";
+import { FEATURES_DATA } from "@/utils/featuresData";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -127,6 +132,25 @@ export const Footer = () => {
             </p>
           </div>
 
+          {/* Features (Dynamically Generated) */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-semibold text-foreground tracking-wide uppercase opacity-70">
+              Features
+            </h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              {FEATURES_DATA.map((feature) => (
+                <li key={feature.id}>
+                  <Link
+                    href={feature.href}
+                    className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
+                  >
+                    {feature.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           {/* Platform & Legal */}
           <div className="space-y-4">
             <h4 className="text-xs font-semibold text-foreground tracking-wide uppercase opacity-70">
@@ -145,60 +169,43 @@ export const Footer = () => {
               </li>
               <li>
                 <Link
+                  href="/docs"
+                  className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
+                >
+                  <Book className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Documentation
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/terms"
                   className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <FileText className="h-3.5 w-3.5" /> Terms of Service
+                  <Scale className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Terms of Service
                 </Link>
               </li>
-            </ul>
-          </div>
-
-          {/* Documentation */}
-          <div className="space-y-4">
-            <h4 className="text-xs font-semibold text-foreground tracking-wide uppercase opacity-70">
-              Documentation
-            </h4>
-            <ul className="space-y-2.5 text-sm text-muted-foreground">
               <li>
-                <a
-                  href="https://github.com/Senzops"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-blue-500 transition-colors flex items-center gap-2"
+                <Link
+                  href="/privacy"
+                  className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <Book className="h-3.5 w-3.5" /> Overview
-                </a>
+                  <Shield className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Privacy Policy
+                </Link>
               </li>
               <li>
-                <a
-                  href="https://github.com/Senzops/server-agent"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-blue-500 transition-colors flex items-center gap-2"
+                <Link
+                  href="/cookie"
+                  className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <Server className="h-3.5 w-3.5" /> Server Agent
-                </a>
+                  <Cookie className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Cookie Policy
+                </Link>
               </li>
               <li>
-                <a
-                  href="https://github.com/Senzops/web-agent"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-blue-500 transition-colors flex items-center gap-2"
+                <Link
+                  href="/gdpr"
+                  className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <Globe className="h-3.5 w-3.5" /> Web Agent
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://github.com/Senzops/.github/blob/dev/SELF_HOSTING.md"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-blue-500 transition-colors flex items-center gap-2"
-                >
-                  <Layout className="h-3.5 w-3.5" /> Self Hosting
-                </a>
+                  <ShieldCheck className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> GDPR compliance
+                </Link>
               </li>
             </ul>
           </div>
@@ -701,7 +708,7 @@ export const DashboardLayout = ({
     setIsTaskModalOpen(false);
     setIsDbModalOpen(false);
     setIsRumModalOpen(false); // NEW
-    setIsViewModalOpen(false); 
+    setIsViewModalOpen(false);
     setNewCreds(null);
     setNewName("");
     setNewDescription("");
@@ -1002,7 +1009,12 @@ export const DashboardLayout = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(Optional)</span></label>
+            <label className="text-sm font-medium">
+              Description{" "}
+              <span className="text-muted-foreground font-normal">
+                (Optional)
+              </span>
+            </label>
             <input
               className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none transition-all"
               placeholder="Describe the purpose of this view..."
@@ -1011,12 +1023,22 @@ export const DashboardLayout = ({
             />
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" onClick={closeModal} disabled={isRegisteringView}>
+            <Button
+              variant="ghost"
+              onClick={closeModal}
+              disabled={isRegisteringView}
+            >
               Cancel
             </Button>
-            <Button onClick={handleRegisterView} disabled={isRegisteringView} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button
+              onClick={handleRegisterView}
+              disabled={isRegisteringView}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
               {isRegisteringView ? (
-                <><Spinner className="mr-2 h-4 w-4" /> Creating...</>
+                <>
+                  <Spinner className="mr-2 h-4 w-4" /> Creating...
+                </>
               ) : (
                 "Create Canvas"
               )}
