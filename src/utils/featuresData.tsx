@@ -112,10 +112,9 @@ const VIEW_COLORS = [
 ];
 const DiagramViews = () => (
   <TiltedCard color="teal" innerClassName="p-4 gap-3">
-    <div className="h-6 w-1/3 bg-background border border-border/50 rounded-md mb-2 shadow-sm" />
     <div className="flex-1 grid grid-cols-3 gap-3">
-      <div className="col-span-2 bg-background border border-border/50 rounded-lg p-3 flex flex-col shadow-sm">
-        <div className="h-3 w-24 bg-muted rounded mb-4" />
+      <div className="col-span-2 row-span-2 bg-background border border-border/50 rounded-lg p-3 flex flex-col shadow-sm">
+        <div className="w-24 bg-background text-muted-foreground rounded mb-4 p-1 text-xs">7day Traffic</div>
         <div className="flex-1 flex items-end gap-1.5 opacity-90">
           {[40, 70, 45, 90, 65, 80, 30].map((h, i) => (
             <div
@@ -126,7 +125,7 @@ const DiagramViews = () => (
           ))}
         </div>
       </div>
-      <div className="col-span-1 bg-background border border-border/50 rounded-lg p-3 flex flex-col items-center justify-center shadow-sm">
+      <div className="col-span-1 bg-background border border-border/50 rounded-lg p-3 flex flex-col items-center justify-center shadow-sm relative">
         <div className="relative w-16 h-16">
           <svg
             viewBox="0 0 36 36"
@@ -139,7 +138,24 @@ const DiagramViews = () => (
             <circle cx="18" cy="18" r="16" />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-teal-600 dark:text-teal-400">
-            99%
+            75%
+          </div>
+        </div>
+      </div>
+      <div className="col-span-1 bg-background border border-border/50 rounded-lg p-3 flex flex-col items-center justify-center shadow-sm relative">
+        <div className="relative w-16 h-16">
+          <svg
+            viewBox="0 0 36 36"
+            className="w-full h-full stroke-red-500 fill-transparent"
+            strokeWidth="4"
+            strokeDasharray="30 100"
+            strokeLinecap="round"
+          >
+            <circle cx="18" cy="18" r="16" className="stroke-muted" />
+            <circle cx="18" cy="18" r="16" />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-600 dark:text-red-400">
+            30%
           </div>
         </div>
       </div>
@@ -188,8 +204,8 @@ const DiagramApm = () => (
       </span>
     </div>
     <div className="relative h-5 w-full flex items-center mt-1">
-      <div className="absolute left-[90%] h-4 w-[10%] bg-indigo-500/10 border border-indigo-500/30 rounded-sm" />
-      <span className="absolute left-[92%] text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 truncate max-w-[8%]">
+      <div className="absolute left-[70%] h-4 w-[10%] bg-indigo-500/10 border border-indigo-500/30 rounded-sm" />
+      <span className="absolute left-[72%] text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 truncate max-w-[8%]">
         PUBLISH.topic
       </span>
     </div>
@@ -489,9 +505,8 @@ const DiagramRum = () => (
         <span className="text-[9px] text-muted-foreground font-bold">CLS</span>
         <span className="text-lg font-bold text-yellow-500">0.14</span>
       </div>
-      <div className="col-span-2 bg-red-500/10 rounded-lg border border-red-500/30 p-2 flex items-center gap-2">
-        <AlertOctagon className="w-4 h-4 text-red-500 shrink-0" />
-        <div className="flex flex-col min-w-0">
+      <div className="col-span-2 bg-red-500/10 rounded-lg border border-red-500/30 p-2 flex items-center justify-center gap-2">
+        <div className="flex flex-col items-center justify-center min-w-0">
           <span className="text-[9px] font-bold text-red-600 dark:text-red-400 uppercase">
             JS Exception
           </span>
@@ -520,7 +535,7 @@ const DiagramWeb = () => (
         <div className="text-2xl font-bold text-foreground">45.2k</div>
       </div>
     </div>
-    <div className="flex-1 border-b border-l border-cyan-500/30 relative ml-2 mb-2">
+    <div className="flex-1 border rounded-md border-cyan-500/30 relative ml-2 mb-2">
       <svg
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="none"
@@ -593,7 +608,7 @@ const DiagramAlerts = () => (
     </div>
 
     <div className="flex justify-center my-1 relative z-0">
-      <div className="h-6 w-px border-l-2 border-dashed border-rose-500/50 relative">
+      <div className="h-8 w-0 border-l-2 border-dashed border-rose-500/50 relative">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-background border border-rose-500/50 rounded-full flex items-center justify-center">
           <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping" />
           <div className="w-1.5 h-1.5 bg-rose-500 rounded-full absolute" />
@@ -661,6 +676,7 @@ const DiagramMcp = () => (
     </div>
   </TiltedCard>
 );
+
 export const renderDiagram = (id: string) => {
   switch (id) {
     case "views":
