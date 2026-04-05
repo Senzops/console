@@ -195,6 +195,11 @@ export const Footer = () => {
                   <Layout className="h-3.5 w-3.5" /> Self Hosting
                 </a>
               </li>
+            </ul>
+            <h4 className="text-xs font-semibold text-foreground tracking-wide uppercase opacity-70">
+              Legal
+            </h4>
+            <ul className="space-y-2.5 text-sm text-muted-foreground">
               <li>
                 <Link
                   href="/terms"
