@@ -22,7 +22,6 @@ import {
   Layout,
   Github,
   Linkedin,
-  FileText,
   Play,
   Box,
   ChevronRight,
@@ -41,7 +40,9 @@ import {
   ShieldCheck,
   Cookie,
   Shield,
-  Scale, // Added for RUM
+  Scale,
+  DollarSign,
+  BadgeDollarSign,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -169,12 +170,31 @@ export const Footer = () => {
               </li>
               <li>
                 <Link
+                  href="/pricing"
+                  className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
+                >
+                  <BadgeDollarSign className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" />{" "}
+                  Pricing
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/docs"
                   className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
                   <Book className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" />{" "}
                   Documentation
                 </Link>
+              </li>
+              <li>
+                <a
+                  href="https://github.com/Senzops/.github/blob/dev/SELF_HOSTING.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
+                >
+                  <Layout className="h-3.5 w-3.5" /> Self Hosting
+                </a>
               </li>
               <li>
                 <Link
