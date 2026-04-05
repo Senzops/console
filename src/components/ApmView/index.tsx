@@ -19,8 +19,8 @@ const fetcher = (url: string) => api.get(url).then(res => res.data);
 
 // --- HELPERS ---
 const formatNumber = (num: number) => {
-  if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(2) + 'K';
+  if (num >= 1000000) return (num / 1000000)?.toFixed(2) + 'M';
+  if (num >= 1000) return (num / 1000)?.toFixed(2) + 'K';
   return num.toString();
 };
 
@@ -66,7 +66,7 @@ const CustomTooltip = ({ active, payload, label, unit = '', labelFormatter }: an
             style={{ color: entry.color || entry.stroke || entry.fill }}>
             {/* If detailed mode, name is like "code_200", clean it up */}
             <span className="capitalize">{entry.name.replace('code_', '')}:</span>
-            <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
+            <span className="font-mono">{typeof entry.value === 'number' ? entry.value?.toFixed(2) : entry.value}{unit}</span>
           </div>
         ))}
       </div>
@@ -213,7 +213,7 @@ const EndpointsTable = ({ routes, router, serviceId }: any) => {
                       <td className="px-6 py-3"><Badge variant="outline" className={`font-mono text-[10px] px-2 py-0.5 border-0 ${getMethodColor(r.method)}`}>{r.method}</Badge></td>
                       <td className="px-6 py-3 font-mono text-xs truncate max-w-[300px] text-foreground">{r.route}</td>
                       <td className="px-6 py-3 text-right font-mono text-xs"><SmartAnimatedValue value={formatNumber(r.count)} /></td>
-                      <td className="px-6 py-3 text-right font-mono text-xs text-red-500"><SmartAnimatedValue value={r.errorRate > 0 ? `${r.errorRate.toFixed(1)}%` : '-'} /></td>
+                      <td className="px-6 py-3 text-right font-mono text-xs text-red-500"><SmartAnimatedValue value={r.errorRate > 0 ? `${r.errorRate?.toFixed(1)}%` : '-'} /></td>
                       <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground"><SmartAnimatedValue value={`${Math.round(r.avgLatency)}ms`} /></td>
                    </tr>
                 ))}
@@ -348,7 +348,7 @@ const InvocationsList = ({ invocations, serviceId, onRefresh, isRefreshing }: an
                              <button onClick={(e) => handleFilterClick(e, String(trace.status))} className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary transition-opacity"><Filter className="w-3 h-3"/></button>
                          </div>
                       </td>
-                      <td className="px-6 py-3 font-mono text-xs"><span className={getLatencyColor(trace.duration)}><SmartAnimatedValue value={`${trace.duration.toFixed(2)}ms`} /></span></td>
+                      <td className="px-6 py-3 font-mono text-xs"><span className={getLatencyColor(trace.duration)}><SmartAnimatedValue value={`${trace.duration?.toFixed(2)}ms`} /></span></td>
                       <td className="px-6 py-3 text-xs text-muted-foreground">
                          <div className="flex items-center gap-2 group/cell">
                              <span className="font-mono text-[10px]">{trace.ip}</span>
@@ -506,7 +506,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <StatCard title="Total Requests" value={formatNumber(overview.totalRequests)} sub="Calls in range" icon={Zap} color="text-orange-500" isMono={isMono} />
-           <StatCard title="Error Rate" value={`${overview.errorRate.toFixed(2)}%`} sub={`${overview.totalErrors} Failures`} icon={AlertOctagon} color="text-red-500" isMono={isMono} />
+           <StatCard title="Error Rate" value={`${overview.errorRate?.toFixed(2)}%`} sub={`${overview.totalErrors} Failures`} icon={AlertOctagon} color="text-red-500" isMono={isMono} />
            <StatCard title="Avg Latency" value={`${Math.round(overview.avgLatency)}ms`} sub="Response Time" icon={Clock} color="text-blue-500" isMono={isMono} />
            <StatCard title="P99 Latency" value={`${Math.round(overview.maxLatency)}ms`} sub="Slowest 1%" icon={Activity} color="text-purple-500" isMono={isMono} />
         </div>

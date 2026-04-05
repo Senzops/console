@@ -41,7 +41,6 @@ import {
   Cookie,
   Shield,
   Scale,
-  DollarSign,
   BadgeDollarSign,
 } from "lucide-react";
 import Link from "next/link";
@@ -973,28 +972,37 @@ export const DashboardLayout = ({
               <ArrowRight className="h-3 w-3 text-amber-500 ml-auto opacity-50 group-hover:opacity-100" />
             </div>
           )}
-          <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-secondary/20">
-            <Avatar
-              src={getGravatar(user.email || "")}
-              fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
-            />
-            <div className="flex flex-col overflow-hidden justify-center">
-              <span className="text-sm font-medium truncate leading-tight flex items-center gap-2">
-                {user.displayName || "User"}
-                {user.isDemo && (
-                  <Badge variant="warning" className="text-[9px] px-1 py-0 h-4">
-                    DEMO
-                  </Badge>
-                )}
-              </span>
-              <span
-                className="text-xs text-muted-foreground truncate leading-tight"
-                title={user.email || ""}
-              >
-                {user.email}
-              </span>
+
+          <Link href="/profile" className="block mb-4" title="Manage Profile">
+            <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-all border border-transparent hover:border-border/40 group cursor-pointer">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <Avatar
+                  src={getGravatar(user.email || "")}
+                  fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
+                />
+                <div className="flex flex-col overflow-hidden justify-center">
+                  <span className="text-sm font-medium truncate leading-tight flex items-center gap-2">
+                    {user.displayName || "User"}
+                    {user.isDemo && (
+                      <Badge
+                        variant="warning"
+                        className="text-[9px] px-1 py-0 h-4"
+                      >
+                        DEMO
+                      </Badge>
+                    )}
+                  </span>
+                  <span
+                    className="text-xs text-muted-foreground truncate leading-tight"
+                    title={user.email || ""}
+                  >
+                    {user.email}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+          </Link>
+
           <Button
             onClick={logout}
             variant="outline"
