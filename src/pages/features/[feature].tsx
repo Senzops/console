@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Navbar, Footer } from "../../components/Layout";
 import { Button, cn } from "../../components/Core";
 import { AnimatedBackground } from "../../components/AnimatedBackground";
-import { FEATURES_DATA, renderDiagram } from "../../utils/featuresData";
+import { FEATURES_DATA, renderDiagram } from "../../static/featuresData";
 import {
   ArrowRight,
   CheckCircle2,
@@ -29,7 +29,6 @@ export default function FeaturePage() {
 
   // Find the requested feature from our Single Source of Truth
   const feature = FEATURES_DATA.find((f) => f.id === featureParam);
-
 
   // 404 State if feature doesn't exist
   if (!feature) {

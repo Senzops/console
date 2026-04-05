@@ -48,7 +48,7 @@ import useSWR from "swr";
 import md5 from "md5";
 import { extractErrorMessage } from "@/utils/axiosError";
 import { toast } from "sonner";
-import { FEATURES_DATA } from "@/utils/featuresData";
+import { FEATURES_DATA } from "@/static/featuresData";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -172,7 +172,8 @@ export const Footer = () => {
                   href="/docs"
                   className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <Book className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Documentation
+                  <Book className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" />{" "}
+                  Documentation
                 </Link>
               </li>
               <li>
@@ -180,7 +181,8 @@ export const Footer = () => {
                   href="/terms"
                   className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <Scale className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Terms of Service
+                  <Scale className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" />{" "}
+                  Terms of Service
                 </Link>
               </li>
               <li>
@@ -188,7 +190,8 @@ export const Footer = () => {
                   href="/privacy"
                   className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <Shield className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Privacy Policy
+                  <Shield className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" />{" "}
+                  Privacy Policy
                 </Link>
               </li>
               <li>
@@ -196,7 +199,8 @@ export const Footer = () => {
                   href="/cookie"
                   className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <Cookie className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> Cookie Policy
+                  <Cookie className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" />{" "}
+                  Cookie Policy
                 </Link>
               </li>
               <li>
@@ -204,7 +208,8 @@ export const Footer = () => {
                   href="/gdpr"
                   className="hover:text-emerald-500 transition-colors flex items-center gap-2 group"
                 >
-                  <ShieldCheck className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" /> GDPR compliance
+                  <ShieldCheck className="h-3.5 w-3.5 group-hover:fill-emerald-500/20" />{" "}
+                  GDPR compliance
                 </Link>
               </li>
             </ul>

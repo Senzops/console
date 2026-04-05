@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Navbar, Footer } from "../components/Layout";
 import { Button, cn } from "../components/Core";
 import { AnimatedBackground } from "../components/AnimatedBackground";
-import { FEATURES_DATA, renderDiagram } from "../utils/featuresData";
+import { FEATURES_DATA, renderDiagram } from "../static/featuresData";
 import { ArrowRight, Check, ChevronRight } from "lucide-react";
 import { useAuth } from "../lib/auth";
 
