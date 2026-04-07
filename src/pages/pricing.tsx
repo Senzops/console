@@ -1,42 +1,21 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import Script from "next/script";
 import { Navbar, Footer } from "../components/Layout";
 import { Button, cn } from "../components/Core";
 import { AnimatedBackground } from "../components/AnimatedBackground";
 import { useAuth } from "../lib/auth";
-import {
-  Check,
-  Minus,
-  HelpCircle,
-  Building2,
-  Zap,
-  Loader2,
-} from "lucide-react";
+import { Check, Minus, HelpCircle, Building2, Loader2 } from "lucide-react";
 
-// Types matching the backend response
-interface BackendPlan {
-  id: string;
-  name: string;
-  priceMonthly: number;
-  priceAnnual: number;
-  maxServicesPerType: number;
-  maxIngestionBytes: number;
-  retentionDays: number;
-  paddlePriceIdMonthly: string | null;
-  paddlePriceIdAnnual: string | null;
-}
-
-// UI configuration mapping
+// --- UI CONFIGURATION & MAPPING ---
 const PLAN_UI_META: Record<string, any> = {
   starter: {
     description: "Perfect for side projects and MVPs.",
     features: [
       "2 GB pooled ingestion/month",
-      "3-day data retention",
       "1 service per type (APM, RUM, etc.)",
       "Community support",
+      "Standard dashboards",
     ],
     ctaText: "Start for free",
     popular: false,
@@ -45,10 +24,9 @@ const PLAN_UI_META: Record<string, any> = {
     description: "For production applications and small teams.",
     features: [
       "15 GB pooled ingestion/month",
-      "15-day data retention",
       "5 services per type",
       "Email support",
-      "Basic alerting",
+      "Advanced alerting",
     ],
     ctaText: "Upgrade to Pro",
     popular: true,
@@ -57,7 +35,6 @@ const PLAN_UI_META: Record<string, any> = {
     description: "For scaling engineering organizations.",
     features: [
       "100 GB pooled ingestion/month",
-      "30-day data retention",
       "Unlimited services",
       "Priority support SLA",
       "Advanced incident routing",
@@ -69,43 +46,58 @@ const PLAN_UI_META: Record<string, any> = {
 
 const COMPARE_FEATURES = [
   {
-    category: "Ingestion & Limits",
+    category: "Ingestion & Capacity",
     items: [
       {
         name: "Pooled Data Ingestion",
+        tooltip:
+          "Data limits are shared across all your observability services.",
         starter: "2 GB / mo",
         pro: "15 GB / mo",
         business: "100 GB / mo",
         enterprise: "Custom Volume",
       },
       {
-        name: "Data Retention",
-        starter: "3 Days",
-        pro: "15 Days",
-        business: "30 Days",
-        enterprise: "90+ Days",
-      },
-      {
-        name: "Services (APM, RUM, DB)",
+        name: "Services Limit",
+        tooltip: "Maximum number of registered APIs, websites, or servers.",
         starter: "1 per type",
         pro: "5 per type",
         business: "Unlimited",
         enterprise: "Unlimited",
       },
+      {
+        name: "Overage Flexibility",
+        tooltip:
+          "Ability to ingest past the limit with transparent per-GB pricing.",
+        starter: "-",
+        pro: "$0.50 / GB",
+        business: "$0.40 / GB",
+        enterprise: "Volume Discounts",
+      },
     ],
   },
   {
-    category: "Platform Capabilities",
+    category: "Observability Pillars",
     items: [
       {
-        name: "Native OpenTelemetry (OTLP)",
+        name: "Distributed Tracing (APM)",
+        tooltip: "End-to-end request tracking across microservices.",
         starter: true,
         pro: true,
         business: true,
         enterprise: true,
       },
       {
-        name: "Distributed Tracing (APM)",
+        name: "Log Management",
+        tooltip: "Centralized logging with full-text search.",
+        starter: true,
+        pro: true,
+        business: true,
+        enterprise: true,
+      },
+      {
+        name: "Real User Monitoring (RUM)",
+        tooltip: "Frontend performance and Web Vitals tracking.",
         starter: true,
         pro: true,
         business: true,
@@ -113,6 +105,15 @@ const COMPARE_FEATURES = [
       },
       {
         name: "Infrastructure & VPS",
+        tooltip: "Host-level CPU, Memory, and Disk metrics.",
+        starter: true,
+        pro: true,
+        business: true,
+        enterprise: true,
+      },
+      {
+        name: "Background Task Tracking",
+        tooltip: "Monitor cron jobs and queue workers.",
         starter: true,
         pro: true,
         business: true,
@@ -120,17 +121,106 @@ const COMPARE_FEATURES = [
       },
     ],
   },
+  {
+    category: "Analytics & Alerting",
+    items: [
+      {
+        name: "Custom Canvas Dashboards",
+        tooltip: "Build bespoke views using a drag-and-drop widget engine.",
+        starter: "1 Canvas",
+        pro: "10 Canvases",
+        business: "Unlimited",
+        enterprise: "Unlimited",
+      },
+      {
+        name: "Alert Policies",
+        tooltip: "Trigger conditions based on metric thresholds.",
+        starter: "3 Policies",
+        pro: "25 Policies",
+        business: "Unlimited",
+        enterprise: "Unlimited",
+      },
+      {
+        name: "Incident Routing",
+        tooltip: "Where alerts can be sent.",
+        starter: "Email Only",
+        pro: "Email, Webhooks",
+        business: "Email, Webhooks, Slack",
+        enterprise: "PagerDuty, OpsGenie",
+      },
+      {
+        name: "Anomaly Detection",
+        tooltip: "AI-driven detection of unusual metric deviations.",
+        starter: false,
+        pro: false,
+        business: true,
+        enterprise: true,
+      },
+    ],
+  },
+  {
+    category: "Security & Compliance",
+    items: [
+      {
+        name: "Encryption At Rest (AES-256)",
+        tooltip: "All stored telemetry and credentials are encrypted.",
+        starter: true,
+        pro: true,
+        business: true,
+        enterprise: true,
+      },
+      {
+        name: "Role-Based Access Control (RBAC)",
+        tooltip: "Granular permissions for team members.",
+        starter: false,
+        pro: false,
+        business: true,
+        enterprise: true,
+      },
+      {
+        name: "SAML / Single Sign-On (SSO)",
+        tooltip: "Integrate with Okta, Azure AD, or Google Workspace.",
+        starter: false,
+        pro: false,
+        business: false,
+        enterprise: true,
+      },
+      {
+        name: "Custom BAA & DPA",
+        tooltip: "Signed agreements for HIPAA and advanced GDPR compliance.",
+        starter: false,
+        pro: false,
+        business: false,
+        enterprise: true,
+      },
+    ],
+  },
 ];
+
+// --- TOOLTIP COMPONENT ---
+const Tooltip = ({
+  children,
+  text,
+}: {
+  children: React.ReactNode;
+  text: string;
+}) => (
+  <div className="relative flex items-center group cursor-help">
+    {children}
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max max-w-[200px] md:max-w-xs bg-popover border border-border text-popover-foreground text-xs rounded-md shadow-xl p-2 z-50 text-center leading-relaxed">
+      {text}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-4 border-transparent border-t-border" />
+    </div>
+  </div>
+);
 
 export default function PricingPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [annual, setAnnual] = useState(true);
-  const [plans, setPlans] = useState<BackendPlan[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [paddleReady, setPaddleReady] = useState(false);
 
-  // Fetch true backend limits and Paddle Price IDs
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/billing/plans`)
       .then((res) => res.json())
@@ -144,64 +234,25 @@ export default function PricingPage() {
       });
   }, []);
 
-  // Initialize Paddle v2
-  const initializePaddle = () => {
-    if (typeof window !== "undefined" && (window as any).Paddle) {
-      (window as any).Paddle.Environment.set(
-        process.env.NEXT_PUBLIC_PADDLE_ENV || "sandbox",
-      );
-      (window as any).Paddle.Initialize({
-        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || "",
-      });
-      setPaddleReady(true);
-    }
-  };
-
-  // Centralized Checkout / CTA Handler
-  const handleCheckout = (
-    planId: string,
-    paddlePriceIdMonthly: string | null,
-    paddlePriceIdAnnual: string | null,
-  ) => {
-    // 1. Strict Auth Check
+  const handleRoute = (planId: string) => {
     if (!user) {
-      return router.push("/login");
+      // Redirect to login, but save their intent so we can route them to payment after login
+      return router.push(
+        `/login?redirect=/checkout?plan=${planId}&billing=${annual ? "annual" : "monthly"}`,
+      );
     }
-
-    // 2. Route Free Tier
     if (planId === "starter") {
       return router.push("/dashboard");
     }
-
-    // 3. Trigger Paddle Checkout
-    const priceId = annual ? paddlePriceIdAnnual : paddlePriceIdMonthly;
-
-    if (!priceId) {
-      console.error("Missing Paddle Price ID for plan:", planId);
-      return;
-    }
-
-    if (paddleReady && (window as any).Paddle) {
-      (window as any).Paddle.Checkout.open({
-        items: [{ priceId, quantity: 1 }],
-        customer: { email: user.email }, // Pre-fill email
-        customData: { ownerId: user.uid }, // CRITICAL: This is passed to the Webhook securely
-      });
-    } else {
-      console.error("Paddle is not initialized yet.");
-    }
+    // Route to the dedicated payment checkout page
+    router.push(
+      `/checkout?plan=${planId}&billing=${annual ? "annual" : "monthly"}`,
+    );
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col selection:bg-primary/20 selection:text-primary overflow-x-hidden">
       <Navbar />
-
-      {/* Paddle JS v2 Script Injection */}
-      <Script
-        src="https://cdn.paddle.com/paddle/v2/paddle.js"
-        strategy="lazyOnload"
-        onLoad={initializePaddle}
-      />
 
       <main className="flex-grow pt-24 pb-32">
         {/* --- HERO SECTION --- */}
@@ -317,13 +368,7 @@ export default function PricingPage() {
 
                       <div className="mb-8">
                         <Button
-                          onClick={() =>
-                            handleCheckout(
-                              plan.id,
-                              plan.paddlePriceIdMonthly,
-                              plan.paddlePriceIdAnnual,
-                            )
-                          }
+                          onClick={() => handleRoute(plan.id)}
                           className={cn(
                             "w-full h-12 font-semibold text-base",
                             meta.popular ? "shadow-md" : "",
@@ -365,8 +410,8 @@ export default function PricingPage() {
                   Enterprise
                 </h3>
                 <p className="text-muted-foreground">
-                  Custom ingestion volumes, 90+ day retention, dedicated
-                  support, and custom BAAs/SLAs for large organizations.
+                  Custom ingestion volumes, dedicated support, SAML SSO, and
+                  custom BAAs/SLAs for large organizations.
                 </p>
               </div>
             </div>
@@ -392,7 +437,7 @@ export default function PricingPage() {
               Compare all features
             </h2>
             <p className="text-muted-foreground text-lg">
-              Detailed breakdown of platform limits and capabilities.
+              A detailed breakdown of platform capabilities.
             </p>
           </div>
           <div className="overflow-x-auto pb-8">
@@ -404,7 +449,7 @@ export default function PricingPage() {
                     Starter
                   </th>
                   <th className="p-4 border-b border-border text-primary font-bold text-lg flex items-center gap-2">
-                    Pro <Zap className="w-4 h-4" />
+                    Pro
                   </th>
                   <th className="p-4 border-b border-border text-foreground font-bold text-lg">
                     Business
@@ -428,11 +473,15 @@ export default function PricingPage() {
                     {section.items.map((item, iIdx) => (
                       <tr
                         key={iIdx}
-                        className="hover:bg-muted/20 transition-colors"
+                        className="hover:bg-muted/10 transition-colors"
                       >
-                        <td className="p-4 border-b border-border/40 text-foreground font-medium bg-background sticky left-0 z-10 flex items-center gap-2">
-                          {item.name}{" "}
-                          <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                        <td className="p-4 border-b border-border/40 text-foreground font-medium bg-background sticky left-0 z-10">
+                          <Tooltip text={item.tooltip}>
+                            <span className="flex items-center gap-2">
+                              {item.name}{" "}
+                              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/50" />
+                            </span>
+                          </Tooltip>
                         </td>
                         <td className="p-4 border-b border-border/40 text-muted-foreground">
                           {typeof item.starter === "boolean" ? (
