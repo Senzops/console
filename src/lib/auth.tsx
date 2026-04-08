@@ -71,9 +71,9 @@ interface AuthContextType {
   loading: boolean;
   loginGoogle: () => Promise<void>;
   loginEmail: (e: string, p: string) => Promise<void>;
-  signupEmail: (e: string, p: string, n: string) => Promise<void>; // Added name
+  signupEmail: (e: string, p: string, n: string) => Promise<void>;
   resetPassword: (e: string) => Promise<void>;
-  resendVerification: () => Promise<void>; // New
+  resendVerification: () => Promise<void>;
   loginAsDemo: () => void;
   logout: () => Promise<void>;
   token: string | null;
@@ -100,13 +100,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const unsubscribe = onAuthStateChanged(auth, async (currUser) => {
       if (currUser) {
-        setUser(currUser);
+        // 1. Get the secure token
         const t = await currUser.getIdToken();
-        setToken(t);
+        
+        // 2. Attach token to global axios instance
         api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
         delete api.defaults.headers.common['x-demo-mode'];
+
+        // 3. JIT Background Synchronization
+        // Fire-and-forget request to ensure DB consistency.
+        // We do NOT await this, so the UI loads instantly without blocking the user.
+        api.post('/user/sync').catch((err) => {
+          console.warn('[Identity Sync] Background sync deferred:', err);
+        });
+
+        // 4. Update React State
+        setUser(currUser);
+        setToken(t);
       } else {
         if (!user?.isDemo) {
+          // Clear session securely
           setUser(null);
           setToken(null);
           delete api.defaults.headers.common['Authorization'];
