@@ -978,7 +978,7 @@ export const DashboardLayout = ({
             </div>
           )}
 
-          <Link href="/profile" className="block mb-4" title="Manage Profile">
+          <Link href="/dashboard/profile" className="block mb-4" title="Manage Profile">
             <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-all border border-transparent hover:border-border/40 group cursor-pointer">
               <div className="flex items-center gap-3 overflow-hidden">
                 <Avatar
