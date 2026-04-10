@@ -3,11 +3,11 @@ import { useRouter } from "next/router";
 import Script from "next/script";
 import Link from "next/link";
 import md5 from "md5";
-import { Avatar, Button, Card, CardContent, cn } from "../components/Core";
-import { useAuth } from "../lib/auth";
+import { Avatar, Button, Card, CardContent, cn } from "../../components/Core";
+import { useAuth } from "../../lib/auth";
 import { ShieldCheck, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { NetworkBackground } from "../components/NetworkBackground";
+import { NetworkBackground } from "../../components/NetworkBackground";
 import { useTheme } from "@/lib/theme";
 
 // Types matching the backend response
@@ -115,6 +115,7 @@ export default function PaymentPage() {
           displayMode: "overlay",
           theme: theme === "light" || theme === "latte" ? "light" : "dark",
           showAddDiscounts: true,
+          successUrl: `${window.location.origin}/checkout/success`,
         },
       });
     } else {
