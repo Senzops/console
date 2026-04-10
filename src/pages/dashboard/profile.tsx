@@ -31,6 +31,7 @@ import {
   HardDrive,
   Calendar,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { extractErrorMessage } from "@/utils/axiosError";
 
@@ -66,6 +67,8 @@ export default function ProfilePage() {
   // --- Loading States ---
   const [isCanceling, setIsCanceling] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [downloadingTx, setDownloadingTx] = useState<string | null>(null);
 
   if (!user) return null;
 
@@ -113,6 +116,28 @@ export default function ProfilePage() {
     } catch (e: any) {
       toast.error(extractErrorMessage(e, "Failed to delete account."));
       setIsDeleting(false);
+    }
+  };
+
+  const handleDownloadReceipt = async (transactionId: string) => {
+    setDownloadingTx(transactionId);
+    try {
+      // The API handles both cached URLs and JIT Paddle fetching
+      const res = await api.get(
+        `/billing/transactions/${transactionId}/receipt`,
+      );
+      if (res.data.url) {
+        window.open(res.data.url, "_blank");
+      }
+    } catch (e: any) {
+      toast.error(
+        extractErrorMessage(
+          e,
+          "Receipt is still generating. Please check back shortly.",
+        ),
+      );
+    } finally {
+      setDownloadingTx(null);
     }
   };
 
@@ -453,20 +478,24 @@ export default function ProfilePage() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {tx.receiptUrl ? (
-                          <a
-                            href={tx.receiptUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors text-xs font-semibold uppercase tracking-wide"
-                          >
-                            Download <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground font-mono text-xs">
-                            N/A
-                          </span>
-                        )}
+                        <button
+                          onClick={() =>
+                            handleDownloadReceipt(tx.paddleTransactionId)
+                          }
+                          disabled={downloadingTx === tx.paddleTransactionId}
+                          className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors text-xs font-semibold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {downloadingTx === tx.paddleTransactionId ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />{" "}
+                              Fetching...
+                            </>
+                          ) : (
+                            <>
+                              Download <ExternalLink className="w-3.5 h-3.5" />
+                            </>
+                          )}
+                        </button>
                       </td>
                     </tr>
                   ))
