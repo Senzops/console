@@ -8,6 +8,7 @@ import { useAuth } from "../lib/auth";
 import { ShieldCheck, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { NetworkBackground } from "../components/NetworkBackground";
+import { useTheme } from "@/lib/theme";
 
 // Types matching the backend response
 interface BackendPlan {
@@ -29,6 +30,7 @@ const getGravatar = (email: string) =>
 export default function PaymentPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { theme } = useTheme();
 
   const [plans, setPlans] = useState<BackendPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +113,8 @@ export default function PaymentPage() {
         customData: { ownerId: user.uid },
         settings: {
           displayMode: "overlay",
-          theme: "light",
+          theme: theme === "light" || theme === "latte" ? "light" : "dark",
+          showAddDiscounts: true,
         },
       });
     } else {
