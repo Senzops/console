@@ -420,6 +420,12 @@ export const DOCS_DATA: DocsConfig = {
           language: "yaml",
           code: `exporters:\n  otlphttp/senzor:\n    endpoint: "https://api.senzor.dev/v1/traces"\n    headers:\n      Authorization: "Bearer <YOUR_APM_API_KEY>"\n\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      exporters: [otlphttp/senzor]`,
           notes: "Senzor specifically requires the `otlphttp` exporter protocol. gRPC is not currently supported for external ingestion."
+        },
+        {
+          framework: "Node.js (Express / Fastify)",
+          language: "typescript",
+          code: `npm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/exporter-logs-otlp-http @opentelemetry/sdk-logs\n\n// tracing.ts\nimport { NodeSDK } from "@opentelemetry/sdk-node";\nimport { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";\nimport { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";\nimport { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";\nimport { SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";\n\nconst sdk = new NodeSDK({\n  traceExporter: new OTLPTraceExporter({\n    url: "https://api.senzor.dev/api/otlp/v1/traces",\n    headers: { Authorization: "Bearer <YOUR_APM_API_KEY>" },\n  }),\n  logRecordProcessors: [\n    new SimpleLogRecordProcessor(\n      new OTLPLogExporter({\n        url: "https://api.senzor.dev/api/otlp/v1/logs",\n        headers: { Authorization: "Bearer <YOUR_APM_API_KEY>" },\n      })\n    ),\n  ],\n  instrumentations: [getNodeAutoInstrumentations()],\n});\n\nsdk.start();`,
+          notes: "Run your application by importing this configuration file before your main entry point: `node --import ./dist/tracing.js dist/server/index.js`. This provides zero-touch auto-instrumentation for your Node.js backend."
         }
       ],
       troubleshooting: [
