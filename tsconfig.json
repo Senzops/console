@@ -25,6 +25,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "tailwind.config.js"  ],
+, "tailwind.config.js", "src/components/DocsUI"  ],
   "exclude": ["node_modules"]
 }
