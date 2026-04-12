@@ -612,7 +612,7 @@ export default function GlobalLogsDashboard() {
                             {log.level}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-foreground font-mono text-xs truncate max-w-sm md:max-w-xl lg:max-w-3xl xl:max-w-5xl">
+                        <td className="px-4 py-3 text-foreground font-mono text-xs truncate max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl">
                           {log.message}
                         </td>
                       </tr>
