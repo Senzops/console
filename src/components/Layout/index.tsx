@@ -290,7 +290,7 @@ export const Footer = () => {
 };
 
 // Helper for Sidebar Sections
-const SidebarSection = ({
+export const SidebarSection = ({
   title,
   items,
   hrefPrefix,
@@ -301,103 +301,281 @@ const SidebarSection = ({
   const router = useRouter();
   const { sidebarMode } = useTheme();
 
+  // 1. Accordion State (Expanded by default)
+  const [isExpanded, setIsExpanded] = useState(true);
+
   const showAll = sidebarMode === "all";
   const visibleItems = showAll ? items : items?.slice(0, 2) || [];
   const remaining = (items?.length || 0) - visibleItems?.length;
 
+  // 2. Track if any child within this section is currently active
+  const isAnyChildActive = items?.some((item: any) =>
+    router.asPath.includes(`${hrefPrefix}/${item._id}`),
+  );
+
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between px-2 mb-2 group">
-        <Link
-          href={linkPrefix}
-          className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground flex items-center gap-1 transition-colors"
-        >
-          {title}{" "}
-          <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </Link>
+    <div className="space-y-1 mb-2">
+      {/* --- HEADER --- */}
+      <div className="flex items-center justify-between px-1 group">
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          {/* Accordion Toggle (Separated from the Link) */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className="p-0.5 rounded-md text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            aria-label="Toggle section"
+          >
+            <ChevronRight
+              className={cn(
+                "h-3.5 w-3.5 transition-transform duration-200",
+                isExpanded ? "rotate-90" : "rotate-0",
+              )}
+            />
+          </button>
+
+          {/* Main Title Link */}
+          <Link
+            href={linkPrefix}
+            className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors truncate flex-1 py-1"
+          >
+            {title}
+          </Link>
+        </div>
+
+        {/* Optional Add Action */}
         {onAdd && (
           <Button
             size="icon"
             variant="ghost"
-            className="h-5 w-5"
+            className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
             onClick={onAdd}
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
 
-      {!items && (
-        <div className="flex justify-center py-4">
-          <Spinner className="h-4 w-4 text-muted-foreground" />
-        </div>
-      )}
-
-      {visibleItems?.map((item: any) => {
-        const isActive = router.asPath.includes(`${hrefPrefix}/${item._id}`);
-        let statusColor = "bg-secondary";
-        if (item.status === "online" || item.status === "up")
-          statusColor = "bg-emerald-500";
-        else if (item.status === "offline" || item.status === "down")
-          statusColor = "bg-destructive";
-
-        let Icon = DefaultIcon;
-        if (!Icon) {
-          if (hrefPrefix.includes("web"))
-            Icon = <Globe className="h-3 w-3 text-blue-500 shrink-0" />;
-          else if (hrefPrefix.includes("rum"))
-            Icon = (
-              <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
-            );
-          else if (hrefPrefix.includes("apm"))
-            Icon = <Box className="h-3 w-3 text-orange-500 shrink-0" />;
-          else if (hrefPrefix.includes("monitor"))
-            Icon = (
-              <Activity
-                className={`h-3 w-3 shrink-0 ${item.status === "up" ? "text-emerald-500" : "text-destructive"}`}
-              />
-            );
-          else if (hrefPrefix.includes("task"))
-            Icon = <Workflow className="h-3 w-3 text-indigo-500 shrink-0" />;
-          else
-            Icon = (
-              <div className={`h-2 w-2 rounded-full shrink-0 ${statusColor}`} />
-            );
-        }
-
-        return (
-          <Link href={`${hrefPrefix}/${item._id}`} key={item._id}>
-            <Button
-              variant={isActive ? "secondary" : "ghost"}
-              className={cn(
-                "w-full justify-start gap-2 mb-1 h-9",
-                isActive &&
-                  "bg-secondary/80 font-semibold border border-border/50",
-              )}
-            >
-              {Icon}
-              <span className="truncate">{item.name}</span>
-            </Button>
-          </Link>
-        );
-      })}
-
-      {!showAll && remaining > 0 && (
-        <Link href={linkPrefix}>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 h-7 text-xs text-muted-foreground/70 hover:text-primary pl-8"
+      {/* --- ACCORDION BODY (Animated via CSS Grid) --- */}
+      <div
+        className={cn(
+          "grid transition-all duration-300 ease-in-out",
+          isExpanded
+            ? "grid-rows-[1fr] opacity-100 mt-1"
+            : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="overflow-hidden">
+          {/* The Branch Line Container 
+            ml-3 indents it perfectly under the Chevron. 
+            border-l-2 creates the subtle tracking line.
+          */}
+          <div
+            className={cn(
+              "ml-3 pl-2.5 border-l-2 flex flex-col gap-0.5 py-0.5 transition-colors duration-500",
+              isAnyChildActive ? "border-primary/50" : "border-border/30",
+            )}
           >
-            Show {remaining} more
-          </Button>
-        </Link>
-      )}
+            {!items && (
+              <div className="flex justify-center py-3">
+                <Spinner className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            )}
 
-      {items?.length === 0 && (
-        <div className="px-2 text-[10px] text-muted-foreground">
-          No service items
+            {visibleItems?.map((item: any) => {
+              const isActive = router.asPath.includes(
+                `${hrefPrefix}/${item._id}`,
+              );
+
+              let statusColor = "bg-secondary";
+              if (item.status === "online" || item.status === "up")
+                statusColor = "bg-emerald-500";
+              else if (item.status === "offline" || item.status === "down")
+                statusColor = "bg-destructive";
+
+              let Icon = DefaultIcon;
+              if (!Icon) {
+                if (hrefPrefix.includes("web"))
+                  Icon = <Globe className="h-3 w-3 text-blue-500 shrink-0" />;
+                else if (hrefPrefix.includes("rum"))
+                  Icon = (
+                    <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
+                  );
+                else if (hrefPrefix.includes("apm"))
+                  Icon = <Box className="h-3 w-3 text-orange-500 shrink-0" />;
+                else if (hrefPrefix.includes("monitor"))
+                  Icon = (
+                    <Activity
+                      className={cn(
+                        "h-3 w-3 shrink-0",
+                        item.status === "up"
+                          ? "text-emerald-500"
+                          : "text-destructive",
+                      )}
+                    />
+                  );
+                else if (hrefPrefix.includes("task"))
+                  Icon = (
+                    <Workflow className="h-3 w-3 text-indigo-500 shrink-0" />
+                  );
+                else
+                  Icon = (
+                    <div
+                      className={cn(
+                        "h-2 w-2 rounded-full shrink-0",
+                        statusColor,
+                      )}
+                    />
+                  );
+              }
+
+              return (
+                <Link href={`${hrefPrefix}/${item._id}`} key={item._id}>
+                  <Button
+                    variant={isActive ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start gap-2.5 h-8 px-2 text-xs transition-colors",
+                      isActive
+                        ? "bg-secondary/80 font-semibold border border-border/50 text-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
+                    )}
+                  >
+                    {Icon}
+                    <span className="truncate">{item.name}</span>
+                  </Button>
+                </Link>
+              );
+            })}
+
+            {/* "Show More" Truncation */}
+            {!showAll && remaining > 0 && (
+              <Link href={linkPrefix}>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2.5 h-7 px-2 text-[11px] text-muted-foreground/70 hover:text-primary mt-0.5"
+                >
+                  <div className="w-3 h-3 flex items-center justify-center shrink-0">
+                    <div className="h-1 w-1 rounded-full bg-current opacity-40" />
+                  </div>
+                  Show {remaining} more
+                </Button>
+              </Link>
+            )}
+
+            {/* Empty State */}
+            {items?.length === 0 && (
+              <div className="px-2 py-1.5 text-[10px] text-muted-foreground italic">
+                No service items
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
+    </div>
+  );
+};
+
+// --- Static Sidebar Group (For AI, Logs, Alerts, etc.) ---
+export const SidebarGroup = ({
+  title,
+  links,
+}: {
+  title: string;
+  links: any[];
+}) => {
+  const router = useRouter();
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  // Auto-detect active children for the branch line highlight
+  const isAnyChildActive = links?.some((link: any) =>
+    router.asPath.includes(link.href),
+  );
+
+  return (
+    <div className="space-y-1 mb-2 mt-4">
+      {/* --- HEADER --- */}
+      <div
+        className="flex items-center justify-between px-1 group cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className="p-0.5 rounded-md text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            aria-label="Toggle section"
+          >
+            <ChevronRight
+              className={cn(
+                "h-3.5 w-3.5 transition-transform duration-200",
+                isExpanded ? "rotate-90" : "rotate-0",
+              )}
+            />
+          </button>
+
+          {/* Main Title (No Link, acts entirely as the accordion toggle) */}
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors truncate flex-1 py-1 select-none">
+            {title}
+          </span>
+        </div>
+      </div>
+
+      {/* --- ACCORDION BODY (Animated via CSS Grid) --- */}
+      <div
+        className={cn(
+          "grid transition-all duration-300 ease-in-out",
+          isExpanded
+            ? "grid-rows-[1fr] opacity-100 mt-1"
+            : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="overflow-hidden">
+          {/* The Branch Line Container */}
+          <div
+            className={cn(
+              "ml-3 pl-2.5 border-l-2 flex flex-col gap-0.5 py-0.5 transition-colors duration-500",
+              isAnyChildActive ? "border-primary/50" : "border-border/30",
+            )}
+          >
+            {links?.map((link: any, idx: number) => {
+              const isActive = router.asPath.includes(link.href);
+              const Icon = link.icon;
+
+              return (
+                <Link href={link.href} key={idx}>
+                  <Button
+                    variant={isActive ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start gap-2.5 h-8 px-2 text-xs transition-colors",
+                      isActive
+                        ? "bg-secondary/80 font-semibold border border-border/50 text-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
+                    )}
+                  >
+                    {Icon && (
+                      <Icon
+                        className={cn("h-3.5 w-3.5 shrink-0", link.iconColor)}
+                      />
+                    )}
+                    <span className="truncate">{link.label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
+
+            {links?.length === 0 && (
+              <div className="px-2 py-1.5 text-[10px] text-muted-foreground italic">
+                No items
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -770,7 +948,7 @@ export const DashboardLayout = ({
         </div>
 
         {/* Scrollable Nav Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex-1 overflow-y-auto py-4 px-2 space-y-6">
           <SidebarSection
             title="Saved Views"
             items={viewsList?.views}
@@ -803,7 +981,7 @@ export const DashboardLayout = ({
             onAdd={!user.isDemo ? () => setIsWebModalOpen(true) : undefined}
           />
 
-          {/* --- NEW RUM SECTION --- */}
+          {/* --- RUM SECTION --- */}
           <SidebarSection
             title="Web APM (RUM)"
             items={rumList}
@@ -833,108 +1011,56 @@ export const DashboardLayout = ({
           />
 
           {/* --- Error Tracking --- */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between px-2 mb-2 group">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 transition-colors">
-                Error Tracking
-              </span>
-            </div>
-            <Link href="/dashboard/errors">
-              <Button
-                variant={
-                  router.asPath.includes("/dashboard/errors")
-                    ? "secondary"
-                    : "ghost"
-                }
-                className={cn(
-                  "w-full justify-start gap-2 mb-1 h-9",
-                  router.asPath.includes("/dashboard/errors") &&
-                    "bg-secondary/80 font-semibold border border-border/50",
-                )}
-              >
-                <AlertOctagon className="h-3 w-3 shrink-0 text-destructive" />
-                <span className="truncate">Error Explorer</span>
-              </Button>
-            </Link>
-          </div>
+          <SidebarGroup
+            title="Error Tracking"
+            links={[
+              {
+                href: "/dashboard/errors",
+                label: "Error Explorer",
+                icon: AlertOctagon,
+                iconColor: "text-destructive",
+              },
+            ]}
+          />
 
           {/* --- Log Management --- */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between px-2 mb-2 group">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 transition-colors">
-                Log Management
-              </span>
-            </div>
-            <Link href="/dashboard/logs">
-              <Button
-                variant={
-                  router.asPath.includes("/dashboard/logs")
-                    ? "secondary"
-                    : "ghost"
-                }
-                className={cn(
-                  "w-full justify-start gap-2 mb-1 h-9",
-                  router.asPath.includes("/dashboard/logs") &&
-                    "bg-secondary/80 font-semibold border border-border/50",
-                )}
-              >
-                <Terminal className="h-3 w-3 shrink-0 text-blue-500" />
-                <span className="truncate">Log Explorer</span>
-              </Button>
-            </Link>
-          </div>
+          <SidebarGroup
+            title="Log Management"
+            links={[
+              {
+                href: "/dashboard/logs",
+                label: "Log Explorer",
+                icon: Terminal,
+                iconColor: "text-blue-500",
+              },
+            ]}
+          />
 
           {/* --- AI Integrations (MCP) --- */}
-          <div className="space-y-1 mt-4">
-            <div className="flex items-center justify-between px-2 mb-2 group">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 transition-colors">
-                AI Integrations
-              </span>
-            </div>
-            <Link href="/dashboard/ai/mcp">
-              <Button
-                variant={
-                  router.asPath.includes("/dashboard/ai/mcp")
-                    ? "secondary"
-                    : "ghost"
-                }
-                className={cn(
-                  "w-full justify-start gap-2 mb-1 h-9",
-                  router.asPath.includes("/dashboard/ai/mcp") &&
-                    "bg-secondary/80 font-semibold border border-border/50",
-                )}
-              >
-                <Bot className="h-3 w-3 shrink-0 text-blue-500" />
-                <span className="truncate">MCP Server</span>
-              </Button>
-            </Link>
-          </div>
+          <SidebarGroup
+            title="AI Integrations"
+            links={[
+              {
+                href: "/dashboard/ai/mcp",
+                label: "MCP Server",
+                icon: Bot,
+                iconColor: "text-blue-500",
+              },
+            ]}
+          />
 
           {/* --- Alerts & Incidents --- */}
-          <div className="space-y-1 mt-4">
-            <div className="flex items-center justify-between px-2 mb-2 group">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 transition-colors">
-                Alerts & Incidents
-              </span>
-            </div>
-            <Link href="/dashboard/alerts">
-              <Button
-                variant={
-                  router.asPath.includes("/dashboard/alerts")
-                    ? "secondary"
-                    : "ghost"
-                }
-                className={cn(
-                  "w-full justify-start gap-2 mb-1 h-9",
-                  router.asPath.includes("/dashboard/alerts") &&
-                    "bg-secondary/80 font-semibold border border-border/50",
-                )}
-              >
-                <BellRing className="h-3 w-3 shrink-0 text-destructive" />
-                <span className="truncate">Alert Policies</span>
-              </Button>
-            </Link>
-          </div>
+          <SidebarGroup
+            title="Alerts & Incidents"
+            links={[
+              {
+                href: "/dashboard/alerts",
+                label: "Alert Policies",
+                icon: BellRing,
+                iconColor: "text-destructive",
+              },
+            ]}
+          />
 
           <SidebarSection
             title="Uptime"
@@ -978,7 +1104,11 @@ export const DashboardLayout = ({
             </div>
           )}
 
-          <Link href="/dashboard/profile" className="block mb-4" title="Manage Profile">
+          <Link
+            href="/dashboard/profile"
+            className="block mb-4"
+            title="Manage Profile"
+          >
             <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-all border border-transparent hover:border-border/40 group cursor-pointer">
               <div className="flex items-center gap-3 overflow-hidden">
                 <Avatar
