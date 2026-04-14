@@ -76,12 +76,12 @@ const SCHEMA_DOCS: Record<
   ],
   vps: [
     {
-      field: "metrics.cpu.usage",
+      field: "metrics.cpu.usagePercent",
       type: "number",
       desc: "Total CPU utilization %",
     },
     {
-      field: "metrics.memory.usedPercent",
+      field: "metrics.memory.usagePercent",
       type: "number",
       desc: "RAM utilization %",
     },
@@ -123,7 +123,7 @@ const SCHEMA_DOCS: Record<
 const DEFAULT_QUERIES: Record<string, string> = {
   logs: '{\n  "level": "error",\n  "message": { "$regex": "timeout", "$options": "i" }\n}',
   apm: '{\n  "duration": { "$gt": 2000 },\n  "status": { "$gte": 500 }\n}',
-  vps: '{\n  "metrics.cpu.usage": { "$gt": 90 }\n}',
+  vps: '{\n  "metrics.cpu.usagePercent": { "$gt": 90 }\n}',
   database: '{\n  "latency": { "$gt": 150 }\n}',
   uptime: '{\n  "status": "down"\n}',
   rum: '{\n  "metrics.lcp": { "$gt": 2500 }\n}',
