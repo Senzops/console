@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth, api } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
 import { useRouter } from "next/router";
@@ -301,8 +301,24 @@ export const SidebarSection = ({
   const router = useRouter();
   const { sidebarMode } = useTheme();
 
-  // 1. Accordion State (Expanded by default)
-  const [isExpanded, setIsExpanded] = useState(true);
+  // ENTERPRISE FIX: Bind accordion state synchronously to session storage to persist across unmounts
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(`sidebar-section-${title}`);
+      if (saved !== null) return saved === "true";
+    }
+    return true;
+  });
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const nextState = !isExpanded;
+    setIsExpanded(nextState);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(`sidebar-section-${title}`, String(nextState));
+    }
+  };
 
   const showAll = sidebarMode === "all";
   const visibleItems = showAll ? items : items?.slice(0, 2) || [];
@@ -320,11 +336,7 @@ export const SidebarSection = ({
         <div className="flex items-center gap-1 flex-1 min-w-0">
           {/* Accordion Toggle (Separated from the Link) */}
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
+            onClick={handleToggle}
             className="p-0.5 rounded-md text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             aria-label="Toggle section"
           >
@@ -486,7 +498,25 @@ export const SidebarGroup = ({
   links: any[];
 }) => {
   const router = useRouter();
-  const [isExpanded, setIsExpanded] = useState(true);
+
+  // ENTERPRISE FIX: Bind accordion state synchronously to session storage to persist across unmounts
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(`sidebar-group-${title}`);
+      if (saved !== null) return saved === "true";
+    }
+    return true;
+  });
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const nextState = !isExpanded;
+    setIsExpanded(nextState);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(`sidebar-group-${title}`, String(nextState));
+    }
+  };
 
   // Auto-detect active children for the branch line highlight
   const isAnyChildActive = links?.some((link: any) =>
@@ -498,15 +528,10 @@ export const SidebarGroup = ({
       {/* --- HEADER --- */}
       <div
         className="flex items-center justify-between px-1 group cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggle}
       >
         <div className="flex items-center gap-1 flex-1 min-w-0">
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
             className="p-0.5 rounded-md text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             aria-label="Toggle section"
           >
@@ -599,6 +624,9 @@ export const DashboardLayout = ({
   } = useTheme();
   const router = useRouter();
 
+  // ENTERPRISE FIX: Reference for the scrollable container
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
   // Fetch Lists
   const { data: serverList, mutate: mutateServers } = useSWR(
     token ? "/vps/list" : null,
@@ -632,6 +660,50 @@ export const DashboardLayout = ({
     token ? "/views" : null,
     fetcher,
   ); // SAVED VIEWS
+
+  // ENTERPRISE FIX: Hydrate scroll position instantly on mount and intercept scroll events
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+
+    const restoreScroll = () => {
+      const savedScroll = sessionStorage.getItem("senzor-sidebar-scroll");
+      if (savedScroll) {
+        sidebar.scrollTop = Number(savedScroll);
+      }
+    };
+
+    // Restore immediately
+    restoreScroll();
+
+    // Listen and save
+    const handleScroll = () => {
+      sessionStorage.setItem(
+        "senzor-sidebar-scroll",
+        String(sidebar.scrollTop),
+      );
+    };
+
+    sidebar.addEventListener("scroll", handleScroll, { passive: true });
+    return () => sidebar.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Guarantee scroll restore even if data fetches take a split second to paint the DOM height
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem("senzor-sidebar-scroll");
+    if (savedScroll && sidebarRef.current) {
+      sidebarRef.current.scrollTop = Number(savedScroll);
+    }
+  }, [
+    serverList,
+    webList,
+    monitorList,
+    apmList,
+    dbList,
+    taskList,
+    rumList,
+    viewsList,
+  ]);
 
   // Modal States
   const [isServerModalOpen, setIsServerModalOpen] = useState(false);
@@ -948,7 +1020,10 @@ export const DashboardLayout = ({
         </div>
 
         {/* Scrollable Nav Area */}
-        <div className="flex-1 overflow-y-auto py-4 px-2 space-y-6">
+        <div
+          ref={sidebarRef}
+          className="flex-1 overflow-y-auto py-4 px-2 space-y-6"
+        >
           <SidebarSection
             title="Saved Views"
             items={viewsList?.views}
