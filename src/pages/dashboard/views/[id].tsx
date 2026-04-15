@@ -357,7 +357,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
               <Area
                 type="monotone"
                 dataKey={k}
-                stackId={config.groupBy ? "1" : undefined}
                 stroke={getColor(i)}
                 fill={`url(#color-${k})`}
                 strokeWidth={2}
@@ -386,7 +385,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             <Bar
               key={k}
               dataKey={k}
-              stackId={config.groupBy ? "1" : undefined}
               fill={getColor(i)}
               radius={config.groupBy ? [0, 0, 0, 0] : [2, 2, 0, 0]}
             />
