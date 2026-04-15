@@ -260,7 +260,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
         <PieChart className="focus:outline-none" style={{ outline: "none" }}>
           <RechartsTooltip
             content={<CustomTooltip range={range} />}
-            cursor={{ fill: "transparent" }}
           />
           <Pie
             data={data}
@@ -344,7 +343,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
               border: "1px solid hsl(var(--border))",
             }}
             content={<CustomTooltip range={range} />}
-            cursor={{ stroke: "#888", strokeWidth: 1, strokeDasharray: "3 3" }}
           />
           {keys.map((k, i) => (
             <React.Fragment key={k}>
@@ -360,7 +358,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
                 stroke={getColor(i)}
                 fill={`url(#color-${k})`}
                 strokeWidth={2}
-                activeDot={{ r: 4, strokeWidth: 0 }}
               />
             </React.Fragment>
           ))}
@@ -404,7 +401,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
               border: "1px solid hsl(var(--border))",
             }}
             content={<CustomTooltip range={range} />}
-            cursor={{ stroke: "#888", strokeWidth: 1, strokeDasharray: "3 3" }}
           />
           {keys.map((k, i) => (
             <Line
@@ -414,7 +410,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
               stroke={getColor(i)}
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 4, strokeWidth: 0 }}
             />
           ))}
         </LineChart>
