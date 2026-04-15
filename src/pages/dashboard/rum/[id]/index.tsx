@@ -733,7 +733,7 @@ export default function RumDashboard() {
                       : service.domains?.[0] || "Unknown Domain"}
                   </span>
                 </div>
-                
+
                 <span className="text-muted-foreground font-mono ml-2">
                   Last Seen:{" "}
                   {service.lastSeen
@@ -830,7 +830,7 @@ export default function RumDashboard() {
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="#333"
+                  stroke="hsl(var(--border))"
                   vertical={false}
                 />
                 <XAxis dataKey="rawTime" hide />
@@ -906,7 +906,7 @@ export default function RumDashboard() {
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="#333"
+                  stroke="hsl(var(--border))"
                   vertical={false}
                 />
                 <XAxis dataKey="rawTime" hide />
@@ -984,7 +984,7 @@ export default function RumDashboard() {
                   </defs>
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="#333"
+                    stroke="hsl(var(--border))"
                     vertical={false}
                   />
                   <XAxis dataKey="rawTime" hide />
@@ -1037,7 +1037,7 @@ export default function RumDashboard() {
                   </defs>
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="#333"
+                    stroke="hsl(var(--border))"
                     vertical={false}
                   />
                   <XAxis dataKey="rawTime" hide />

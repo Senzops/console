@@ -258,9 +258,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
         className="focus:outline-none"
       >
         <PieChart className="focus:outline-none" style={{ outline: "none" }}>
-          <RechartsTooltip
-            content={<CustomTooltip range={range} />}
-          />
+          <RechartsTooltip content={<CustomTooltip range={range} />} />
           <Pie
             data={data}
             dataKey="value"
@@ -334,7 +332,11 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
           data={data}
           margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="hsl(var(--border))"
+            vertical={false}
+          />
           <XAxis dataKey="time" hide />
           <YAxis hide />
           <RechartsTooltip
@@ -367,7 +369,11 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
           data={data}
           margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="hsl(var(--border))"
+            vertical={false}
+          />
           <XAxis dataKey="time" hide />
           <YAxis hide />
           <RechartsTooltip
@@ -392,7 +398,11 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
           data={data}
           margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="hsl(var(--border))"
+            vertical={false}
+          />
           <XAxis dataKey="time" hide />
           <YAxis hide />
           <RechartsTooltip

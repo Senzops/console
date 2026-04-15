@@ -112,7 +112,7 @@ const DynamicChart = ({ title, className, data, type = 'area', series, tooltipSu
                      </linearGradient>
                  ))}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip suffix={tooltipSuffix} formatter={tooltipFormatter} />} />
@@ -140,7 +140,7 @@ const DynamicChart = ({ title, className, data, type = 'area', series, tooltipSu
            </AreaChart>
        ) : (
            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip suffix={tooltipSuffix} formatter={tooltipFormatter} />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />

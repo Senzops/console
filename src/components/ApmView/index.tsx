@@ -517,7 +517,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
               <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={formattedGraph.data}>
                       <defs><linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#f97316")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#f97316")} stopOpacity={0} /></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="rawTime" hide />
                       <YAxis hide />
                       <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit=" rps" />} />
@@ -535,7 +535,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                   <AreaChart data={formattedGraph.data}>
                     <defs><linearGradient id="colorAvgLatency" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#3b82f6")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#3b82f6")} stopOpacity={0} /></linearGradient></defs>
                     <defs><linearGradient id="colorMaxLatency" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ef4444")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ef4444")} stopOpacity={0} /></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="rawTime" hide />
                     <YAxis hide />
                     <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit="ms" />} />
@@ -565,7 +565,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                     {statusChartMode === 'errors' ? (
                         <AreaChart data={formattedGraph.data}>
                             <defs><linearGradient id="colorErr" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ef4444")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ef4444")} stopOpacity={0} /></linearGradient></defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                             <XAxis dataKey="rawTime" hide />
                             <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
                             <Area type="monotone" dataKey="errors" stroke={getColor("#ef4444")} fill={("url(#colorErr)")} strokeWidth={2} name="Errors" />
@@ -573,7 +573,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                     ) : (
                         /* Standard Distribution Bar Chart */
                         <BarChart data={formattedGraph.data}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                             <XAxis dataKey="rawTime" hide />
                             <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
                             <Bar dataKey="codes2xx" stackId="a" fill={getColor("#10b981")} name="2xx" />

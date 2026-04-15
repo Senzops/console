@@ -93,7 +93,7 @@ export default function TraefikDetail() {
           <ChartCard title="Active Routers">
             <AreaChart data={chartData} className="outline-none">
               {!isMono && <defs><linearGradient id="colorRout" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>}
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <Tooltip content={<CustomTooltip unit="" />} />
               <Area type="step" dataKey="activeRouters" stroke={getColor("#10b981")} strokeWidth={2} fill={isMono ? getColor("#10b981") : "url(#colorRout)"} name="Routers" animationDuration={1500} />
@@ -102,7 +102,7 @@ export default function TraefikDetail() {
           <ChartCard title="Active Services">
             <AreaChart data={chartData} className="outline-none">
               {!isMono && <defs><linearGradient id="colorServ" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient></defs>}
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <Tooltip content={<CustomTooltip unit="" />} />
               <Area type="step" dataKey="activeServices" stroke={getColor("#3b82f6")} strokeWidth={2} fill={isMono ? getColor("#3b82f6") : "url(#colorServ)"} name="Services" animationDuration={1500} />

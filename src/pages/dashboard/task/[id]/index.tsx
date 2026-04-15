@@ -579,7 +579,7 @@ export default function TaskServiceDashboard() {
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="#333"
+                  stroke="hsl(var(--border))"
                   vertical={false}
                 />
                 <XAxis dataKey="rawTime" hide />

@@ -512,7 +512,7 @@ export default function GlobalLogsDashboard() {
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="#333"
+                  stroke="hsl(var(--border))"
                   vertical={false}
                   opacity={0.3}
                 />

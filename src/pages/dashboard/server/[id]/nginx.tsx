@@ -70,7 +70,7 @@ export default function NginxDetail() {
           <ChartCard title="Request Rate (req/s)">
             <AreaChart data={chartData} className="outline-none">
               {!isMono && <defs><linearGradient id="colorNginx" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>}
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit=" rps" />} />
@@ -80,7 +80,7 @@ export default function NginxDetail() {
 
           <ChartCard title="Connection State">
             <BarChart data={chartData} className="outline-none">
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <Tooltip content={<CustomTooltip unit="" />} />
               <Bar dataKey="reading" stackId="a" fill={getColor("#3b82f6")} name="Reading" animationDuration={1500} />

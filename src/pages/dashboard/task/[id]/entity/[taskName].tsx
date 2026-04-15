@@ -479,13 +479,22 @@ export default function TaskEntityDetail() {
                 </h1>
               </div>
               <div className="flex items-center gap-3 pl-9">
-                <Badge variant="outline" className="font-mono text-[10px] bg-muted/50 capitalize">{signature?.taskType || 'Task Entity Signature Profile'}</Badge>
+                <Badge
+                  variant="outline"
+                  className="font-mono text-[10px] bg-muted/50 capitalize"
+                >
+                  {signature?.taskType || "Task Entity Signature Profile"}
+                </Badge>
                 {signature?.scheduleExpression && (
-                  <Badge variant="outline" className="font-mono text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20 flex items-center gap-1.5">
-                    <CalendarClock className="h-3 w-3" /> {signature.scheduleExpression}
+                  <Badge
+                    variant="outline"
+                    className="font-mono text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20 flex items-center gap-1.5"
+                  >
+                    <CalendarClock className="h-3 w-3" />{" "}
+                    {signature.scheduleExpression}
                   </Badge>
                 )}
-             </div>
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Select
@@ -582,7 +591,7 @@ export default function TaskEntityDetail() {
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="#333"
+                  stroke="hsl(var(--border))"
                   vertical={false}
                 />
                 <XAxis dataKey="rawTime" hide />
