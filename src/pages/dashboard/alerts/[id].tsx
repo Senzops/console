@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import Link from "next/link";
@@ -19,6 +19,7 @@ import {
   Input,
   DataError,
   Select,
+  cn,
 } from "../../../components/Core";
 import {
   ArrowLeft,
@@ -40,94 +41,22 @@ import {
   RefreshCw,
   Edit2,
   BookOpen,
+  ChevronRight,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
-// --- Schema Documentation Library ---
-const SCHEMA_DOCS: Record<
-  string,
-  { field: string; type: string; desc: string }[]
-> = {
-  apm: [
-    { field: "duration", type: "number", desc: "Execution latency in ms" },
-    { field: "status", type: "number", desc: "HTTP Response code (e.g. 500)" },
-    {
-      field: "route",
-      type: "string",
-      desc: "Endpoint route (e.g. /api/users)",
-    },
-    { field: "method", type: "string", desc: "HTTP Method (GET, POST)" },
-  ],
-  logs: [
-    {
-      field: "level",
-      type: "string",
-      desc: "Log severity (error, warn, info)",
-    },
-    {
-      field: "message",
-      type: "string",
-      desc: "Full log text body (supports regex)",
-    },
-    { field: "serviceModel", type: "string", desc: "Originating service type" },
-  ],
-  vps: [
-    {
-      field: "metrics.cpu.usagePercent",
-      type: "number",
-      desc: "Total CPU utilization %",
-    },
-    {
-      field: "metrics.memory.usagePercent",
-      type: "number",
-      desc: "RAM utilization %",
-    },
-    { field: "isOnline", type: "boolean", desc: "Agent heartbeat status" },
-  ],
-  database: [
-    { field: "latency", type: "number", desc: "Query response time in ms" },
-    { field: "connections", type: "number", desc: "Active DB connections" },
-    { field: "ops", type: "number", desc: "Operations per second" },
-  ],
-  uptime: [
-    {
-      field: "status",
-      type: "string",
-      desc: "Endpoint health ('up' or 'down')",
-    },
-    { field: "latency", type: "number", desc: "Ping latency in ms" },
-  ],
-  rum: [
-    {
-      field: "metrics.lcp",
-      type: "number",
-      desc: "Largest Contentful Paint ms",
-    },
-    { field: "metrics.cls", type: "number", desc: "Cumulative Layout Shift" },
-    { field: "browser", type: "string", desc: "User Agent browser string" },
-  ],
-  task: [
-    {
-      field: "status",
-      type: "string",
-      desc: "Job execution ('completed', 'failed')",
-    },
-    { field: "duration", type: "number", desc: "Job runtime in ms" },
-    { field: "taskName", type: "string", desc: "Specific worker/queue name" },
-  ],
-};
-
-const DEFAULT_QUERIES: Record<string, string> = {
-  logs: '{\n  "level": "error",\n  "message": { "$regex": "timeout", "$options": "i" }\n}',
-  apm: '{\n  "duration": { "$gt": 2000 },\n  "status": { "$gte": 500 }\n}',
-  vps: '{\n  "metrics.cpu.usagePercent": { "$gt": 90 }\n}',
-  database: '{\n  "latency": { "$gt": 150 }\n}',
-  uptime: '{\n  "status": "down"\n}',
-  rum: '{\n  "metrics.lcp": { "$gt": 2500 }\n}',
-  task: '{\n  "status": "failed"\n}',
+// Enterprise Default Alert Pipelines
+const DEFAULT_ALERT_QUERIES: Record<string, string> = {
+  logs: '[\n  { "$match": {\n    "level": "error",\n    "message": { "$regex": "timeout", "$options": "i" }\n  } }\n]',
+  apm: '[\n  { "$match": {\n    "duration": { "$gt": 2000 },\n    "status": { "$gte": 500 }\n  } }\n]',
+  vps: '[\n  { "$match": {\n    "metrics.cpu.usagePercent": { "$gt": 90 }\n  } }\n]',
+  database: '[\n  { "$match": {\n    "latency": { "$gt": 150 }\n  } }\n]',
+  uptime: '[\n  { "$match": {\n    "status": "down"\n  } }\n]',
+  rum: '[\n  { "$match": {\n    "metrics.lcp": { "$gt": 2500 }\n  } }\n]',
+  task: '[\n  { "$match": {\n    "status": "failed"\n  } }\n]',
 };
 
 const getTargetIcon = (target: string) => {
@@ -147,6 +76,166 @@ const getTargetIcon = (target: string) => {
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
+};
+
+// --- Reusable Schema Explorer Component ---
+const SchemaTreeNode = ({ node }: { node: any }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const childKeys = Object.keys(node.children || {});
+  const hasChildren = childKeys.length > 0;
+
+  return (
+    <div className="ml-1">
+      <div
+        className={cn(
+          "flex items-start gap-2 py-1.5 px-2 rounded-md transition-colors",
+          hasChildren ? "cursor-pointer hover:bg-muted/50" : "",
+        )}
+        onClick={() => hasChildren && setIsOpen(!isOpen)}
+      >
+        {hasChildren ? (
+          <ChevronRight
+            className={cn(
+              "h-3.5 w-3.5 mt-0.5 shrink-0 transition-transform",
+              isOpen ? "rotate-90" : "",
+            )}
+          />
+        ) : (
+          <div className="w-3.5 h-3.5 shrink-0" />
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <code className="text-xs font-bold text-primary truncate">
+              {node.name}
+            </code>
+            {!hasChildren && node.type && (
+              <Badge
+                variant="secondary"
+                className="text-[9px] uppercase font-mono tracking-wider opacity-80 shrink-0"
+              >
+                {node.type}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {hasChildren && isOpen && (
+        <div className="border-l border-border/40 ml-3.5 pl-1 my-0.5">
+          {childKeys.map((key) => (
+            <SchemaTreeNode key={key} node={node.children[key]} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const SchemaExplorer = ({ target, schemaData }: any) => {
+  const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
+  const schemaList = schemaData?.schema?.[target] || [];
+
+  const tree = useMemo(() => {
+    const root = { children: {} as Record<string, any> };
+    schemaList.forEach((item: any) => {
+      const parts = item.field.split(".");
+      let current: any = root; // FIX: Typed as any to support dynamic schema mapping
+      parts.forEach((part: string, i: number) => {
+        if (!current.children[part]) {
+          current.children[part] = {
+            name: part,
+            fullPath: parts.slice(0, i + 1).join("."),
+            children: {},
+          };
+        }
+        current = current.children[part];
+        if (i === parts.length - 1) {
+          current.type = item.type;
+          current.desc = item.desc;
+        }
+      });
+    });
+    return root.children;
+  }, [schemaList]);
+
+  return (
+    <div className="flex flex-col h-full border-l border-border/40 bg-muted/5">
+      <div className="p-4 border-b border-border/40 shrink-0 bg-background/50">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-primary" /> Schema Explorer
+          </h3>
+          <div className="flex items-center bg-muted p-0.5 rounded-md border border-border/60">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode("tree")}
+              className={cn(
+                "h-6 px-2 text-[10px] rounded-sm",
+                viewMode === "tree"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              Tree
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className={cn(
+                "h-6 px-2 text-[10px] rounded-sm",
+                viewMode === "list"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              List
+            </Button>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Available attributes for <strong>{target}</strong>. Use these to build
+          your MongoDB Aggregation Pipeline filter.
+        </p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3">
+        {schemaList.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-8">
+            No schema available.
+          </p>
+        ) : viewMode === "tree" ? (
+          Object.values(tree).map((node: any) => (
+            <SchemaTreeNode key={node.name} node={node} />
+          ))
+        ) : (
+          <div className="space-y-2">
+            {schemaList.map((doc: any, i: number) => (
+              <div
+                key={i}
+                className="bg-card border border-border/60 p-3 rounded-lg shadow-sm hover:border-primary/30 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <code className="text-xs text-primary font-bold break-all">
+                    {doc.field}
+                  </code>
+                  <Badge
+                    variant="secondary"
+                    className="text-[9px] uppercase font-mono opacity-80 shrink-0 ml-2"
+                  >
+                    {doc.type}
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{doc.desc}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 // --- Conditions Table ---
@@ -537,26 +626,29 @@ export default function AlertPolicyDetail() {
   const [conditionForm, setConditionForm] = useState({
     name: "",
     target: "apm",
-    queryStr: DEFAULT_QUERIES["apm"],
+    queryStr: DEFAULT_ALERT_QUERIES["apm"],
     operator: "gt",
     value: 10,
     windowMins: 5,
     frequency: "once",
   });
 
-  // --- Data Fetching (Poll every 15s) ---
+  // --- Data Fetching ---
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? `/alerts/policies/${id}` : null,
     fetcher,
     { refreshInterval: 15000 },
   );
 
+  // Add the dynamic Schema hook
+  const { data: schemaData } = useSWR(token ? "/schema" : null, fetcher);
+
   // Update snippet when target changes, ONLY if creating a new condition
   useEffect(() => {
     if (!editingId) {
       setConditionForm((prev) => ({
         ...prev,
-        queryStr: DEFAULT_QUERIES[prev.target] || "{}",
+        queryStr: DEFAULT_ALERT_QUERIES[prev.target] || "[]",
       }));
     }
   }, [conditionForm.target, editingId]);
@@ -567,7 +659,7 @@ export default function AlertPolicyDetail() {
     setConditionForm({
       name: "",
       target: "apm",
-      queryStr: DEFAULT_QUERIES["apm"],
+      queryStr: DEFAULT_ALERT_QUERIES["apm"],
       operator: "gt",
       value: 10,
       windowMins: 5,
@@ -680,6 +772,8 @@ export default function AlertPolicyDetail() {
     );
 
   const { policy, conditions, incidents } = data;
+  const monacoTheme =
+    theme === "light" || theme === "latte" ? "light" : "vs-dark";
 
   return (
     <DashboardLayout>
@@ -754,184 +848,225 @@ export default function AlertPolicyDetail() {
 
       {/* --- MODAL: MASSIVE CONDITION BUILDER --- */}
       {isConditionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
-          <Card className="w-full max-w-5xl max-h-[90vh] flex flex-col border-border/60 shadow-2xl bg-card">
-            <CardHeader className="p-4 border-b border-border/40 flex flex-row items-center justify-between bg-muted/20 shrink-0">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6 bg-background/90 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="absolute inset-0"
+            onClick={() => !isSubmitting && setIsConditionModalOpen(false)}
+          />
+
+          <Card className="w-full max-w-[1600px] h-full md:h-[95vh] flex flex-col border-border/60 md:rounded-xl shadow-2xl bg-background overflow-hidden relative z-10">
+            {/* Header */}
+            <div className="h-14 border-b border-border/40 bg-muted/20 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
                 <Code2 className="h-5 w-5 text-primary" />{" "}
                 {editingId ? "Edit Condition" : "Build Condition"}
               </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsConditionModalOpen(false)}
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleSaveCondition}
+                  disabled={isSubmitting}
+                  className="h-8 text-xs font-semibold bg-primary shadow-sm hidden sm:flex"
+                >
+                  {isSubmitting ? (
+                    <Spinner className="h-3 w-3" />
+                  ) : editingId ? (
+                    "Update Condition"
+                  ) : (
+                    "Deploy Condition"
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsConditionModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive ml-1 shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-            <CardContent className="p-0 flex-1 overflow-y-auto overflow-x-hidden">
-              <form
-                onSubmit={handleSaveCondition}
-                className="flex flex-col h-full"
-              >
-                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-                  {/* Left: Editor & Logic (Span 2) */}
-                  <div className="lg:col-span-2 flex flex-col gap-6">
-                    {/* Name & Target */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          Condition Name
-                        </label>
-                        <Input
-                          placeholder="e.g., High APM Latency Spike"
-                          value={conditionForm.name}
-                          onChange={(e) =>
-                            setConditionForm({
-                              ...conditionForm,
-                              name: e.target.value,
-                            })
-                          }
-                          disabled={isSubmitting}
-                          required
-                        />
+            {/* Enterprise Two-Pane Layout */}
+            <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-card overflow-hidden">
+              {/* Left Panel: Scrollable Configuration & Editor */}
+              <div className="w-full md:w-2/3 flex flex-col border-r border-border/40 h-full shrink-0 md:shrink overflow-y-auto bg-background">
+                {/* Control Row */}
+                <div className="p-4 border-b border-border/40 flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-muted/10 shrink-0">
+                  <div className="space-y-1 w-full sm:flex-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Condition Name
+                    </label>
+                    <Input
+                      placeholder="e.g., High APM Latency Spike"
+                      value={conditionForm.name}
+                      onChange={(e) =>
+                        setConditionForm({
+                          ...conditionForm,
+                          name: e.target.value,
+                        })
+                      }
+                      disabled={isSubmitting}
+                      className="h-9 text-sm bg-background border-border/60 shadow-sm"
+                    />
+                  </div>
+                  <div className="space-y-1 w-full sm:flex-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Target Telemetry
+                    </label>
+                    <Select
+                      value={conditionForm.target}
+                      onChange={(e) =>
+                        setConditionForm({
+                          ...conditionForm,
+                          target: e.target.value,
+                          queryStr:
+                            DEFAULT_ALERT_QUERIES[e.target.value] || "[]",
+                        })
+                      }
+                      disabled={isSubmitting}
+                      className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm"
+                    >
+                      <option value="apm">Backend APM</option>
+                      <option value="logs">Logs</option>
+                      <option value="database">Database</option>
+                      <option value="vps">VPS Infra</option>
+                      <option value="task">Tasks</option>
+                      <option value="rum">Web RUM</option>
+                      <option value="uptime">Uptime</option>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Editor Area */}
+                <div className="p-4 shrink-0">
+                  <div
+                    className={cn(
+                      "flex flex-col relative min-h-[350px] border rounded-xl overflow-hidden shadow-sm",
+                      monacoTheme === "light"
+                        ? "bg-background border-border/60"
+                        : "bg-[#1e1e1e] border-[#444]",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "px-4 py-2 border-b flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-2",
+                        monacoTheme === "light"
+                          ? "bg-muted/50 border-border/40"
+                          : "bg-[#2d2d2d] border-[#444]",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5",
+                          monacoTheme === "light"
+                            ? "text-foreground"
+                            : "text-gray-300",
+                        )}
+                      >
+                        <Terminal className="h-3 w-3 text-primary" />{" "}
+                        Aggregation Pipeline Filter
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <CheckCircle className="h-3 w-3" /> Tenant Sandbox
+                        Active
                       </div>
+                    </div>
+                    <div className="w-full relative h-[250px] sm:h-[300px]">
+                      <Editor
+                        height="100%"
+                        defaultLanguage="json"
+                        theme={monacoTheme}
+                        value={conditionForm.queryStr}
+                        onChange={(val) =>
+                          setConditionForm({
+                            ...conditionForm,
+                            queryStr: val || "[]",
+                          })
+                        }
+                        options={{
+                          minimap: { enabled: false },
+                          scrollBeyondLastLine: false,
+                          fontSize: 13,
+                          formatOnPaste: true,
+                          tabSize: 2,
+                          padding: { top: 16 },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Threshold Logic Area */}
+                <div className="px-4 pb-4 shrink-0">
+                  <div className="bg-muted/10 border border-border/60 rounded-xl p-5 space-y-4 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-orange-500" /> Trigger
+                      Thresholds
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          Target Telemetry
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Document Count
                         </label>
                         <Select
-                          value={conditionForm.target}
+                          value={conditionForm.operator}
                           onChange={(e) =>
                             setConditionForm({
                               ...conditionForm,
-                              target: e.target.value,
+                              operator: e.target.value,
                             })
                           }
                           disabled={isSubmitting}
-                          className="capitalize"
+                          className="bg-background shadow-sm"
                         >
-                          <option value="apm">Backend APM (Traces)</option>
-                          <option value="logs">Global Logs</option>
-                          <option value="database">Database Metrics</option>
-                          <option value="vps">Infrastructure (VPS)</option>
-                          <option value="task">Background Tasks</option>
-                          <option value="rum">Frontend (RUM)</option>
-                          <option value="uptime">Uptime Monitors</option>
+                          <option value="gt">Is Greater Than (&gt;)</option>
+                          <option value="lt">Is Less Than (&lt;)</option>
+                          <option value="eq">Is Exactly (==)</option>
                         </Select>
                       </div>
-                    </div>
-
-                    {/* Monaco Editor */}
-                    <div className="flex-1 min-h-[300px] border border-border/60 rounded-xl overflow-hidden bg-[#1e1e1e] flex flex-col shadow-inner">
-                      <div className="bg-[#2d2d2d] border-b border-border/40 px-4 py-2 flex items-center justify-between shrink-0">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                          <Terminal className="h-3 w-3 text-blue-400" /> Safe
-                          MQL Sandbox
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Threshold Value
                         </label>
-                        <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">
-                          <CheckCircle className="h-3 w-3" /> Tenant Sandbox
-                          Active
-                        </div>
-                      </div>
-                      <div className="flex-1 w-full pt-2">
-                        <Editor
-                          height="100%"
-                          defaultLanguage="json"
-                          theme={
-                            theme === "light" || theme === "latte"
-                              ? "light"
-                              : "vs-dark"
-                          }
-                          value={conditionForm.queryStr}
-                          onChange={(val) =>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={conditionForm.value}
+                          onChange={(e) =>
                             setConditionForm({
                               ...conditionForm,
-                              queryStr: val || "{}",
+                              value: Number(e.target.value),
                             })
                           }
-                          options={{
-                            minimap: { enabled: false },
-                            scrollBeyondLastLine: false,
-                            fontSize: 13,
-                            formatOnPaste: true,
-                            tabSize: 2,
-                            padding: { top: 10 },
-                          }}
+                          disabled={isSubmitting}
+                          className="bg-background shadow-sm"
                         />
                       </div>
-                    </div>
-
-                    {/* Threshold Logic */}
-                    <div className="bg-muted/30 border border-border/60 rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-orange-500" /> Trigger
-                        Thresholds
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <div className="space-y-2">
-                          <label className="text-xs font-medium text-muted-foreground">
-                            Document Count
-                          </label>
-                          <Select
-                            value={conditionForm.operator}
-                            onChange={(e) =>
-                              setConditionForm({
-                                ...conditionForm,
-                                operator: e.target.value,
-                              })
-                            }
-                            disabled={isSubmitting}
-                          >
-                            <option value="gt">Is Greater Than (&gt;)</option>
-                            <option value="lt">Is Less Than (&lt;)</option>
-                            <option value="eq">Is Exactly (==)</option>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-medium text-muted-foreground">
-                            Threshold Value
-                          </label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={conditionForm.value}
-                            onChange={(e) =>
-                              setConditionForm({
-                                ...conditionForm,
-                                value: Number(e.target.value),
-                              })
-                            }
-                            disabled={isSubmitting}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-medium text-muted-foreground">
-                            Evaluation Window
-                          </label>
-                          <Select
-                            value={conditionForm.windowMins}
-                            onChange={(e) =>
-                              setConditionForm({
-                                ...conditionForm,
-                                windowMins: Number(e.target.value),
-                              })
-                            }
-                            disabled={isSubmitting}
-                          >
-                            <option value="1">Last 1 Minute</option>
-                            <option value="5">Last 5 Minutes</option>
-                            <option value="15">Last 15 Minutes</option>
-                            <option value="60">Last 1 Hour</option>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-2 pt-2 border-t border-border/40">
+                      <div className="space-y-2">
                         <label className="text-xs font-medium text-muted-foreground">
-                          Notification Frequency
+                          Evaluation Window
+                        </label>
+                        <Select
+                          value={conditionForm.windowMins}
+                          onChange={(e) =>
+                            setConditionForm({
+                              ...conditionForm,
+                              windowMins: Number(e.target.value),
+                            })
+                          }
+                          disabled={isSubmitting}
+                          className="bg-background shadow-sm"
+                        >
+                          <option value="1">Last 1 Minute</option>
+                          <option value="5">Last 5 Minutes</option>
+                          <option value="15">Last 15 Minutes</option>
+                          <option value="60">Last 1 Hour</option>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Frequency
                         </label>
                         <Select
                           value={conditionForm.frequency}
@@ -942,97 +1077,39 @@ export default function AlertPolicyDetail() {
                             })
                           }
                           disabled={isSubmitting}
+                          className="bg-background shadow-sm"
                         >
-                          <option value="once">
-                            Once per signal (Auto-resolves when metrics
-                            normalize. Best for reducing noise)
-                          </option>
-                          <option value="always">
-                            Always (Notify on every evaluation tick as long as
-                            threshold breaches)
-                          </option>
+                          <option value="once">Notify Once</option>
+                          <option value="always">Notify Always</option>
                         </Select>
                       </div>
                     </div>
                   </div>
-
-                  {/* Right: Schema Documentation (Span 1) */}
-                  <div className="lg:col-span-1 border-l border-border/40 pl-6 flex flex-col h-full">
-                    <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
-                      <BookOpen className="h-4 w-4 text-blue-500" /> Schema
-                      Explorer
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      Available query attributes for the{" "}
-                      <strong>{conditionForm.target}</strong> collection. Use
-                      these to build your MongoDB JSON filter.
-                    </p>
-
-                    <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-                      {SCHEMA_DOCS[conditionForm.target]?.map((doc, i) => (
-                        <div
-                          key={i}
-                          className="bg-card border border-border/60 p-3 rounded-lg shadow-sm hover:border-blue-500/30 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <code className="text-xs text-blue-500 font-bold">
-                              {doc.field}
-                            </code>
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] uppercase font-mono"
-                            >
-                              {doc.type}
-                            </Badge>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            {doc.desc}
-                          </p>
-                        </div>
-                      ))}
-                      <div className="bg-muted/50 p-4 rounded-lg border border-border/40 mt-4">
-                        <h4 className="text-xs font-bold mb-2">
-                          Example Evaluation
-                        </h4>
-                        <p className="text-[11px] text-muted-foreground mb-2">
-                          If you write <code>{`{ "status": 500 }`}</code>, the
-                          engine will trigger if the count of 500 errors exceeds
-                          your threshold in the last {conditionForm.windowMins}{" "}
-                          minutes.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="p-4 border-t border-border/40 bg-muted/10 flex justify-end gap-3 shrink-0">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsConditionModalOpen(false)}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="bg-primary min-w-[140px] text-primary-foreground"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Spinner className="mr-2 h-4 w-4" /> Saving...
-                      </>
-                    ) : editingId ? (
-                      "Update Condition"
-                    ) : (
-                      "Deploy Condition"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
+                <Button
+                  onClick={handleSaveCondition}
+                  disabled={isSubmitting}
+                  className="m-4 mt-0 h-10 font-bold bg-primary sm:hidden"
+                >
+                  {isSubmitting ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : editingId ? (
+                    "Update Condition"
+                  ) : (
+                    "Deploy Condition"
+                  )}
+                </Button>
+              </div>
+
+              {/* Right Panel: Locked Schema Explorer */}
+              <div className="w-full md:w-1/3 flex flex-col h-[400px] md:h-full bg-muted/5 overflow-hidden border-t md:border-t-0 border-border/40">
+                <SchemaExplorer
+                  target={conditionForm.target}
+                  schemaData={schemaData}
+                />
+              </div>
+            </div>
           </Card>
         </div>
       )}

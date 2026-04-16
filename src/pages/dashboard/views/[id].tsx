@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import Editor from "@monaco-editor/react";
@@ -57,6 +57,7 @@ import {
   BookOpen,
   CheckCircle,
   Zap,
+  ChevronRight,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -103,81 +104,177 @@ const CHART_COLORS = [
   "#f97316",
 ];
 
+// Enterprise Aggregation Pipeline Defaults
 const DEFAULT_QUERIES: Record<string, string> = {
-  logs: '{\n  "level": "error",\n  "message": { "$regex": "timeout", "$options": "i" }\n}',
-  apm: '{\n  "duration": { "$gt": 2000 },\n  "status": { "$gte": 500 }\n}',
-  vps: '{\n  "metrics.cpu.usagePercent": { "$gt": 90 }\n}',
-  database: '{\n  "latency": { "$gt": 150 }\n}',
-  uptime: '{\n  "status": "down"\n}',
-  rum: '{\n  "metrics.lcp": { "$gt": 2500 }\n}',
-  task: '{\n  "status": "failed"\n}',
+  logs: '[\n  { "$match": { "level": "error" } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
+  apm: '[\n  { "$match": { "duration": { "$gt": 1000 } } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
+  vps: '[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 80 } } },\n  { "$sort": { "createdAt": -1 } },\n  { "$limit": 100 }\n]',
+  database: '[\n  { "$match": { "latency": { "$gt": 100 } } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
+  uptime: '[\n  { "$match": { "status": "down" } },\n  { "$sort": { "createdAt": -1 } },\n  { "$limit": 100 }\n]',
+  rum: '[\n  { "$match": { "metrics.lcp": { "$gt": 2500 } } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
+  task: '[\n  { "$match": { "status": "failed" } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
 };
 
+// Aggregation Pipeline Templates replacing legacy backend configurations
 const QUICK_TEMPLATES: Record<string, any[]> = {
   apm: [
     {
-      label: "Avg Latency",
-      config: { viz: "area", agg: "avg", field: "duration", group: "" },
-      query: "{}",
+      label: "Avg Latency (Area)",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateTrunc": { "date": "$timestamp", "unit": "minute", "binSize": 5 } },\n    "value": { "$avg": "$duration" }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Errors by Service",
-      config: { viz: "bar", agg: "count", field: "", group: "serviceId" },
-      query: '{\n  "status": { "$gte": 500 }\n}',
+      label: "Errors by Service (Bar)",
+      config: { viz: "bar" },
+      query: `[\n  { "$match": { "status": { "$gte": 500 } } },\n  { "$group": { "_id": "$service.name", "value": { "$sum": 1 } } },\n  { "$project": { "time": "$_id", "name": "$_id", "value": 1, "_id": 0 } }\n]`,
     },
     {
-      label: "Slow Traces",
-      config: { viz: "table", agg: "count", field: "", group: "" },
-      query: '{\n  "duration": { "$gt": 1500 }\n}',
+      label: "Slow Traces (Table)",
+      config: { viz: "table" },
+      query: `[\n  { "$match": { "duration": { "$gt": 1500 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
     },
   ],
   logs: [
     {
-      label: "Errors Trend",
-      config: { viz: "line", agg: "count", field: "", group: "" },
-      query: '{\n  "level": "error"\n}',
-    },
-    {
-      label: "Severity Split",
-      config: { viz: "pie", agg: "count", field: "", group: "level" },
-      query: "{}",
+      label: "Errors Trend (Line)",
+      config: { viz: "line" },
+      query: `[\n  { "$match": { "level": "error" } },\n  { "$group": {\n    "_id": { "$dateTrunc": { "date": "$timestamp", "unit": "minute", "binSize": 5 } },\n    "value": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
   ],
   vps: [
     {
-      label: "CPU Usage",
-      config: {
-        viz: "line",
-        agg: "avg",
-        field: "metrics.cpu.usagePercent",
-        group: "vpsId",
-      },
-      query: "{}",
-    },
-    {
-      label: "RAM Usage",
-      config: {
-        viz: "area",
-        agg: "max",
-        field: "metrics.memory.usagePercent",
-        group: "",
-      },
-      query: "{}",
-    },
-  ],
-  database: [
-    {
-      label: "Avg Latency",
-      config: { viz: "line", agg: "avg", field: "latency", group: "" },
-      query: "{}",
-    },
-    {
-      label: "Ops/sec",
-      config: { viz: "area", agg: "avg", field: "ops", group: "dbId" },
-      query: "{}",
+      label: "Cluster Resource Usage (Area)",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateTrunc": { "date": "$createdAt", "unit": "minute", "binSize": 5 } },\n    "CPU": { "$avg": "$metrics.cpu.usagePercent" },\n    "RAM": { "$avg": "$metrics.memory.usagePercent" }\n  }},\n  { "$project": { "time": "$_id", "CPU": 1, "RAM": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
   ],
 };
+
+// --- Reusable Schema Explorer Component ---
+const SchemaTreeNode = ({ node }: { node: any }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const childKeys = Object.keys(node.children || {});
+  const hasChildren = childKeys.length > 0;
+
+  return (
+    <div className="ml-1">
+      <div
+        className={cn(
+          "flex items-start gap-2 py-1.5 px-2 rounded-md transition-colors",
+          hasChildren ? "cursor-pointer hover:bg-muted/50" : ""
+        )}
+        onClick={() => hasChildren && setIsOpen(!isOpen)}
+      >
+        {hasChildren ? (
+          <ChevronRight className={cn("h-3.5 w-3.5 mt-0.5 shrink-0 transition-transform", isOpen ? "rotate-90" : "")} />
+        ) : (
+          <div className="w-3.5 h-3.5 shrink-0" />
+        )}
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <code className="text-xs font-bold text-primary truncate">{node.name}</code>
+            {!hasChildren && node.type && (
+              <Badge variant="secondary" className="text-[9px] uppercase font-mono tracking-wider opacity-80 shrink-0">
+                {node.type}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {hasChildren && isOpen && (
+        <div className="border-l border-border/40 ml-3.5 pl-1 my-0.5">
+          {childKeys.map((key) => (
+            <SchemaTreeNode key={key} node={node.children[key]} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const SchemaExplorer = ({ target, schemaData }: any) => {
+  const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
+  const schemaList = schemaData?.schema?.[target] || [];
+
+  const tree = useMemo(() => {
+    const root = { children: {} as Record<string, any> };
+    schemaList.forEach((item: any) => {
+      const parts = item.field.split(".");
+      let current: any = root; // FIX: Typed as any to support dynamic schema mapping
+      parts.forEach((part: string, i: number) => {
+        if (!current.children[part]) {
+          current.children[part] = {
+            name: part,
+            fullPath: parts.slice(0, i + 1).join("."),
+            children: {},
+          };
+        }
+        current = current.children[part];
+        if (i === parts.length - 1) {
+          current.type = item.type;
+          current.desc = item.desc;
+        }
+      });
+    });
+    return root.children;
+  }, [schemaList]);
+
+  return (
+    <div className="flex flex-col h-full border-l border-border/40 bg-muted/5">
+      <div className="p-4 border-b border-border/40 shrink-0 bg-background/50">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-primary" /> Schema Explorer
+          </h3>
+          <div className="flex items-center bg-muted p-0.5 rounded-md border border-border/60">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode("tree")}
+              className={cn("h-6 px-2 text-[10px] rounded-sm", viewMode === "tree" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}
+            >
+              Tree
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className={cn("h-6 px-2 text-[10px] rounded-sm", viewMode === "list" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}
+            >
+              List
+            </Button>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Available attributes for <strong>{target}</strong>. Use these to build your MongoDB Aggregation Pipeline.
+        </p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3">
+        {schemaList.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-8">No schema available.</p>
+        ) : viewMode === "tree" ? (
+          Object.values(tree).map((node: any) => <SchemaTreeNode key={node.name} node={node} />)
+        ) : (
+          <div className="space-y-2">
+            {schemaList.map((doc: any, i: number) => (
+              <div key={i} className="bg-card border border-border/60 p-3 rounded-lg shadow-sm hover:border-primary/30 transition-colors">
+                <div className="flex items-center justify-between mb-1">
+                  <code className="text-xs text-primary font-bold break-all">{doc.field}</code>
+                  <Badge variant="secondary" className="text-[9px] uppercase font-mono opacity-80 shrink-0 ml-2">{doc.type}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{doc.desc}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 
 // --- Recharts Tooltip Formatting ---
 const formatAxisDate = (str: string, range: string) => {
@@ -221,7 +318,9 @@ const CustomTooltip = ({ active, payload, label, range }: any) => {
 };
 
 // --- Sub-Component: Chart Renderer ---
-const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
+const ChartRenderer = ({ data, config, range, isMono }: any) => {
+  const visualization = config?.viz || "table";
+
   if (
     !data ||
     (Array.isArray(data) && data.length === 0 && visualization !== "billboard")
@@ -252,11 +351,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
 
   if (visualization === "pie") {
     return (
-      <ResponsiveContainer
-        width="100%"
-        height="100%"
-        className="focus:outline-none"
-      >
+      <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
         <PieChart className="focus:outline-none" style={{ outline: "none" }}>
           <RechartsTooltip content={<CustomTooltip range={range} />} />
           <Pie
@@ -273,12 +368,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             style={{ outline: "none" }}
           >
             {data.map((_: any, index: number) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={getColor(index)}
-                style={{ outline: "none" }}
-                className="focus:outline-none"
-              />
+              <Cell key={`cell-${index}`} fill={getColor(index)} style={{ outline: "none" }} className="focus:outline-none" />
             ))}
           </Pie>
         </PieChart>
@@ -320,30 +410,18 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     );
   }
 
-  // Time-Series (Area, Line, Bar)
-  const keys = config.groupBy
-    ? Object.keys(data[0] || {}).filter((k) => k !== "time")
-    : ["value"];
+  // Time-Series (Area, Line, Bar) expects explicitly formatted data fields
+  const keys = Object.keys(data[0] || {}).filter(k => k !== "time" && k !== "name" && k !== "_id");
 
   return (
     <ResponsiveContainer width="100%" height="100%">
       {visualization === "area" ? (
-        <AreaChart
-          data={data}
-          margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="hsl(var(--border))"
-            vertical={false}
-          />
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis dataKey="time" hide />
           <YAxis hide />
           <RechartsTooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-            }}
+            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
             content={<CustomTooltip range={range} />}
           />
           {keys.map((k, i) => (
@@ -354,73 +432,35 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
                   <stop offset="95%" stopColor={getColor(i)} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <Area
-                type="monotone"
-                dataKey={k}
-                stroke={getColor(i)}
-                fill={`url(#color-${k})`}
-                strokeWidth={2}
-              />
+              <Area type="monotone" dataKey={k} stroke={getColor(i)} fill={`url(#color-${k})`} strokeWidth={2} />
             </React.Fragment>
           ))}
         </AreaChart>
       ) : visualization === "bar" ? (
-        <BarChart
-          data={data}
-          margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="hsl(var(--border))"
-            vertical={false}
-          />
+        <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis dataKey="time" hide />
           <YAxis hide />
           <RechartsTooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-            }}
+            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
             content={<CustomTooltip range={range} />}
             cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
           />
           {keys.map((k, i) => (
-            <Bar
-              key={k}
-              dataKey={k}
-              fill={getColor(i)}
-              radius={config.groupBy ? [0, 0, 0, 0] : [2, 2, 0, 0]}
-            />
+            <Bar key={k} dataKey={k} fill={getColor(i)} radius={[2, 2, 0, 0]} />
           ))}
         </BarChart>
       ) : (
-        <LineChart
-          data={data}
-          margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="hsl(var(--border))"
-            vertical={false}
-          />
+        <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis dataKey="time" hide />
           <YAxis hide />
           <RechartsTooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-            }}
+            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
             content={<CustomTooltip range={range} />}
           />
           {keys.map((k, i) => (
-            <Line
-              key={k}
-              type="monotone"
-              dataKey={k}
-              stroke={getColor(i)}
-              strokeWidth={2}
-              dot={false}
-            />
+            <Line key={k} type="monotone" dataKey={k} stroke={getColor(i)} strokeWidth={2} dot={false} />
           ))}
         </LineChart>
       )}
@@ -428,7 +468,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
   );
 };
 
-// --- Sub-Component: Single Widget Wrapper (Strict ApmView Parity) ---
+// --- Sub-Component: Single Widget Wrapper ---
 const WidgetWrapper = ({
   widget,
   layoutNode,
@@ -482,11 +522,7 @@ const WidgetWrapper = ({
         className="h-6 w-6 text-muted-foreground hover:bg-muted/50 shrink-0 transition-colors"
         onClick={() => setIsMaximized(!isMaximized)}
       >
-        {isMaximized ? (
-          <X className="h-4 w-4" />
-        ) : (
-          <Maximize className="h-4 w-4" />
-        )}
+        {isMaximized ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
       </Button>
     </div>
   );
@@ -533,7 +569,6 @@ const WidgetWrapper = ({
             <ChartRenderer
               data={data.data}
               config={widget.config}
-              visualization={widget.visualization}
               range={range}
               isMono={isMono}
             />
@@ -605,10 +640,10 @@ export default function CustomDashboardView() {
   const [builderForm, setBuilderForm] = useState({
     name: "",
     target: "apm",
-    visualization: "line",
-    queryStr: DEFAULT_QUERIES["apm"] || "{}",
-    config: { aggregate: "count", aggregateField: "", groupBy: "" },
+    queryStr: DEFAULT_QUERIES["apm"] || "[]",
+    config: { viz: "table" },
   });
+  
   const editorRef = useRef<any>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -701,13 +736,8 @@ export default function CustomDashboardView() {
   const applyTemplate = (template: any) => {
     setBuilderForm((prev) => ({
       ...prev,
-      visualization: template.config.viz,
       queryStr: template.query,
-      config: {
-        aggregate: template.config.agg,
-        aggregateField: template.config.field,
-        groupBy: template.config.group,
-      },
+      config: { viz: template.config.viz },
     }));
     setTimeout(() => editorRef.current?.setValue(template.query), 50);
   };
@@ -717,14 +747,13 @@ export default function CustomDashboardView() {
     setBuilderForm({
       name: "",
       target: "apm",
-      visualization: "line",
-      queryStr: DEFAULT_QUERIES["apm"] || "{}",
-      config: { aggregate: "count", aggregateField: "", groupBy: "" },
+      queryStr: DEFAULT_QUERIES["apm"] || "[]",
+      config: { viz: "table" },
     });
     setPreviewData(null);
     setIsBuilderOpen(true);
     setTimeout(
-      () => editorRef.current?.setValue(DEFAULT_QUERIES["apm"] || "{}"),
+      () => editorRef.current?.setValue(DEFAULT_QUERIES["apm"] || "[]"),
       100,
     );
   };
@@ -734,13 +763,8 @@ export default function CustomDashboardView() {
     setBuilderForm({
       name: w.name,
       target: w.target,
-      visualization: w.visualization,
       queryStr: JSON.stringify(w.query, null, 2),
-      config: {
-        aggregate: w.config.aggregate,
-        aggregateField: w.config.aggregateField || "",
-        groupBy: w.config.groupBy || "",
-      },
+      config: { viz: w.config?.viz || w.visualization || "table" },
     });
     setPreviewData(null);
     setIsBuilderOpen(true);
@@ -751,12 +775,12 @@ export default function CustomDashboardView() {
   };
 
   const runLivePreview = async () => {
-    const queryStr = editorRef.current?.getValue() || "{}";
+    const queryStr = editorRef.current?.getValue() || "[]";
     let parsedQuery;
     try {
       parsedQuery = JSON.parse(queryStr);
     } catch (err) {
-      toast.error("Invalid JSON MQL format in Editor.");
+      toast.error("Invalid JSON format in Pipeline Editor.");
       return;
     }
 
@@ -766,8 +790,6 @@ export default function CustomDashboardView() {
       const res = await postFetcher("/views/execute", {
         target: builderForm.target,
         query: parsedQuery,
-        visualization: builderForm.visualization,
-        config: builderForm.config,
         range,
       });
       setPreviewData(res);
@@ -783,12 +805,12 @@ export default function CustomDashboardView() {
       toast.error("Widget needs a name");
       return;
     }
-    const queryStr = editorRef.current?.getValue() || "{}";
+    const queryStr = editorRef.current?.getValue() || "[]";
     let parsedQuery;
     try {
       parsedQuery = JSON.parse(queryStr);
     } catch (err) {
-      toast.error("Invalid JSON MQL format.");
+      toast.error("Invalid JSON format in Pipeline Editor.");
       return;
     }
 
@@ -799,9 +821,9 @@ export default function CustomDashboardView() {
         name: builderForm.name,
         target: builderForm.target,
         query: parsedQuery,
-        visualization: builderForm.visualization,
         config: builderForm.config,
       };
+      
       if (editingWidgetId) {
         await api.put(`/views/widgets/${editingWidgetId}`, payload);
         toast.success("Widget updated!");
@@ -852,11 +874,8 @@ export default function CustomDashboardView() {
 
   const { view, widgets } = data;
   const orderedLayout = isEditing ? localLayout : data?.view?.layout || [];
-  const availableTargets = Object.keys(schemaData?.schema || {});
 
-  // Dynamic Theme Logic for IDE Component
-  const monacoTheme =
-    theme === "light" || theme === "latte" ? "light" : "vs-dark";
+  const monacoTheme = theme === "light" || theme === "latte" ? "light" : "vs-dark";
 
   return (
     <DashboardLayout>
@@ -1117,91 +1136,172 @@ export default function CustomDashboardView() {
             </div>
 
             {/* Enterprise Two-Pane Layout */}
-            <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-card overflow-y-auto md:overflow-hidden">
-              {/* Left Panel: Fixed Layout (Editor Top, Preview Bottom) */}
-              <div className="w-full md:w-2/3 flex flex-col border-r border-border/40 h-auto md:h-full shrink-0 md:shrink">
-                {/* Editor Area (Top Half) */}
-                <div className="flex-1 flex flex-col relative min-h-[300px] border-b border-border/40 bg-background">
-                  <div
-                    className={cn(
-                      "px-4 py-2 border-b flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-2",
-                      monacoTheme === "light"
-                        ? "bg-muted/50 border-border/40"
-                        : "bg-[#2d2d2d] border-[#444]",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5",
-                        monacoTheme === "light"
-                          ? "text-foreground"
-                          : "text-gray-300",
-                      )}
-                    >
-                      <Terminal className="h-3 w-3 text-blue-500" /> Filter
-                      Engine (MQL)
-                    </span>
-                    {QUICK_TEMPLATES[builderForm.target] && (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={cn(
-                            "text-[10px]",
-                            monacoTheme === "light"
-                              ? "text-muted-foreground"
-                              : "text-gray-400",
-                          )}
-                        >
-                          <Zap className="h-3 w-3 inline text-amber-500" />{" "}
-                          Templates:
-                        </span>
-                        {QUICK_TEMPLATES[builderForm.target].map((t, i) => (
-                          <Badge
-                            key={i}
-                            variant="secondary"
-                            className="cursor-pointer text-[9px] hover:bg-primary hover:text-primary-foreground transition-colors border border-border/60 shadow-sm"
-                            onClick={() => applyTemplate(t)}
-                          >
-                            {t.label}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div
-                    className={cn(
-                      "flex-1 w-full relative",
-                      monacoTheme === "light"
-                        ? "bg-background"
-                        : "bg-[#1e1e1e]",
-                    )}
-                  >
-                    <Editor
-                      height="100%"
-                      defaultLanguage="json"
-                      theme={monacoTheme}
-                      value={builderForm.queryStr}
-                      onMount={handleEditorMount}
-                      onChange={(val) =>
+            <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-card overflow-hidden">
+              {/* Left Panel: Scrollable Configuration & Editor */}
+              <div className="w-full md:w-2/3 flex flex-col border-r border-border/40 h-full shrink-0 md:shrink overflow-y-auto bg-background">
+                
+                {/* Control Row */}
+                <div className="p-4 border-b border-border/40 flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-muted/10 shrink-0">
+                  <div className="space-y-1 w-full sm:flex-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Widget Title
+                    </label>
+                    <Input
+                      placeholder="e.g., API Latency Trend"
+                      value={builderForm.name}
+                      onChange={(e) =>
                         setBuilderForm({
                           ...builderForm,
-                          queryStr: val || "{}",
+                          name: e.target.value,
                         })
                       }
-                      options={{
-                        minimap: { enabled: false },
-                        scrollBeyondLastLine: false,
-                        fontSize: 13,
-                        formatOnPaste: true,
-                        tabSize: 2,
-                        padding: { top: 16 },
-                      }}
+                      className="h-9 text-sm bg-background border-border/60 shadow-sm"
                     />
+                  </div>
+                  <div className="space-y-1 w-full sm:flex-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Target Data Source
+                    </label>
+                    <Select
+                      value={builderForm.target}
+                      onChange={(e) => {
+                        const newTarget = e.target.value;
+                        setBuilderForm((prev) => ({
+                          ...prev,
+                          target: newTarget,
+                          queryStr: DEFAULT_QUERIES[newTarget] || "[]",
+                          config: { viz: "table" },
+                        }));
+                        setTimeout(
+                          () =>
+                            editorRef.current?.setValue(
+                              DEFAULT_QUERIES[newTarget] || "[]",
+                            ),
+                          50,
+                        );
+                        setPreviewData(null);
+                      }}
+                      className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm"
+                    >
+                      <option value="apm">Backend APM</option>
+                      <option value="logs">Logs</option>
+                      <option value="database">Database</option>
+                      <option value="vps">VPS Infra</option>
+                      <option value="task">Tasks</option>
+                      <option value="rum">Web RUM</option>
+                      <option value="uptime">Uptime</option>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 w-full sm:flex-1">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                      Chart Type
+                    </label>
+                    <Select
+                      value={builderForm.config.viz}
+                      onChange={(e) =>
+                        setBuilderForm({
+                          ...builderForm,
+                          config: { viz: e.target.value },
+                        })
+                      }
+                      className="h-9 text-sm bg-background border-border/60 shadow-sm"
+                    >
+                      <option value="line">Line Chart</option>
+                      <option value="area">Area Chart</option>
+                      <option value="bar">Bar Chart</option>
+                      <option value="pie">Pie Chart</option>
+                      <option value="billboard">Billboard Number</option>
+                      <option value="table">Data Table</option>
+                    </Select>
                   </div>
                 </div>
 
-                {/* Live Preview Area (Bottom Half) */}
-                <div className="h-[400px] md:h-[45%] bg-background p-4 sm:p-6 flex flex-col relative shrink-0">
-                  <div className="h-full w-full relative flex flex-col rounded-lg border border-border/60 bg-card/50 overflow-hidden">
+                {/* Editor Area */}
+                <div className="p-4 shrink-0">
+                  <div
+                    className={cn(
+                      "flex flex-col relative border rounded-xl overflow-hidden shadow-sm",
+                      monacoTheme === "light"
+                        ? "bg-background border-border/60"
+                        : "bg-[#1e1e1e] border-[#444]"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "px-4 py-2 border-b flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-2",
+                        monacoTheme === "light"
+                          ? "bg-muted/50 border-border/40"
+                          : "bg-[#2d2d2d] border-[#444]",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5",
+                          monacoTheme === "light"
+                            ? "text-foreground"
+                            : "text-gray-300",
+                        )}
+                      >
+                        <Terminal className="h-3 w-3 text-primary" /> Aggregation Pipeline (MQL)
+                      </span>
+                      {QUICK_TEMPLATES[builderForm.target] && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={cn(
+                              "text-[10px]",
+                              monacoTheme === "light"
+                                ? "text-muted-foreground"
+                                : "text-gray-400",
+                            )}
+                          >
+                            <Zap className="h-3 w-3 inline text-amber-500" />{" "}
+                            Templates:
+                          </span>
+                          {QUICK_TEMPLATES[builderForm.target].map((t, i) => (
+                            <Badge
+                              key={i}
+                              variant="secondary"
+                              className="cursor-pointer text-[9px] hover:bg-primary hover:text-primary-foreground transition-colors border border-border/60 shadow-sm"
+                              onClick={() => applyTemplate(t)}
+                            >
+                              {t.label}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-full relative h-[250px] sm:h-[300px]">
+                      <Editor
+                        height="100%"
+                        defaultLanguage="json"
+                        theme={monacoTheme}
+                        value={builderForm.queryStr}
+                        onMount={handleEditorMount}
+                        onChange={(val) =>
+                          setBuilderForm({
+                            ...builderForm,
+                            queryStr: val || "[]",
+                          })
+                        }
+                        options={{
+                          minimap: { enabled: false },
+                          scrollBeyondLastLine: false,
+                          fontSize: 13,
+                          formatOnPaste: true,
+                          tabSize: 2,
+                          padding: { top: 16 },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Preview Area */}
+                <div className="px-4 pb-4 shrink-0 flex flex-col">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-2 mb-3 px-1">
+                    <Activity className="h-4 w-4 text-primary" /> Live Preview
+                  </h3>
+                  <div className="h-[400px] w-full relative flex flex-col rounded-xl border border-border/60 bg-card/50 overflow-hidden shadow-sm">
                     {!previewData && !previewError && !isPreviewLoading ? (
                       <div className="m-auto text-center flex flex-col items-center">
                         <Activity className="h-10 w-10 text-muted-foreground/30 mb-3" />
@@ -1209,7 +1309,7 @@ export default function CustomDashboardView() {
                           Awaiting Execution
                         </p>
                         <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                          Write your MQL filter above and click Run Query.
+                          Write your Pipeline above and click Run Query.
                         </p>
                       </div>
                     ) : isPreviewLoading ? (
@@ -1226,7 +1326,6 @@ export default function CustomDashboardView() {
                         <ChartRenderer
                           data={previewData?.data}
                           config={builderForm.config}
-                          visualization={builderForm.visualization}
                           range={range}
                           isMono={isMono}
                         />
@@ -1234,217 +1333,19 @@ export default function CustomDashboardView() {
                     )}
                   </div>
                 </div>
+
+                <Button
+                  onClick={saveWidget}
+                  disabled={isSaving || !previewData}
+                  className="m-4 mt-0 h-10 font-bold bg-primary sm:hidden"
+                >
+                  {isSaving ? <Spinner className="h-4 w-4" /> : editingWidgetId ? "Update Widget" : "Save to Dashboard"}
+                </Button>
               </div>
 
-              {/* Right Panel: Scrollable Options */}
-              <div className="w-full md:w-1/3 flex flex-col h-auto md:h-full bg-muted/5 md:overflow-y-auto">
-                <div className="p-5 space-y-6">
-                  {/* Source & Name */}
-                  <div className="space-y-4 pb-5 border-b border-border/40">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Widget Title
-                      </label>
-                      <Input
-                        placeholder="e.g., API Latency Trend"
-                        value={builderForm.name}
-                        onChange={(e) =>
-                          setBuilderForm({
-                            ...builderForm,
-                            name: e.target.value,
-                          })
-                        }
-                        className="h-9 text-sm bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Target Data Source
-                      </label>
-                      <Select
-                        value={builderForm.target}
-                        onChange={(e) => {
-                          const newTarget = e.target.value;
-                          setBuilderForm((prev) => ({
-                            ...prev,
-                            target: newTarget,
-                            queryStr: DEFAULT_QUERIES[newTarget] || "{}",
-                            config: {
-                              aggregate: "count",
-                              aggregateField: "",
-                              groupBy: "",
-                            },
-                          }));
-                          setTimeout(
-                            () =>
-                              editorRef.current?.setValue(
-                                DEFAULT_QUERIES[newTarget] || "{}",
-                              ),
-                            50,
-                          );
-                          setPreviewData(null);
-                        }}
-                        className="capitalize h-9 text-sm bg-background"
-                      >
-                        <option value="apm">Backend APM</option>
-                        <option value="logs">Logs</option>
-                        <option value="database">Database</option>
-                        <option value="vps">VPS Infra</option>
-                        <option value="task">Tasks</option>
-                        <option value="rum">Web RUM</option>
-                        <option value="uptime">Uptime</option>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Display Config */}
-                  <div className="space-y-4 pb-5 border-b border-border/40">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                      <LayoutTemplate className="h-3.5 w-3.5 text-orange-500" />{" "}
-                      Visualization Options
-                    </h3>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase text-muted-foreground">
-                        Chart Type
-                      </label>
-                      <Select
-                        value={builderForm.visualization}
-                        onChange={(e) =>
-                          setBuilderForm({
-                            ...builderForm,
-                            visualization: e.target.value,
-                          })
-                        }
-                        className="h-9 text-sm bg-background"
-                      >
-                        <option value="line">Line Chart</option>
-                        <option value="area">Area Chart</option>
-                        <option value="bar">Bar Chart</option>
-                        <option value="pie">Pie Chart</option>
-                        <option value="billboard">Billboard Number</option>
-                        <option value="table">Data Table</option>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase text-muted-foreground">
-                          Math
-                        </label>
-                        <Select
-                          value={builderForm.config.aggregate}
-                          onChange={(e) =>
-                            setBuilderForm({
-                              ...builderForm,
-                              config: {
-                                ...builderForm.config,
-                                aggregate: e.target.value,
-                              },
-                            })
-                          }
-                          className="h-9 text-sm bg-background"
-                        >
-                          <option value="count">Count Rows</option>
-                          <option value="avg">Average</option>
-                          <option value="sum">Sum</option>
-                          <option value="max">Max</option>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase text-muted-foreground">
-                          Target Field
-                        </label>
-                        <Input
-                          placeholder="e.g. duration"
-                          value={builderForm.config.aggregateField}
-                          onChange={(e) =>
-                            setBuilderForm({
-                              ...builderForm,
-                              config: {
-                                ...builderForm.config,
-                                aggregateField: e.target.value,
-                              },
-                            })
-                          }
-                          disabled={builderForm.config.aggregate === "count"}
-                          className="h-9 text-sm bg-background"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase text-muted-foreground">
-                        Group By{" "}
-                        <span className="lowercase font-normal opacity-70">
-                          (Optional)
-                        </span>
-                      </label>
-                      <Input
-                        placeholder="e.g. status"
-                        value={builderForm.config.groupBy}
-                        onChange={(e) =>
-                          setBuilderForm({
-                            ...builderForm,
-                            config: {
-                              ...builderForm.config,
-                              groupBy: e.target.value,
-                            },
-                          })
-                        }
-                        disabled={builderForm.visualization === "billboard"}
-                        className="h-9 text-sm bg-background"
-                      />
-                    </div>
-
-                    <Button
-                      onClick={saveWidget}
-                      disabled={isSaving || !previewData}
-                      className="w-full mt-4 h-10 font-bold bg-primary sm:hidden"
-                    >
-                      {isSaving ? (
-                        <Spinner className="h-4 w-4" />
-                      ) : editingWidgetId ? (
-                        "Update Widget"
-                      ) : (
-                        "Save to Dashboard"
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Schema Docs */}
-                  <div className="space-y-3 pb-8">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                      <BookOpen className="h-3.5 w-3.5 text-blue-500" />{" "}
-                      Dictionary
-                    </h3>
-                    <div className="space-y-2">
-                      {schemaData?.schema?.[builderForm.target]?.map(
-                        (doc: any, i: number) => (
-                          <div
-                            key={i}
-                            className="bg-card border border-border/60 p-3 rounded-lg shadow-sm"
-                          >
-                            <div className="flex items-center justify-between">
-                              <code className="text-xs text-blue-500 font-bold">
-                                {doc.field}
-                              </code>
-                              <span className="text-[9px] uppercase font-mono opacity-50">
-                                {doc.type}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-1">
-                              {doc.desc}
-                            </p>
-                          </div>
-                        ),
-                      )}
-                      {(!schemaData?.schema?.[builderForm.target] ||
-                        schemaData.schema[builderForm.target].length === 0) && (
-                        <p className="text-xs text-muted-foreground text-center py-4">
-                          No dictionary available.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {/* Right Panel: Locked Schema Explorer */}
+              <div className="w-full md:w-1/3 flex flex-col h-[400px] md:h-full bg-muted/5 overflow-hidden border-t md:border-t-0 border-border/40">
+                <SchemaExplorer target={builderForm.target} schemaData={schemaData} />
               </div>
             </div>
           </Card>
