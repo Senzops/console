@@ -104,24 +104,24 @@ const CHART_COLORS = [
   "#f97316",
 ];
 
-// Enterprise Aggregation Pipeline Defaults
+// Enterprise Aggregation Pipeline Defaults (Safe $match + $project arrays)
 const DEFAULT_QUERIES: Record<string, string> = {
-  logs: '[\n  { "$match": { "level": "error" } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
-  apm: '[\n  { "$match": { "duration": { "$gt": 1000 } } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
-  vps: '[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 80 } } },\n  { "$sort": { "createdAt": -1 } },\n  { "$limit": 100 }\n]',
-  database: '[\n  { "$match": { "latency": { "$gt": 100 } } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
-  uptime: '[\n  { "$match": { "status": "down" } },\n  { "$sort": { "createdAt": -1 } },\n  { "$limit": 100 }\n]',
-  rum: '[\n  { "$match": { "metrics.lcp": { "$gt": 2500 } } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
-  task: '[\n  { "$match": { "status": "failed" } },\n  { "$sort": { "timestamp": -1 } },\n  { "$limit": 100 }\n]',
+  logs: '[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "service": "$serviceModel" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  apm: '[\n  { "$match": { "duration": { "$gt": 1000 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  vps: '[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 50 } } },\n  { "$project": { "time": "$createdAt", "cpu": "$metrics.cpu.usagePercent", "ram": "$metrics.memory.usagePercent", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  database: '[\n  { "$match": { "latency.read.avg": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "readLatency": "$latency.read.avg", "connections": "$connections.current", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  uptime: '[\n  { "$match": { "status": "down" } },\n  { "$project": { "time": "$createdAt", "url": "$service.url", "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  rum: '[\n  { "$match": { "vitals.lcp": { "$gt": 2500 } } },\n  { "$project": { "time": "$createdAt", "browser": 1, "lcp": "$vitals.lcp", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  task: '[\n  { "$match": { "status": "failed" } },\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
-// Aggregation Pipeline Templates replacing legacy backend configurations
+// Universal Pipeline Templates ($dateToString ensures < 5.0 compat)
 const QUICK_TEMPLATES: Record<string, any[]> = {
   apm: [
     {
       label: "Avg Latency (Area)",
       config: { viz: "area" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateTrunc": { "date": "$timestamp", "unit": "minute", "binSize": 5 } },\n    "value": { "$avg": "$duration" }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "value": { "$avg": "$duration" }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
       label: "Errors by Service (Bar)",
@@ -131,23 +131,81 @@ const QUICK_TEMPLATES: Record<string, any[]> = {
     {
       label: "Slow Traces (Table)",
       config: { viz: "table" },
-      query: `[\n  { "$match": { "duration": { "$gt": 1500 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
+      query: `[\n  { "$match": { "duration": { "$gt": 1500 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name", "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
     },
   ],
   logs: [
     {
       label: "Errors Trend (Line)",
       config: { viz: "line" },
-      query: `[\n  { "$match": { "level": "error" } },\n  { "$group": {\n    "_id": { "$dateTrunc": { "date": "$timestamp", "unit": "minute", "binSize": 5 } },\n    "value": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+      query: `[\n  { "$match": { "level": "error" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "value": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
+    {
+      label: "Recent Errors (Table)",
+      config: { viz: "table" },
+      query: `[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "service": "$serviceModel" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
+    }
   ],
   vps: [
     {
-      label: "Cluster Resource Usage (Area)",
+      label: "Resource Usage (Area)",
       config: { viz: "area" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateTrunc": { "date": "$createdAt", "unit": "minute", "binSize": 5 } },\n    "CPU": { "$avg": "$metrics.cpu.usagePercent" },\n    "RAM": { "$avg": "$metrics.memory.usagePercent" }\n  }},\n  { "$project": { "time": "$_id", "CPU": 1, "RAM": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "CPU": { "$avg": "$metrics.cpu.usagePercent" },\n    "RAM": { "$avg": "$metrics.memory.usagePercent" }\n  }},\n  { "$project": { "time": "$_id", "CPU": 1, "RAM": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "High CPU Nodes (Bar)",
+      config: { viz: "bar" },
+      query: `[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 80 } } },\n  { "$group": { "_id": "$service.name", "value": { "$avg": "$metrics.cpu.usagePercent" } } },\n  { "$project": { "time": "$_id", "name": "$_id", "value": 1, "_id": 0 } }\n]`
     },
   ],
+  database: [
+    {
+      label: "Latency Trend (Line)",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Read": { "$avg": "$latency.read.avg" },\n    "Write": { "$avg": "$latency.write.avg" }\n  }},\n  { "$project": { "time": "$_id", "Read": 1, "Write": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Active Connections (Area)",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Connections": { "$avg": "$connections.current" }\n  }},\n  { "$project": { "time": "$_id", "Connections": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    }
+  ],
+  uptime: [
+    {
+      label: "Downtime Events (Table)",
+      config: { viz: "table" },
+      query: `[\n  { "$match": { "status": "down" } },\n  { "$project": { "time": "$createdAt", "service": "$service.name", "url": "$service.url", "statusCode": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`
+    },
+    {
+      label: "Ping Latency (Area)",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "Latency": { "$avg": "$latency" }\n  }},\n  { "$project": { "time": "$_id", "Latency": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    }
+  ],
+  rum: [
+    {
+      label: "LCP Trend (Line)",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "LCP": { "$avg": "$vitals.lcp" }\n  }},\n  { "$project": { "time": "$_id", "LCP": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    },
+    {
+      label: "Browsers (Pie)",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": { "_id": "$browser", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
+    }
+  ],
+  task: [
+    {
+      label: "Failure Trend (Bar)",
+      config: { viz: "bar" },
+      query: `[\n  { "$match": { "status": "failed" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "value": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    },
+    {
+      label: "Slow Tasks (Table)",
+      config: { viz: "table" },
+      query: `[\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "duration": -1 } },\n  { "$limit": 100 }\n]`
+    }
+  ]
 };
 
 // --- Reusable Schema Explorer Component ---
@@ -166,7 +224,7 @@ const SchemaTreeNode = ({ node }: { node: any }) => {
         onClick={() => hasChildren && setIsOpen(!isOpen)}
       >
         {hasChildren ? (
-          <ChevronRight className={cn("h-3.5 w-3.5 mt-0.5 shrink-0 transition-transform", isOpen ? "rotate-90" : "")} />
+          <ChevronRight className={cn("h-3.5 w-3.5 mt-0.5 shrink-0 transition-transform text-muted-foreground", isOpen ? "rotate-90" : "")} />
         ) : (
           <div className="w-3.5 h-3.5 shrink-0" />
         )}
@@ -202,7 +260,7 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
     const root = { children: {} as Record<string, any> };
     schemaList.forEach((item: any) => {
       const parts = item.field.split(".");
-      let current: any = root; // FIX: Typed as any to support dynamic schema mapping
+      let current: any = root;
       parts.forEach((part: string, i: number) => {
         if (!current.children[part]) {
           current.children[part] = {
@@ -1137,6 +1195,7 @@ export default function CustomDashboardView() {
 
             {/* Enterprise Two-Pane Layout */}
             <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-card overflow-hidden">
+              
               {/* Left Panel: Scrollable Configuration & Editor */}
               <div className="w-full md:w-2/3 flex flex-col border-r border-border/40 h-full shrink-0 md:shrink overflow-y-auto bg-background">
                 
@@ -1270,6 +1329,7 @@ export default function CustomDashboardView() {
                         </div>
                       )}
                     </div>
+                    {/* Native Fixed Height for Monaco to prevent Flexbox Collapse */}
                     <div className="w-full relative h-[250px] sm:h-[300px]">
                       <Editor
                         height="100%"

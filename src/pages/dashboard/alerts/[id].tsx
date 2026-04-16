@@ -23,7 +23,6 @@ import {
 } from "../../../components/Core";
 import {
   ArrowLeft,
-  BellRing,
   Plus,
   Trash2,
   AlertTriangle,
@@ -53,9 +52,10 @@ const DEFAULT_ALERT_QUERIES: Record<string, string> = {
   logs: '[\n  { "$match": {\n    "level": "error",\n    "message": { "$regex": "timeout", "$options": "i" }\n  } }\n]',
   apm: '[\n  { "$match": {\n    "duration": { "$gt": 2000 },\n    "status": { "$gte": 500 }\n  } }\n]',
   vps: '[\n  { "$match": {\n    "metrics.cpu.usagePercent": { "$gt": 90 }\n  } }\n]',
-  database: '[\n  { "$match": {\n    "latency": { "$gt": 150 }\n  } }\n]',
+  database:
+    '[\n  { "$match": {\n    "latency.read.avg": { "$gt": 150 }\n  } }\n]',
   uptime: '[\n  { "$match": {\n    "status": "down"\n  } }\n]',
-  rum: '[\n  { "$match": {\n    "metrics.lcp": { "$gt": 2500 }\n  } }\n]',
+  rum: '[\n  { "$match": {\n    "vitals.lcp": { "$gt": 2500 }\n  } }\n]',
   task: '[\n  { "$match": {\n    "status": "failed"\n  } }\n]',
 };
 
@@ -96,7 +96,7 @@ const SchemaTreeNode = ({ node }: { node: any }) => {
         {hasChildren ? (
           <ChevronRight
             className={cn(
-              "h-3.5 w-3.5 mt-0.5 shrink-0 transition-transform",
+              "h-3.5 w-3.5 mt-0.5 shrink-0 transition-transform text-muted-foreground",
               isOpen ? "rotate-90" : "",
             )}
           />
@@ -942,7 +942,7 @@ export default function AlertPolicyDetail() {
                 <div className="p-4 shrink-0">
                   <div
                     className={cn(
-                      "flex flex-col relative min-h-[350px] border rounded-xl overflow-hidden shadow-sm",
+                      "flex flex-col relative border rounded-xl overflow-hidden shadow-sm",
                       monacoTheme === "light"
                         ? "bg-background border-border/60"
                         : "bg-[#1e1e1e] border-[#444]",
@@ -972,6 +972,7 @@ export default function AlertPolicyDetail() {
                         Active
                       </div>
                     </div>
+                    {/* Native Fixed Height for Monaco to prevent Flexbox Collapse */}
                     <div className="w-full relative h-[250px] sm:h-[300px]">
                       <Editor
                         height="100%"
