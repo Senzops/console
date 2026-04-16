@@ -104,7 +104,7 @@ const CHART_COLORS = [
   "#f97316",
 ];
 
-// Enterprise Aggregation Pipeline Defaults (Safe $match + $project arrays)
+// Enterprise Aggregation Pipeline Defaults (Safe $match + limits)
 const DEFAULT_QUERIES: Record<string, string> = {
   logs: '[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "service": "$serviceModel" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   apm: '[\n  { "$match": { "duration": { "$gt": 1000 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
@@ -115,7 +115,7 @@ const DEFAULT_QUERIES: Record<string, string> = {
   task: '[\n  { "$match": { "status": "failed" } },\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
-// Universal Pipeline Templates ($dateToString ensures < 5.0 compat)
+// Universal Pipeline Templates ($dateToString ensures < 5.0 compat fallback for $dateTrunc)
 const QUICK_TEMPLATES: Record<string, any[]> = {
   apm: [
     {
@@ -144,6 +144,11 @@ const QUICK_TEMPLATES: Record<string, any[]> = {
       label: "Recent Errors (Table)",
       config: { viz: "table" },
       query: `[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "service": "$serviceModel" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
+    },
+    {
+      label: "Severity Split (Pie)",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": { "_id": "$level", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
     }
   ],
   vps: [
@@ -155,7 +160,7 @@ const QUICK_TEMPLATES: Record<string, any[]> = {
     {
       label: "High CPU Nodes (Bar)",
       config: { viz: "bar" },
-      query: `[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 80 } } },\n  { "$group": { "_id": "$service.name", "value": { "$avg": "$metrics.cpu.usagePercent" } } },\n  { "$project": { "time": "$_id", "name": "$_id", "value": 1, "_id": 0 } }\n]`
+      query: `[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 80 } } },\n  { "$group": { "_id": "$service.name", "CPU": { "$avg": "$metrics.cpu.usagePercent" } } },\n  { "$project": { "time": "$_id", "name": "$_id", "value": "$CPU", "_id": 0 } }\n]`
     },
   ],
   database: [
@@ -260,7 +265,7 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
     const root = { children: {} as Record<string, any> };
     schemaList.forEach((item: any) => {
       const parts = item.field.split(".");
-      let current: any = root;
+      let current: any = root; // Force typed to allow dynamic properties
       parts.forEach((part: string, i: number) => {
         if (!current.children[part]) {
           current.children[part] = {
@@ -323,7 +328,6 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
                   <code className="text-xs text-primary font-bold break-all">{doc.field}</code>
                   <Badge variant="secondary" className="text-[9px] uppercase font-mono opacity-80 shrink-0 ml-2">{doc.type}</Badge>
                 </div>
-                <p className="text-[11px] text-muted-foreground">{doc.desc}</p>
               </div>
             ))}
           </div>
@@ -376,12 +380,12 @@ const CustomTooltip = ({ active, payload, label, range }: any) => {
 };
 
 // --- Sub-Component: Chart Renderer ---
-const ChartRenderer = ({ data, config, range, isMono }: any) => {
-  const visualization = config?.viz || "table";
+const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
+  const activeViz = visualization || config?.viz || "table";
 
   if (
     !data ||
-    (Array.isArray(data) && data.length === 0 && visualization !== "billboard")
+    (Array.isArray(data) && data.length === 0 && activeViz !== "billboard")
   ) {
     return (
       <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm font-medium">
@@ -395,27 +399,64 @@ const ChartRenderer = ({ data, config, range, isMono }: any) => {
       ? "hsl(var(--chart-mono))"
       : CHART_COLORS[index % CHART_COLORS.length];
 
-  if (visualization === "billboard") {
-    const val =
-      Array.isArray(data) && data.length > 0 ? data[0].value : data.value || 0;
+  // Enterprise Billboard Render Engine
+  if (activeViz === "billboard") {
+    const items = Array.isArray(data) ? data : [data];
+    const blacklist = ["value", "null", "undefined", "time", "_id", "name"];
+
     return (
-      <div className="h-full flex flex-col items-center justify-center">
-        <div className="text-6xl font-bold tracking-tighter text-foreground">
-          <SmartAnimatedValue value={formatNumber(val || 0)} />
-        </div>
+      <div className="h-full w-full flex flex-row flex-wrap items-center justify-center gap-8 overflow-auto p-4">
+        {items.map((item: any, idx: number) => {
+          // Exclude time and strict blacklisted system keys
+          const keys = Object.keys(item).filter((k) => !blacklist.includes(k.toLowerCase()));
+          const displayKey = keys.length > 0 ? keys[0] : null;
+
+          // Resolve value gracefully
+          let val = 0;
+          if (displayKey) val = item[displayKey];
+          else if (item.value !== undefined) val = item.value;
+          else val = Object.values(item)[0] as number;
+
+          const isNumber = typeof val === "number" || !isNaN(Number(val));
+          const displayVal = isNumber ? formatNumber(Number(val)) : String(val || 0);
+
+          return (
+            <div key={idx} className="flex flex-col items-center justify-center text-center">
+              <div className="text-5xl md:text-6xl font-bold tracking-tighter text-foreground">
+                <SmartAnimatedValue value={displayVal} />
+              </div>
+              {displayKey && (
+                <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-2 opacity-70">
+                  {displayKey}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  if (visualization === "pie") {
+  if (activeViz === "pie") {
+    // Dynamic Fallback Mapping
+    const firstItem = data[0] || {};
+    const itemKeys = Object.keys(firstItem);
+    let nameK = "name";
+    let valK = "value";
+
+    if (!itemKeys.includes("name") && !itemKeys.includes("value")) {
+      nameK = itemKeys.find(k => typeof firstItem[k] === "string") || itemKeys[0];
+      valK = itemKeys.find(k => typeof firstItem[k] === "number" && k !== nameK) || itemKeys[1] || itemKeys[0];
+    }
+
     return (
       <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
         <PieChart className="focus:outline-none" style={{ outline: "none" }}>
           <RechartsTooltip content={<CustomTooltip range={range} />} />
           <Pie
             data={data}
-            dataKey="value"
-            nameKey="name"
+            dataKey={valK}
+            nameKey={nameK}
             cx="50%"
             cy="50%"
             innerRadius={60}
@@ -434,7 +475,7 @@ const ChartRenderer = ({ data, config, range, isMono }: any) => {
     );
   }
 
-  if (visualization === "table") {
+  if (activeViz === "table") {
     return (
       <div className="w-full h-full overflow-auto rounded-md border border-border/40 bg-card">
         <table className="w-full text-sm text-left border-collapse whitespace-nowrap">
@@ -468,21 +509,35 @@ const ChartRenderer = ({ data, config, range, isMono }: any) => {
     );
   }
 
-  // Time-Series (Area, Line, Bar) expects explicitly formatted data fields
-  const keys = Object.keys(data[0] || {}).filter(k => k !== "time" && k !== "name" && k !== "_id");
+  // Time-Series (Area, Line, Bar) automatic key mapping robustness
+  let timeKey = "time";
+  let renderKeys: string[] = [];
+
+  const firstItem = data[0] || {};
+  const itemKeys = Object.keys(firstItem);
+  
+  if (itemKeys.includes("time")) {
+    timeKey = "time";
+  } else {
+    // If the user forgot to project the time object perfectly, auto-map it
+    const possibleTime = itemKeys.find(k => k.toLowerCase().includes("time") || k.toLowerCase().includes("date") || k === "_id");
+    if (possibleTime) timeKey = possibleTime;
+  }
+  
+  renderKeys = itemKeys.filter((k) => k !== timeKey && k !== "name" && k !== "_id");
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      {visualization === "area" ? (
+      {activeViz === "area" ? (
         <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-          <XAxis dataKey="time" hide />
+          <XAxis dataKey={timeKey} hide />
           <YAxis hide />
           <RechartsTooltip
             contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
             content={<CustomTooltip range={range} />}
           />
-          {keys.map((k, i) => (
+          {renderKeys.map((k, i) => (
             <React.Fragment key={k}>
               <defs>
                 <linearGradient id={`color-${k}`} x1="0" y1="0" x2="0" y2="1">
@@ -494,30 +549,30 @@ const ChartRenderer = ({ data, config, range, isMono }: any) => {
             </React.Fragment>
           ))}
         </AreaChart>
-      ) : visualization === "bar" ? (
+      ) : activeViz === "bar" ? (
         <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-          <XAxis dataKey="time" hide />
+          <XAxis dataKey={timeKey} hide />
           <YAxis hide />
           <RechartsTooltip
             contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
             content={<CustomTooltip range={range} />}
             cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
           />
-          {keys.map((k, i) => (
+          {renderKeys.map((k, i) => (
             <Bar key={k} dataKey={k} fill={getColor(i)} radius={[2, 2, 0, 0]} />
           ))}
         </BarChart>
       ) : (
         <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-          <XAxis dataKey="time" hide />
+          <XAxis dataKey={timeKey} hide />
           <YAxis hide />
           <RechartsTooltip
             contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
             content={<CustomTooltip range={range} />}
           />
-          {keys.map((k, i) => (
+          {renderKeys.map((k, i) => (
             <Line key={k} type="monotone" dataKey={k} stroke={getColor(i)} strokeWidth={2} dot={false} />
           ))}
         </LineChart>
@@ -627,6 +682,7 @@ const WidgetWrapper = ({
             <ChartRenderer
               data={data.data}
               config={widget.config}
+              visualization={widget.visualization}
               range={range}
               isMono={isMono}
             />
@@ -698,8 +754,9 @@ export default function CustomDashboardView() {
   const [builderForm, setBuilderForm] = useState({
     name: "",
     target: "apm",
+    visualization: "line",
     queryStr: DEFAULT_QUERIES["apm"] || "[]",
-    config: { viz: "table" },
+    config: {},
   });
   
   const editorRef = useRef<any>(null);
@@ -795,7 +852,7 @@ export default function CustomDashboardView() {
     setBuilderForm((prev) => ({
       ...prev,
       queryStr: template.query,
-      config: { viz: template.config.viz },
+      visualization: template.config.viz,
     }));
     setTimeout(() => editorRef.current?.setValue(template.query), 50);
   };
@@ -805,8 +862,9 @@ export default function CustomDashboardView() {
     setBuilderForm({
       name: "",
       target: "apm",
+      visualization: "table",
       queryStr: DEFAULT_QUERIES["apm"] || "[]",
-      config: { viz: "table" },
+      config: {},
     });
     setPreviewData(null);
     setIsBuilderOpen(true);
@@ -821,8 +879,9 @@ export default function CustomDashboardView() {
     setBuilderForm({
       name: w.name,
       target: w.target,
+      visualization: w.visualization || w.config?.viz || "table",
       queryStr: JSON.stringify(w.query, null, 2),
-      config: { viz: w.config?.viz || w.visualization || "table" },
+      config: w.config || {},
     });
     setPreviewData(null);
     setIsBuilderOpen(true);
@@ -879,6 +938,7 @@ export default function CustomDashboardView() {
         name: builderForm.name,
         target: builderForm.target,
         query: parsedQuery,
+        visualization: builderForm.visualization,
         config: builderForm.config,
       };
       
@@ -1229,7 +1289,7 @@ export default function CustomDashboardView() {
                           ...prev,
                           target: newTarget,
                           queryStr: DEFAULT_QUERIES[newTarget] || "[]",
-                          config: { viz: "table" },
+                          visualization: "table"
                         }));
                         setTimeout(
                           () =>
@@ -1256,11 +1316,11 @@ export default function CustomDashboardView() {
                       Chart Type
                     </label>
                     <Select
-                      value={builderForm.config.viz}
+                      value={builderForm.visualization}
                       onChange={(e) =>
                         setBuilderForm({
                           ...builderForm,
-                          config: { viz: e.target.value },
+                          visualization: e.target.value,
                         })
                       }
                       className="h-9 text-sm bg-background border-border/60 shadow-sm"
@@ -1329,7 +1389,6 @@ export default function CustomDashboardView() {
                         </div>
                       )}
                     </div>
-                    {/* Native Fixed Height for Monaco to prevent Flexbox Collapse */}
                     <div className="w-full relative h-[250px] sm:h-[300px]">
                       <Editor
                         height="100%"
@@ -1386,6 +1445,7 @@ export default function CustomDashboardView() {
                         <ChartRenderer
                           data={previewData?.data}
                           config={builderForm.config}
+                          visualization={builderForm.visualization}
                           range={range}
                           isMono={isMono}
                         />
