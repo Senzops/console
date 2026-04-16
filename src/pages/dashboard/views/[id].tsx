@@ -619,7 +619,7 @@ export default function CustomDashboardView() {
     fetcher,
     { revalidateOnFocus: false },
   );
-  const { data: schemaData } = useSWR(token ? "/views/schema" : null, fetcher);
+  const { data: schemaData } = useSWR(token ? "/schema" : null, fetcher);
 
   useEffect(() => {
     if (data?.view?.layout) setLocalLayout([...data.view.layout]);
