@@ -385,7 +385,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
 
   if (
     !data ||
-    (Array.isArray(data) && data.length === 0 && activeViz !== "billboard")
+    (Array.isArray(data) && data.length === 0)
   ) {
     return (
       <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm font-medium">
@@ -726,7 +726,7 @@ export default function CustomDashboardView() {
   const { token } = useAuth();
   const { theme, isMono } = useTheme();
 
-  const [range, setRange] = useState("24h");
+  const [range, setRange] = useState("1h");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
