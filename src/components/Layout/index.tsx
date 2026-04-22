@@ -42,6 +42,8 @@ import {
   Shield,
   Scale,
   BadgeDollarSign,
+  Menu, // Added Menu for Hamburger
+  X
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -626,6 +628,13 @@ export const DashboardLayout = ({
 
   // ENTERPRISE FIX: Reference for the scrollable container
   const sidebarRef = useRef<HTMLDivElement>(null);
+  // Mobile Sidebar State
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Close the mobile sidebar whenever the route changes
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [router.asPath]);
 
   // Fetch Lists
   const { data: serverList, mutate: mutateServers } = useSWR(
@@ -686,7 +695,7 @@ export const DashboardLayout = ({
 
     sidebar.addEventListener("scroll", handleScroll, { passive: true });
     return () => sidebar.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [isMobileSidebarOpen]); // Add isMobileSidebarOpen so it binds when mounted on mobile
 
   // Guarantee scroll restore even if data fetches take a split second to paint the DOM height
   useEffect(() => {
@@ -1001,12 +1010,26 @@ export const DashboardLayout = ({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background transition-colors duration-300">
-      <aside className="w-64 border-r bg-card flex flex-col hidden md:flex shrink-0 z-40">
-        {/* Brand */}
-        <div className="p-6 border-b shrink-0">
+      {/* --- MOBILE BACKDROP --- */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* --- UNIFIED ENTERPRISE SIDEBAR (Desktop + Mobile Drawer) --- */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shadow-2xl md:shadow-none",
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Brand Header */}
+        <div className="p-4 md:p-6 border-b shrink-0 flex items-center justify-between h-14 md:h-auto">
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 font-bold text-xl mb-0 tracking-tight hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 font-bold text-xl tracking-tight hover:opacity-80 transition-opacity"
           >
             <div className="relative h-8 w-8 rounded-lg overflow-hidden">
               <img
@@ -1017,6 +1040,15 @@ export const DashboardLayout = ({
             </div>
             <span>Senzor</span>
           </Link>
+          {/* Close button solely for Mobile UX */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden text-muted-foreground hover:text-foreground -mr-2"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
         {/* Scrollable Nav Area */}
@@ -1224,9 +1256,26 @@ export const DashboardLayout = ({
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-background">
-        {children}
-      </main>
+      {/* --- MAIN CONTENT AREA --- */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background relative">
+        
+        {/* --- FLOATING MOBILE MENU BUTTON --- */}
+        {!isMobileSidebarOpen && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="md:hidden fixed top-4 right-4 z-50 h-10 w-10 rounded-full shadow-lg bg-background/80 backdrop-blur-md border border-border/50 text-foreground hover:bg-accent transition-all"
+            onClick={() => setIsMobileSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
+
+        {/* --- CONTENT INJECTION --- */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden relative">
+          {children}
+        </main>
+      </div>
 
       {/* --- SAVED VIEW MODAL --- */}
       <Dialog
