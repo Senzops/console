@@ -42,8 +42,9 @@ import {
   Shield,
   Scale,
   BadgeDollarSign,
-  Menu, // Added Menu for Hamburger
-  X
+  Menu,
+  X,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -626,10 +627,89 @@ export const DashboardLayout = ({
   } = useTheme();
   const router = useRouter();
 
-  // ENTERPRISE FIX: Reference for the scrollable container
+  // Reference for the scrollable container
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Mobile Sidebar State
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // PWA LOGIC
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone
+      ) {
+        setIsInstalled(true);
+      }
+
+      // Hydrate PWA prompt from global window object if it was caught before a route change
+      if ((window as any).__pwaInstallPrompt) {
+        setIsInstallable(true);
+      }
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event globally so it survives Next.js page remounts
+      (window as any).__pwaInstallPrompt = e;
+      setIsInstallable(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setIsInstallable(false);
+      (window as any).__pwaInstallPrompt = null;
+      toast.success("App installed successfully!");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt,
+      );
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    const promptEvent = (window as any).__pwaInstallPrompt;
+    if (!promptEvent) return;
+
+    // Show the native install prompt
+    promptEvent.prompt();
+
+    // Wait for the user to respond to the prompt
+    const { outcome } = await promptEvent.userChoice;
+    if (outcome === "accepted") {
+      setIsInstallable(false);
+      (window as any).__pwaInstallPrompt = null;
+    }
+  };
+
+  // Dynamic PWA Theme Color Synchronization
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      let metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (!metaTheme) {
+        metaTheme = document.createElement("meta");
+        metaTheme.setAttribute("name", "theme-color");
+        document.head.appendChild(metaTheme);
+      }
+
+      const bg = getComputedStyle(document.documentElement)
+        .getPropertyValue("--background")
+        .trim();
+
+      metaTheme.setAttribute("content", `hsl(${bg})`);
+    }
+  }, [theme]);
 
   // Close the mobile sidebar whenever the route changes
   useEffect(() => {
@@ -1022,7 +1102,7 @@ export const DashboardLayout = ({
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shadow-2xl md:shadow-none",
-          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         {/* Brand Header */}
@@ -1177,8 +1257,18 @@ export const DashboardLayout = ({
             onAdd={!user.isDemo ? () => setIsMonitorModalOpen(true) : undefined}
           />
 
-          {/* Settings */}
+          {/* Settings & PWA */}
           <div className="pt-4 border-t border-border/40">
+            {isInstallable && !isInstalled && (
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-primary hover:text-primary hover:bg-primary/10 h-9 font-medium transition-colors"
+                onClick={handleInstallClick}
+              >
+                <Download className="h-4 w-4 shrink-0" /> Install App
+              </Button>
+            )}
+
             <Button
               variant="ghost"
               className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-9"
@@ -1258,7 +1348,6 @@ export const DashboardLayout = ({
 
       {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background relative">
-        
         {/* --- FLOATING MOBILE MENU BUTTON --- */}
         {!isMobileSidebarOpen && (
           <Button

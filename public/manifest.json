@@ -1,0 +1,44 @@
+{
+  "name": "Senzor",
+  "short_name": "Senzor",
+  "description": "Complete observability platform for modern engineering teams. Monitor servers, analytics, and uptime.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "developer",
+    "productivity",
+    "observability",
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Global Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "description": "View global infrastructure and services"
+    },
+    {
+      "name": "Mission Control",
+      "short_name": "Alerts",
+      "url": "/dashboard/alerts",
+      "description": "Manage alert policies and incidents"
+    },
+    {
+      "name": "Log Management",
+      "short_name": "Logs",
+      "url": "/dashboard/logs",
+      "description": "Search centralized system logs"
+    }
+  ]
+}
