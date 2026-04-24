@@ -32,19 +32,53 @@
       "name": "Global Dashboard",
       "short_name": "Dashboard",
       "url": "/dashboard",
-      "description": "View global infrastructure and services"
+      "description": "View global infrastructure and services",
+      "icons": [
+        {
+          "src": "/icons/shortcut-dashboard.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Saved Views",
+      "short_name": "Views",
+      "url": "/dashboard/views",
+      "description": "Access custom dashboard canvases",
+      "icons": [
+        {
+          "src": "/icons/shortcut-views.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Mission Control",
       "short_name": "Alerts",
       "url": "/dashboard/alerts",
-      "description": "Manage alert policies and incidents"
+      "description": "Manage alert policies and incidents",
+      "icons": [
+        {
+          "src": "/icons/shortcut-alerts.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Log Management",
       "short_name": "Logs",
       "url": "/dashboard/logs",
-      "description": "Search centralized system logs"
+      "description": "Search centralized system logs",
+      "icons": [
+        {
+          "src": "/icons/shortcut-logs.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }
