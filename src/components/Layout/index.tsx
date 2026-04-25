@@ -1228,6 +1228,12 @@ export const DashboardLayout = ({
             title="AI Integrations"
             links={[
               {
+                href: "/dashboard/ai/assistant",
+                label: "Assistant",
+                icon: Bot,
+                iconColor: "text-blue-500",
+              },
+              {
                 href: "/dashboard/ai/mcp",
                 label: "MCP Server",
                 icon: Bot,
