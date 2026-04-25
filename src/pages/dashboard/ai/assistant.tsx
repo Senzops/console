@@ -193,7 +193,7 @@ export default function AiAssistantPage() {
         setHardwareProfile({ 
           supported: true, 
           vramEstimate,
-          name: adapter.info.isFallbackAdapter ? "Software Renderer" : "Hardware GPU"
+          name: adapter.info?.isFallbackAdapter ? "Software Renderer" : "Hardware GPU"
         });
         
         if (vramEstimate >= 8) setSelectedModel(LOCAL_MODELS[0].id);
@@ -353,14 +353,14 @@ export default function AiAssistantPage() {
         content: "You are Senzor Operational Intelligence, an enterprise SRE assistant. Use tools to fetch logs and metrics to help the user diagnose issues. Always summarize the telemetry into actionable insights." 
       };
 
-      const completionArgs: any = {
-        messages: [systemPrompt, ...currentChatContext],
-        tools: AI_TOOLS
-      };
-
       if (provider === "webllm") {
         try {
-          let reply = await engineRef.current.chat.completions.create(completionArgs);
+          // Hermes models on WebLLM forbid custom system prompts when tools are provided. 
+          // They utilize an internal system prompt for strict function calling adherence.
+          let reply = await engineRef.current.chat.completions.create({
+            messages: currentChatContext,
+            tools: AI_TOOLS
+          });
 
           if (reply.choices[0].message.tool_calls) {
             while (reply.choices[0].message.tool_calls && reply.choices[0].message.tool_calls.length > 0) {
@@ -373,12 +373,12 @@ export default function AiAssistantPage() {
               currentChatContext.push({ 
                 role: "tool", 
                 tool_call_id: toolCall.id, 
-                name: toolCall.function.name, // Required for WebLLM/Hermes resolution
+                name: toolCall.function.name,
                 content: result 
               });
 
               reply = await engineRef.current.chat.completions.create({
-                messages: [systemPrompt, ...currentChatContext],
+                messages: currentChatContext, // Strict: No System Prompt
                 tools: AI_TOOLS
               });
             }
@@ -387,7 +387,7 @@ export default function AiAssistantPage() {
         } catch (engineErr: any) {
           console.warn("[Senzor Intelligence] Engine Error, falling back to standard completion:", engineErr);
           const fallbackReply = await engineRef.current.chat.completions.create({
-            messages: [systemPrompt, ...currentChatContext]
+            messages: currentChatContext
           });
           finalAiResponse = fallbackReply.choices[0].message.content || "I encountered an error processing that request.";
         }
@@ -399,7 +399,8 @@ export default function AiAssistantPage() {
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${byokKey}` },
           body: JSON.stringify({
             model: "gpt-4o", 
-            ...completionArgs
+            messages: [systemPrompt, ...currentChatContext],
+            tools: AI_TOOLS
           })
         });
         let reply = await replyRes.json();
@@ -415,7 +416,7 @@ export default function AiAssistantPage() {
           currentChatContext.push({ 
             role: "tool", 
             tool_call_id: toolCall.id, 
-            name: toolCall.function.name, // Required by OpenAI API for tool responses
+            name: toolCall.function.name, // Required by OpenAI API
             content: result 
           });
 
