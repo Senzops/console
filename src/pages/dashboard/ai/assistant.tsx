@@ -358,32 +358,38 @@ export default function AiAssistantPage() {
           // Hermes models on WebLLM forbid custom system prompts when tools are provided. 
           // They utilize an internal system prompt for strict function calling adherence.
           let reply = await engineRef.current.chat.completions.create({
-            messages: currentChatContext,
-            tools: AI_TOOLS
+          messages: currentChatContext,
+          tools: AI_TOOLS,
+          tool_choice: "auto"
+        });
+
+        while (reply.choices[0].message.tool_calls?.length) {
+          const toolCall = reply.choices[0].message.tool_calls[0];
+          currentChatContext.push(reply.choices[0].message);
+
+          const args = JSON.parse(toolCall.function.arguments || "{}");
+          const result = await executeFrontendTool(toolCall.function.name, args);
+
+          currentChatContext.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+            content: result
           });
 
-          if (reply.choices[0].message.tool_calls) {
-            while (reply.choices[0].message.tool_calls && reply.choices[0].message.tool_calls.length > 0) {
-              const toolCall = reply.choices[0].message.tool_calls[0];
-              currentChatContext.push(reply.choices[0].message);
+          // still allow tools during loop
+          reply = await engineRef.current.chat.completions.create({
+            messages: currentChatContext,
+            tools: AI_TOOLS,
+            tool_choice: "auto"
+          });
+        }
 
-              const args = JSON.parse(toolCall.function.arguments || "{}");
-              const result = await executeFrontendTool(toolCall.function.name, args);
+        const finalReply = await engineRef.current.chat.completions.create({
+          messages: currentChatContext
+        });
 
-              currentChatContext.push({ 
-                role: "tool", 
-                tool_call_id: toolCall.id, 
-                name: toolCall.function.name,
-                content: result 
-              });
-
-              reply = await engineRef.current.chat.completions.create({
-                messages: currentChatContext, // Strict: No System Prompt
-                tools: AI_TOOLS
-              });
-            }
-          }
-          finalAiResponse = reply.choices[0].message.content || "No response generated.";
+        finalAiResponse = finalReply.choices[0].message.content || "No response generated.";
         } catch (engineErr: any) {
           console.warn("[Senzor Intelligence] Engine Error, falling back to standard completion:", engineErr);
           const fallbackReply = await engineRef.current.chat.completions.create({
