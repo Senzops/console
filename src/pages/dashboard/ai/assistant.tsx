@@ -143,6 +143,136 @@ const AI_TOOLS: any = [
   { type: "function", function: { name: "billing_get_active_plans", description: "List all currently available public pricing tiers and platform plans.", parameters: { type: "object", properties: {} } } }
 ];
 
+// ============================================================================
+// 3. TOOL CATEGORY ROUTING & AGENTIC ORCHESTRATION
+// ============================================================================
+
+/**
+ * Tool categories for intent-based routing. Instead of sending all 37 tools
+ * to a small local model (which overwhelms it), we classify the user's intent
+ * via keyword matching and only send the relevant 2-6 tools.
+ */
+const TOOL_CATEGORIES: Record<string, { description: string; tools: string[] }> = {
+  apm: {
+    description: "Backend APM services, performance, latency, RPS, HTTP traces",
+    tools: ["apm_list_services", "apm_get_stats", "apm_get_invocations", "apm_get_trace_detail"]
+  },
+  rum: {
+    description: "Frontend/RUM web performance, Web Vitals, page views",
+    tools: ["rum_list_services", "rum_get_dashboard", "rum_get_trace_detail"]
+  },
+  tasks: {
+    description: "Background tasks, job execution, cron jobs, task queues",
+    tools: ["task_list_services", "task_get_dashboard", "task_get_entity_detail", "task_get_run_detail"]
+  },
+  logs: {
+    description: "System logs, log search, log queries",
+    tools: ["logs_query", "logs_get_by_id", "logs_get_by_trace"]
+  },
+  errors: {
+    description: "Error tracking, exceptions, error groups",
+    tools: ["error_get_global", "error_get_group_detail", "error_get_trace_errors"]
+  },
+  web_analytics: {
+    description: "Website analytics, pageviews, visitors, referrers",
+    tools: ["web_list_websites", "web_get_stats"]
+  },
+  uptime: {
+    description: "Uptime monitoring, health checks, endpoint status",
+    tools: ["uptime_list_monitors", "uptime_get_stats"]
+  },
+  infrastructure: {
+    description: "VPS servers, CPU, RAM, disk, network, Docker metrics",
+    tools: ["vps_list", "vps_get_stats"]
+  },
+  database: {
+    description: "Database monitoring, MongoDB, Redis, throughput, latency",
+    tools: ["database_list", "database_get_stats"]
+  },
+  alerts: {
+    description: "Alert policies, incidents, alert destinations",
+    tools: ["alerts_list_destinations", "alerts_list_policies", "alerts_get_policy_details"]
+  },
+  dashboards: {
+    description: "Custom dashboards, saved views, widgets",
+    tools: ["views_list_dashboards", "views_get_dashboard", "views_get_widget_data"]
+  },
+  schema: {
+    description: "Telemetry data schema, dynamic field mapping",
+    tools: ["schema_get_dynamic"]
+  },
+  billing: {
+    description: "Billing, subscription, storage, plans, transactions",
+    tools: ["billing_get_storage_stats", "billing_get_subscription", "billing_get_transactions", "billing_get_transaction_receipt", "billing_get_active_plans"]
+  }
+};
+
+const AGENT_SYSTEM_PROMPT = {
+  role: "system" as const,
+  content: `You are Senzor Operational Intelligence, an enterprise SRE assistant for infrastructure monitoring and observability.
+
+Capabilities:
+- Analyze system telemetry (APM traces, logs, errors, metrics)
+- Diagnose performance issues and identify root causes
+- Provide actionable remediation recommendations
+- Correlate data across multiple observability signals
+
+Instructions:
+- Use the provided tools to fetch real data before answering
+- Always summarize telemetry into concise, actionable insights
+- If data seems anomalous, explain potential root causes
+- Never fabricate metrics or telemetry data
+- If you need data, call the appropriate tool
+- Be thorough but concise`
+};
+
+/** Keyword-based intent classifier — instant, deterministic, no model call needed */
+const classifyIntentByKeywords = (message: string): string[] => {
+  const lower = message.toLowerCase();
+  const matched: string[] = [];
+
+  const keywordMap: Record<string, string[]> = {
+    apm: ["apm", "backend service", "latency", "rps", "trace", "request per", "response time", "api performance", "endpoint performance", "p99", "p95", "throughput"],
+    rum: ["rum", "frontend", "web vital", "lcp", "inp", "cls", "page view", "web performance", "core web vital", "first contentful"],
+    tasks: ["task", "job", "cron", "queue", "background", "worker", "scheduled", "celery", "sidekiq"],
+    logs: ["log", "logging", "syslog", "stdout", "stderr", "debug log", "warn log", "search logs"],
+    errors: ["error", "exception", "crash", "bug", "failure", "failed", "unresolved", "stack trace", "traceback"],
+    web_analytics: ["analytics", "pageview", "visitor", "referrer", "traffic", "web stats", "bounce rate"],
+    uptime: ["uptime", "downtime", "health check", "ping", "monitor", "availability", "status check"],
+    infrastructure: ["vps", "server", "cpu", "ram", "memory", "disk", "docker", "container", "network", "infrastructure", "linux"],
+    database: ["database", "mongodb", "mongo", "redis", "db throughput", "db latency", "query performance"],
+    alerts: ["alert", "incident", "notification", "policy", "trigger", "threshold", "on-call"],
+    dashboards: ["dashboard", "widget", "saved view", "canvas", "custom chart"],
+    schema: ["schema", "field map", "telemetry type", "attribute"],
+    billing: ["billing", "subscription", "plan", "payment", "invoice", "receipt", "storage usage", "pricing", "tier", "cost"]
+  };
+
+  for (const [category, keywords] of Object.entries(keywordMap)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      matched.push(category);
+    }
+  }
+
+  return matched;
+};
+
+/** Resolve AI_TOOLS subset from matched categories, capped to prevent model overload */
+const resolveToolSubset = (categories: string[]): any[] => {
+  if (categories.length === 0) return [];
+  const toolNames = new Set<string>();
+  for (const cat of categories) {
+    TOOL_CATEGORIES[cat]?.tools.forEach(t => toolNames.add(t));
+  }
+  const MAX_TOOLS = 12;
+  return AI_TOOLS.filter((t: any) => toolNames.has(t.function.name)).slice(0, MAX_TOOLS);
+};
+
+interface AgentStatus {
+  phase: "thinking" | "selecting_tools" | "calling_tools" | "analyzing" | "responding" | "idle";
+  detail?: string;
+  tools?: string[];
+}
+
 export default function AiAssistantPage() {
   // --- Engine & State ---
   const [engineMode, setEngineMode] = useState<"setup" | "loading" | "ready">("setup");
@@ -157,7 +287,8 @@ export default function AiAssistantPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [contextLogs, setContextLogs] = useState<any[]>([]); 
+  const [contextLogs, setContextLogs] = useState<any[]>([]);
+  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
   
   const engineRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -335,103 +466,212 @@ export default function AiAssistantPage() {
     }
   };
 
-  // --- Generation Loop ---
+  // --- Agentic Orchestration Loop ---
   const handleSendMessage = async () => {
     if (!input.trim() || isGenerating) return;
-    
-    const newUserMsg = { role: "user", content: input };
-    const currentChatContext = [...messages, newUserMsg];
-    
+
+    const userInput = input;
+    const newUserMsg = { role: "user", content: userInput };
+    const currentChatContext: any[] = [...messages, newUserMsg];
+
     setMessages(currentChatContext);
     setInput("");
     setIsGenerating(true);
+    setAgentStatus({ phase: "thinking", detail: "Analyzing your request..." });
 
     try {
       let finalAiResponse = "";
-      const systemPrompt = { 
-        role: "system", 
-        content: "You are Senzor Operational Intelligence, an enterprise SRE assistant. Use tools to fetch logs and metrics to help the user diagnose issues. Always summarize the telemetry into actionable insights." 
-      };
 
       if (provider === "webllm") {
-        try {
-          // Hermes models on WebLLM forbid custom system prompts when tools are provided. 
-          // They utilize an internal system prompt for strict function calling adherence.
-          let reply = await engineRef.current.chat.completions.create({
-          messages: currentChatContext,
-          tools: AI_TOOLS,
-          tool_choice: "auto"
-        });
+        // ── Phase 1: Instant keyword-based intent classification ──
+        setAgentStatus({ phase: "selecting_tools", detail: "Identifying relevant data sources..." });
+        const categories = classifyIntentByKeywords(userInput);
+        const toolSubset = resolveToolSubset(categories);
 
-        while (reply.choices[0].message.tool_calls?.length) {
-          const toolCall = reply.choices[0].message.tool_calls[0];
-          currentChatContext.push(reply.choices[0].message);
+        setContextLogs(prev => [...prev, {
+          time: new Date(), type: "tool_call", name: "__intent_classification",
+          args: { categories, toolCount: toolSubset.length, tools: toolSubset.map((t: any) => t.function.name) }
+        }]);
+        if (toolSubset.length > 0) setIsInspectorOpen(true);
 
-          const args = JSON.parse(toolCall.function.arguments || "{}");
-          const result = await executeFrontendTool(toolCall.function.name, args);
-
-          currentChatContext.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            name: toolCall.function.name,
-            content: result
+        if (toolSubset.length === 0) {
+          // ── No tools needed — direct conversational completion ──
+          setAgentStatus({ phase: "responding", detail: "Generating response..." });
+          try {
+            const reply = await engineRef.current.chat.completions.create({
+              messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
+              max_tokens: 2048,
+              temperature: 0.4
+            });
+            finalAiResponse = reply.choices[0].message.content || "No response generated.";
+          } catch (directErr: any) {
+            console.warn("[Senzor Intelligence] Direct completion error:", directErr);
+            finalAiResponse = "I encountered an error generating a response. Please try again.";
+          }
+        } else {
+          // ── Phase 2: Agentic tool-calling loop with subset ──
+          setAgentStatus({
+            phase: "calling_tools",
+            detail: `Selected ${toolSubset.length} tools from: ${categories.join(", ")}`,
+            tools: toolSubset.map((t: any) => t.function.name)
           });
 
-          // still allow tools during loop
-          reply = await engineRef.current.chat.completions.create({
-            messages: currentChatContext,
-            tools: AI_TOOLS,
-            tool_choice: "auto"
-          });
-        }
+          const agentMessages: any[] = [AGENT_SYSTEM_PROMPT, ...currentChatContext];
+          const MAX_ITERATIONS = 5;
+          let iteration = 0;
+          let loopCompleted = false;
 
-        const finalReply = await engineRef.current.chat.completions.create({
-          messages: currentChatContext
-        });
+          try {
+            while (iteration < MAX_ITERATIONS) {
+              iteration++;
 
-        finalAiResponse = finalReply.choices[0].message.content || "No response generated.";
-        } catch (engineErr: any) {
-          console.warn("[Senzor Intelligence] Engine Error, falling back to standard completion:", engineErr);
-          const fallbackReply = await engineRef.current.chat.completions.create({
-            messages: currentChatContext
-          });
-          finalAiResponse = fallbackReply.choices[0].message.content || "I encountered an error processing that request.";
+              const reply = await engineRef.current.chat.completions.create({
+                messages: agentMessages,
+                tools: toolSubset,
+                tool_choice: "auto",
+                max_tokens: 2048,
+                temperature: 0.1
+              });
+
+              const choice = reply.choices[0];
+              const assistantMsg = choice.message;
+
+              // Push assistant message to both agent context and persistable context
+              agentMessages.push(assistantMsg);
+              if (assistantMsg.tool_calls?.length) {
+                currentChatContext.push(assistantMsg);
+              }
+
+              // If model produced a text response (no tool calls), we're done
+              if (choice.finish_reason !== "tool_calls" || !assistantMsg.tool_calls?.length) {
+                finalAiResponse = assistantMsg.content || "";
+                loopCompleted = true;
+                break;
+              }
+
+              // ── Execute ALL tool calls in parallel ──
+              const toolCalls = assistantMsg.tool_calls;
+              const toolNames = toolCalls.map((tc: any) => tc.function.name);
+              setAgentStatus({
+                phase: "calling_tools",
+                detail: `Calling: ${toolNames.join(", ")} (iteration ${iteration})`,
+                tools: toolNames
+              });
+
+              const toolResults = await Promise.allSettled(
+                toolCalls.map(async (tc: any) => {
+                  let args: any = {};
+                  try {
+                    args = JSON.parse(tc.function.arguments || "{}");
+                  } catch {
+                    args = {};
+                  }
+                  const result = await executeFrontendTool(tc.function.name, args);
+                  return { toolCallId: tc.id, name: tc.function.name, result };
+                })
+              );
+
+              // Push all tool results back into both contexts
+              for (let i = 0; i < toolCalls.length; i++) {
+                const settled = toolResults[i];
+                const toolMsg = {
+                  role: "tool" as const,
+                  tool_call_id: settled.status === "fulfilled" ? settled.value.toolCallId : toolCalls[i].id,
+                  content: settled.status === "fulfilled"
+                    ? settled.value.result
+                    : JSON.stringify({ error: "Tool execution failed", reason: (settled as PromiseRejectedResult).reason?.message || "Unknown" })
+                };
+                agentMessages.push(toolMsg);
+                currentChatContext.push(toolMsg);
+              }
+
+              setAgentStatus({ phase: "analyzing", detail: `Processing results (step ${iteration}/${MAX_ITERATIONS})...` });
+            }
+
+            // If loop exhausted without a final text response, do one final completion
+            if (!loopCompleted || !finalAiResponse) {
+              setAgentStatus({ phase: "responding", detail: "Synthesizing final analysis..." });
+              const finalReply = await engineRef.current.chat.completions.create({
+                messages: agentMessages,
+                max_tokens: 2048,
+                temperature: 0.3
+              });
+              finalAiResponse = finalReply.choices[0].message.content || "I was unable to generate a complete response.";
+            }
+          } catch (engineErr: any) {
+            console.warn("[Senzor Intelligence] Agentic loop error, attempting fallback:", engineErr);
+            setAgentStatus({ phase: "responding", detail: "Recovering from error..." });
+            try {
+              const fallback = await engineRef.current.chat.completions.create({
+                messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
+                max_tokens: 2048
+              });
+              finalAiResponse = fallback.choices[0].message.content || "I encountered an error processing that request.";
+            } catch {
+              finalAiResponse = "I encountered an internal error. Please try clearing the chat and asking again.";
+            }
+          }
         }
 
       } else {
-        // BYOK Execution via direct fetch to OpenAI
+        // ── BYOK: Cloud API execution (OpenAI) ──
+        // Cloud models handle all 37 tools without issues
+        setAgentStatus({ phase: "calling_tools", detail: "Sending to cloud API..." });
+
         let replyRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${byokKey}` },
           body: JSON.stringify({
-            model: "gpt-4o", 
-            messages: [systemPrompt, ...currentChatContext],
+            model: "gpt-4o",
+            messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
             tools: AI_TOOLS
           })
         });
         let reply = await replyRes.json();
         if (reply.error) throw new Error(reply.error.message);
 
-        while (reply.choices[0].message.tool_calls && reply.choices[0].message.tool_calls.length > 0) {
-          const toolCall = reply.choices[0].message.tool_calls[0];
-          currentChatContext.push(reply.choices[0].message);
+        let byokIteration = 0;
+        while (reply.choices[0].message.tool_calls?.length && byokIteration < 10) {
+          byokIteration++;
+          const assistantMsg = reply.choices[0].message;
+          currentChatContext.push(assistantMsg);
 
-          const args = JSON.parse(toolCall.function.arguments || "{}");
-          const result = await executeFrontendTool(toolCall.function.name, args);
-
-          currentChatContext.push({ 
-            role: "tool", 
-            tool_call_id: toolCall.id, 
-            name: toolCall.function.name, // Required by OpenAI API
-            content: result 
+          // Execute all tool calls in parallel for BYOK too
+          const toolCalls = assistantMsg.tool_calls;
+          setAgentStatus({
+            phase: "calling_tools",
+            detail: `Calling: ${toolCalls.map((tc: any) => tc.function.name).join(", ")}`,
+            tools: toolCalls.map((tc: any) => tc.function.name)
           });
+
+          const toolResults = await Promise.allSettled(
+            toolCalls.map(async (tc: any) => {
+              const args = JSON.parse(tc.function.arguments || "{}");
+              const result = await executeFrontendTool(tc.function.name, args);
+              return { toolCallId: tc.id, name: tc.function.name, result };
+            })
+          );
+
+          for (let i = 0; i < toolCalls.length; i++) {
+            const settled = toolResults[i];
+            currentChatContext.push({
+              role: "tool",
+              tool_call_id: settled.status === "fulfilled" ? settled.value.toolCallId : toolCalls[i].id,
+              name: toolCalls[i].function.name,
+              content: settled.status === "fulfilled"
+                ? settled.value.result
+                : JSON.stringify({ error: "Tool execution failed" })
+            });
+          }
+
+          setAgentStatus({ phase: "analyzing", detail: `Processing results (step ${byokIteration})...` });
 
           replyRes = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${byokKey}` },
             body: JSON.stringify({
               model: "gpt-4o",
-              messages: [systemPrompt, ...currentChatContext],
+              messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
               tools: AI_TOOLS
             })
           });
@@ -441,9 +681,10 @@ export default function AiAssistantPage() {
         finalAiResponse = reply.choices[0].message.content || "No response generated.";
       }
 
+      setAgentStatus({ phase: "idle" });
       const newAiMsg = { role: "assistant", content: finalAiResponse };
       const finalChat = [...currentChatContext, newAiMsg];
-      
+
       setMessages(finalChat);
       await saveChat(chatId, finalChat);
 
@@ -451,6 +692,7 @@ export default function AiAssistantPage() {
       toast.error("Generation failed: " + err.message);
     } finally {
       setIsGenerating(false);
+      setAgentStatus(null);
     }
   };
 
@@ -721,12 +963,24 @@ export default function AiAssistantPage() {
                   <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 shadow-sm">
                     <Bot className="h-4 w-4 text-primary animate-pulse" />
                   </div>
-                  <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm px-5 py-4 text-sm flex items-center gap-3 w-fit shadow-sm">
-                    <div className="flex space-x-1.5 items-center justify-center h-2">
-                      <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '-0.3s' }}></div>
-                      <div className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '-0.15s' }}></div>
-                      <div className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce"></div>
+                  <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm px-5 py-4 text-sm w-fit shadow-sm space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex space-x-1.5 items-center justify-center h-2">
+                        <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '-0.3s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '-0.15s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce"></div>
+                      </div>
+                      {agentStatus?.detail && (
+                        <span className="text-xs text-muted-foreground font-medium">{agentStatus.detail}</span>
+                      )}
                     </div>
+                    {agentStatus?.tools && agentStatus.tools.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {agentStatus.tools.map((tool, i) => (
+                          <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{tool}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
