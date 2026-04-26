@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../../../lib/auth";
 import { DashboardLayout } from "../../../components/Layout";
 import {
@@ -17,13 +19,33 @@ import {
   Upload,
   Database,
   Lock,
-  ArrowRight,
+  ArrowUp,
   X,
   Code2,
   Check,
   AlertTriangle,
   PanelRightClose,
   PanelRightOpen,
+  Brain,
+  Wrench,
+  CheckCircle2,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  RefreshCw,
+  Square,
+  Search,
+  Sparkles,
+  ShieldCheck,
+  TrendingUp,
+  ServerCog,
+  Bug,
+  Activity,
+  Receipt,
+  Zap,
+  Clock,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -480,7 +502,34 @@ const formatObservations = (
 // 7. STREAMING COMPLETION ADAPTER (WebLLM + OpenAI BYOK behind one signature)
 // ============================================================================
 type ChatRole = "system" | "user" | "assistant";
-interface ChatMessage { role: ChatRole; content: string; }
+
+/**
+ * Persisted record of the agent's work for a single assistant turn. UI-only
+ * metadata — never participates in the model's conversation context, but is
+ * saved alongside the message so users can audit past investigations.
+ */
+type AgentStep =
+  | { iteration: number; type: "thinking"; ts: number; content: string }
+  | { iteration: number; type: "tool_call"; ts: number; toolName: string; args: any; durationMs?: number; ok?: boolean }
+  | { iteration: number; type: "tool_result"; ts: number; toolName: string; data: any; durationMs: number }
+  | { iteration: number; type: "tool_error"; ts: number; toolName: string; error: string; durationMs: number };
+
+interface AgentTrace {
+  startedAt: number;
+  endedAt?: number;
+  iterations: number;
+  toolCallCount: number;
+  steps: AgentStep[];
+  provider: "webllm" | "byok";
+  modelHint?: string;
+}
+
+interface ChatMessage {
+  role: ChatRole;
+  content: string;
+  /** Present on assistant messages only; populated after each agent run. */
+  trace?: AgentTrace;
+}
 
 interface StreamOpts {
   provider: "webllm" | "byok";
@@ -906,7 +955,7 @@ const fetchToolDataWithRetry = async (toolName: string, args: any): Promise<any>
 };
 
 // ============================================================================
-// 10. REACT COMPONENT
+// 10. PRESENTATION COMPONENTS
 // ============================================================================
 interface AgentStatus {
   phase: AgentPhase;
@@ -919,6 +968,439 @@ type LogEntry =
   | { time: Date; type: "tool_call"; name: string; args: any }
   | { time: Date; type: "tool_result"; name: string; data: any }
   | { time: Date; type: "tool_error"; name: string; error: string };
+
+interface SuggestedPrompt {
+  category: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  prompts: string[];
+}
+
+const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
+  {
+    category: "Performance",
+    icon: TrendingUp,
+    accent: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+    prompts: [
+      "Which APM service has the highest p99 latency in the last 24 hours?",
+      "Summarize the slowest 5 backend traces today and what they have in common.",
+    ],
+  },
+  {
+    category: "Errors",
+    icon: Bug,
+    accent: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+    prompts: [
+      "List my top unresolved error groups and rank them by impact.",
+      "Has any new error appeared in the last hour that wasn't there yesterday?",
+    ],
+  },
+  {
+    category: "Infrastructure",
+    icon: ServerCog,
+    accent: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+    prompts: [
+      "Are any of my VPS servers approaching 80% memory or CPU usage?",
+      "Show me the slowest database instance and its query throughput.",
+    ],
+  },
+  {
+    category: "Reliability",
+    icon: ShieldCheck,
+    accent: "text-violet-500 bg-violet-500/10 border-violet-500/20",
+    prompts: [
+      "Which uptime monitors had downtime this week?",
+      "Are there any open incidents in my alert policies right now?",
+    ],
+  },
+  {
+    category: "Background Jobs",
+    icon: Activity,
+    accent: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+    prompts: [
+      "Which background tasks have failed most often in the last 24 hours?",
+      "Find the cron job with the worst average duration.",
+    ],
+  },
+  {
+    category: "Billing",
+    icon: Receipt,
+    accent: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
+    prompts: [
+      "How much storage am I using vs my plan limit?",
+      "Show my last 3 billing transactions and their amounts.",
+    ],
+  },
+];
+
+const PHASE_META: Record<AgentPhase, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
+  thinking: { icon: Brain, label: "Reasoning", color: "text-violet-500" },
+  selecting_tools: { icon: Sparkles, label: "Planning", color: "text-amber-500" },
+  calling_tools: { icon: Wrench, label: "Calling tools", color: "text-blue-500" },
+  analyzing: { icon: Zap, label: "Analyzing", color: "text-cyan-500" },
+  responding: { icon: Bot, label: "Responding", color: "text-emerald-500" },
+  idle: { icon: Bot, label: "Idle", color: "text-muted-foreground" },
+};
+
+const PHASE_ORDER: AgentPhase[] = ["thinking", "selecting_tools", "calling_tools", "analyzing", "responding"];
+
+const formatDuration = (ms: number): string => {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+};
+
+/** Compact button with an icon-only mode and a copy-to-clipboard helper. */
+const CopyButton: React.FC<{ value: string; className?: string; label?: string }> = ({ value, className, label }) => {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      toast.error("Could not copy to clipboard");
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      title={label ?? "Copy"}
+      className={cn(
+        "inline-flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md px-1.5 py-1 hover:bg-muted",
+        className,
+      )}
+    >
+      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+      {label && <span>{copied ? "Copied" : label}</span>}
+    </button>
+  );
+};
+
+/**
+ * Markdown renderer tuned for the design system. We deliberately do NOT enable
+ * raw HTML (security) and we restrict to GFM (tables, task lists, autolinks,
+ * strikethrough) which is what we instruct the model to produce.
+ */
+const AssistantMarkdown: React.FC<{ content: string; className?: string }> = ({ content, className }) => {
+  const components = useMemo(() => ({
+    h1: (props: any) => <h1 className="text-base font-bold text-foreground mt-4 mb-2 first:mt-0" {...props} />,
+    h2: (props: any) => <h2 className="text-[15px] font-bold text-foreground mt-4 mb-2 first:mt-0 tracking-tight" {...props} />,
+    h3: (props: any) => <h3 className="text-sm font-bold text-foreground mt-3 mb-1.5 first:mt-0" {...props} />,
+    h4: (props: any) => <h4 className="text-sm font-semibold text-foreground mt-3 mb-1.5 first:mt-0" {...props} />,
+    p: (props: any) => <p className="text-sm leading-relaxed text-foreground my-2 first:mt-0 last:mb-0" {...props} />,
+    ul: (props: any) => <ul className="my-2 list-disc pl-5 space-y-1 text-sm text-foreground marker:text-muted-foreground" {...props} />,
+    ol: (props: any) => <ol className="my-2 list-decimal pl-5 space-y-1 text-sm text-foreground marker:text-muted-foreground" {...props} />,
+    li: (props: any) => <li className="leading-relaxed" {...props} />,
+    strong: (props: any) => <strong className="font-bold text-foreground" {...props} />,
+    em: (props: any) => <em className="italic" {...props} />,
+    a: (props: any) => <a className="text-primary underline underline-offset-2 hover:text-primary/80" target="_blank" rel="noopener noreferrer" {...props} />,
+    blockquote: (props: any) => <blockquote className="border-l-2 border-border pl-3 my-2 text-muted-foreground italic" {...props} />,
+    hr: () => <hr className="my-3 border-border/60" />,
+    table: (props: any) => (
+      <div className="my-3 overflow-x-auto rounded-lg border border-border/60">
+        <table className="w-full text-xs" {...props} />
+      </div>
+    ),
+    thead: (props: any) => <thead className="bg-muted/50" {...props} />,
+    tbody: (props: any) => <tbody className="divide-y divide-border/40" {...props} />,
+    tr: (props: any) => <tr {...props} />,
+    th: (props: any) => <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/60" {...props} />,
+    td: (props: any) => <td className="px-3 py-2 text-foreground" {...props} />,
+    code: ({ inline, className: cls, children, ...props }: any) => {
+      const text = String(children ?? "").replace(/\n$/, "");
+      // Heuristic: react-markdown 10 doesn't always pass `inline`; treat
+      // single-line code without `language-` class as inline.
+      const isInline = inline ?? (!cls && !text.includes("\n"));
+      if (isInline) {
+        return <code className="px-1.5 py-0.5 rounded bg-muted text-[12px] font-mono text-foreground border border-border/60" {...props}>{children}</code>;
+      }
+      const lang = (cls ?? "").replace("language-", "") || "code";
+      return (
+        <div className="my-3 rounded-lg overflow-hidden border border-border/60 bg-[#0d1117] shadow-sm group/code">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/10">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">{lang}</span>
+            <CopyButton value={text} className="text-slate-400 hover:text-slate-100 hover:bg-white/10" />
+          </div>
+          <pre className="p-3 overflow-x-auto text-xs font-mono leading-relaxed text-slate-200">
+            <code {...props}>{children}</code>
+          </pre>
+        </div>
+      );
+    },
+    pre: (props: any) => <>{props.children}</>,
+  }), []);
+
+  return (
+    <div className={cn("min-w-0", className)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components as any}>
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
+/**
+ * Persisted per-message agent activity (collapsible). Renders the trace
+ * captured during the assistant's turn so users can audit past investigations.
+ */
+const AgentActivityTimeline: React.FC<{ trace: AgentTrace; defaultOpen?: boolean }> = ({ trace, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  const elapsedMs = (trace.endedAt ?? Date.now()) - trace.startedAt;
+  const summary = `${trace.iterations} iteration${trace.iterations === 1 ? "" : "s"} · ${trace.toolCallCount} tool call${trace.toolCallCount === 1 ? "" : "s"} · ${formatDuration(elapsedMs)}`;
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/30 overflow-hidden mb-2">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+          <Brain className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+          <span className="text-xs font-semibold text-foreground">Reasoning trace</span>
+        </div>
+        <span className="text-[10px] font-mono text-muted-foreground truncate">{summary}</span>
+      </button>
+      {open && (
+        <div className="border-t border-border/40 bg-background/50 p-3 space-y-2 max-h-[420px] overflow-y-auto">
+          {trace.steps.length === 0 ? (
+            <div className="text-xs text-muted-foreground italic">No recorded steps for this turn.</div>
+          ) : (
+            trace.steps.map((step, i) => <AgentStepRow key={i} step={step} />)
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AgentStepRow: React.FC<{ step: AgentStep }> = ({ step }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (step.type === "thinking") {
+    return (
+      <div className="flex items-start gap-2.5">
+        <div className="mt-0.5 shrink-0 w-5 h-5 rounded-md bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+          <Brain className="h-3 w-3 text-violet-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-500">Thought</span>
+            <span className="text-[10px] font-mono text-muted-foreground">step {step.iteration}</span>
+          </div>
+          <div className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">{step.content}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step.type === "tool_call") {
+    return (
+      <div className="flex items-start gap-2.5">
+        <div className="mt-0.5 shrink-0 w-5 h-5 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+          <Wrench className="h-3 w-3 text-blue-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <button type="button" onClick={() => setExpanded(e => !e)} className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Call</span>
+            <span className="text-xs font-mono text-foreground truncate">{step.toolName}</span>
+            {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+          </button>
+          {expanded && (
+            <pre className="mt-1 text-[10px] font-mono text-muted-foreground bg-muted/40 rounded px-2 py-1 overflow-x-auto whitespace-pre-wrap break-all">
+              {JSON.stringify(step.args ?? {}, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (step.type === "tool_result") {
+    return (
+      <div className="flex items-start gap-2.5">
+        <div className="mt-0.5 shrink-0 w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <button type="button" onClick={() => setExpanded(e => !e)} className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">Result</span>
+            <span className="text-xs font-mono text-foreground truncate">{step.toolName}</span>
+            <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">{formatDuration(step.durationMs)}</span>
+            {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+          </button>
+          {expanded && (
+            <pre className="mt-1 text-[10px] font-mono text-muted-foreground bg-muted/40 rounded px-2 py-1 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
+              {JSON.stringify(step.data, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // tool_error
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="mt-0.5 shrink-0 w-5 h-5 rounded-md bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+        <AlertCircle className="h-3 w-3 text-rose-500" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Error</span>
+          <span className="text-xs font-mono text-foreground truncate">{step.toolName}</span>
+          <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">{formatDuration(step.durationMs)}</span>
+        </div>
+        <div className="text-xs leading-relaxed text-rose-500/90 mt-0.5 break-words">{step.error}</div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Live agent timeline shown while the assistant is currently generating.
+ * Mirrors AgentActivityTimeline but driven by mutable refs/state, not a
+ * persisted trace.
+ */
+const LiveAgentTimeline: React.FC<{
+  status: AgentStatus | null;
+  trace: AgentTrace | null;
+}> = ({ status, trace }) => {
+  const meta = status ? PHASE_META[status.phase] : PHASE_META.idle;
+  const PhaseIcon = meta.icon;
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-border/40 flex items-center gap-3">
+        <div className="relative shrink-0 w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+          <PhaseIcon className={cn("h-3.5 w-3.5", meta.color)} />
+          <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-card animate-pulse" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-foreground">{meta.label}</span>
+            <div className="flex space-x-1 items-center justify-center">
+              <span className="w-1 h-1 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "-0.3s" }} />
+              <span className="w-1 h-1 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "-0.15s" }} />
+              <span className="w-1 h-1 bg-primary/80 rounded-full animate-bounce" />
+            </div>
+          </div>
+          {status?.detail && (
+            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5 line-clamp-2 break-words">{status.detail}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Phase pills */}
+      <div className="px-4 py-2 border-b border-border/40 bg-muted/20 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        {PHASE_ORDER.map((p) => {
+          const m = PHASE_META[p];
+          const isActive = status?.phase === p;
+          const isPast = status ? PHASE_ORDER.indexOf(status.phase) > PHASE_ORDER.indexOf(p) : false;
+          const Icon = m.icon;
+          return (
+            <span
+              key={p}
+              className={cn(
+                "inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-2 py-0.5 border transition-all whitespace-nowrap",
+                isActive ? "border-primary/40 bg-primary/10 text-primary" : isPast ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-500/80" : "border-border/40 bg-background text-muted-foreground/60",
+              )}
+            >
+              {isPast ? <Check className="h-2.5 w-2.5" /> : <Icon className="h-2.5 w-2.5" />}
+              {m.label}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Active tools */}
+      {status?.tools && status.tools.length > 0 && (
+        <div className="px-4 py-2 border-b border-border/40 flex flex-wrap gap-1.5">
+          {status.tools.map((tool, i) => (
+            <span key={i} className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">
+              <Spinner className="h-2.5 w-2.5" /> {tool}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Live timeline */}
+      {trace && trace.steps.length > 0 && (
+        <div className="px-4 py-3 max-h-[280px] overflow-y-auto space-y-2">
+          {trace.steps.slice(-12).map((step, i) => <AgentStepRow key={i} step={step} />)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Renders a single chat message — user bubble (right) or assistant bubble
+ * (left) with trace timeline + markdown + action bar.
+ */
+const MessageBubble: React.FC<{
+  msg: ChatMessage;
+  isLastAssistant: boolean;
+  isGenerating: boolean;
+  onRegenerate: () => void;
+}> = ({ msg, isLastAssistant, isGenerating, onRegenerate }) => {
+  if (msg.role === "user") {
+    return (
+      <div className="flex items-start gap-3 flex-row-reverse">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary text-primary-foreground shadow-sm">
+          <span className="text-xs font-bold">You</span>
+        </div>
+        <div className="max-w-[85%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed bg-primary/10 text-foreground border border-primary/20 whitespace-pre-wrap break-words">
+          {msg.content}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-3 group/msg">
+      <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 shadow-sm">
+        <Bot className="h-4 w-4 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0 max-w-[92%]">
+        {msg.trace && msg.trace.steps.length > 0 && (
+          <AgentActivityTimeline trace={msg.trace} />
+        )}
+        <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card px-4 py-3 shadow-sm">
+          {msg.content ? (
+            <AssistantMarkdown content={msg.content} />
+          ) : (
+            <span className="text-xs italic text-muted-foreground">No response generated.</span>
+          )}
+        </div>
+        {msg.content && (
+          <div className="mt-1.5 flex items-center gap-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+            <CopyButton value={msg.content} label="Copy" />
+            {isLastAssistant && !isGenerating && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="inline-flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md px-1.5 py-1 hover:bg-muted"
+                title="Regenerate response"
+              >
+                <RefreshCw className="h-3 w-3" />
+                <span>Regenerate</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 11. REACT COMPONENT
+// ============================================================================
 
 export default function AiAssistantPage() {
   // --- Engine & State ---
@@ -936,6 +1418,7 @@ export default function AiAssistantPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [contextLogs, setContextLogs] = useState<LogEntry[]>([]);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
+  const [liveTrace, setLiveTrace] = useState<AgentTrace | null>(null);
 
   const engineRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -943,16 +1426,25 @@ export default function AiAssistantPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isGenerating, contextLogs]);
+  }, [messages, isGenerating, contextLogs, liveTrace]);
 
   useEffect(() => {
     loadChat(chatId).then(msgs => {
       // Defensive: only accept clean user/assistant text from disk. Older
       // builds persisted tool / assistant-with-tool_calls messages; strip them.
+      // We accept the optional `trace` field (UI-only metadata) so users can
+      // re-open past investigations.
       const cleaned = (Array.isArray(msgs) ? msgs : [])
         .filter((m: any) =>
           m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string"
-        ) as ChatMessage[];
+        )
+        .map((m: any) => {
+          const out: ChatMessage = { role: m.role, content: m.content };
+          if (m.role === "assistant" && m.trace && typeof m.trace === "object") {
+            out.trace = m.trace as AgentTrace;
+          }
+          return out;
+        });
       if (cleaned.length > 0) setMessages(cleaned);
     });
   }, [chatId]);
@@ -1065,11 +1557,12 @@ export default function AiAssistantPage() {
     }
   }, []);
 
-  // --- Agentic Send ---
-  const handleSendMessage = async () => {
-    const trimmed = input.trim();
-    if (!trimmed || isGenerating) return;
-
+  /**
+   * Core turn runner. Drives runAgent with React-state-aware callbacks,
+   * captures a structured trace, and reconciles streaming UI state.
+   * Used by both the user send flow and the regenerate flow.
+   */
+  const runTurn = useCallback(async (userText: string, history: ChatMessage[]) => {
     if (provider === "webllm" && !engineRef.current) {
       toast.error("Local engine is not ready.");
       return;
@@ -1079,25 +1572,36 @@ export default function AiAssistantPage() {
       return;
     }
 
-    const userMessage: ChatMessage = { role: "user", content: trimmed };
-    const historyBeforeTurn = messages;
-    setMessages(prev => [...prev, userMessage]);
-    setInput("");
     setIsGenerating(true);
     setAgentStatus({ phase: "thinking", detail: "Analyzing your request…" });
 
     const abort = new AbortController();
     abortRef.current = abort;
 
-    // Live-streaming assistant message: index inside `messages` is captured
-    // when streaming begins. We use a closure variable rather than chasing
-    // state because React batches setMessages and we need stable identity.
+    const trace: AgentTrace = {
+      startedAt: Date.now(),
+      iterations: 0,
+      toolCallCount: 0,
+      steps: [],
+      provider,
+      modelHint: provider === "webllm" ? selectedModel : "gpt-4o",
+    };
+    setLiveTrace(trace);
+
+    const toolStartTimes = new WeakMap<ParsedToolCall, number>();
     let assistantIndex: number | null = null;
     let streamingContent = "";
     let thinkingTail = "";
 
+    const pushStep = (step: AgentStep) => {
+      trace.steps.push(step);
+      // Trigger React re-render for the live timeline by replacing the ref.
+      setLiveTrace({ ...trace, steps: [...trace.steps] });
+    };
+
     const callbacks: AgentCallbacks = {
       onIterationStart: (iteration) => {
+        trace.iterations = Math.max(trace.iterations, iteration);
         setAgentStatus({ phase: "thinking", detail: `Reasoning (step ${iteration})…` });
         thinkingTail = "";
       },
@@ -1110,7 +1614,6 @@ export default function AiAssistantPage() {
       },
       onThinkingDelta: (text) => {
         thinkingTail = (thinkingTail + text).slice(-220);
-        // Surface live thinking in the status bubble.
         setAgentStatus(prev => ({
           phase: prev?.phase === "responding" ? prev.phase : "thinking",
           detail: thinkingTail.trim(),
@@ -1119,6 +1622,7 @@ export default function AiAssistantPage() {
       },
       onThinkingEnd: (full, iteration) => {
         if (full) {
+          pushStep({ iteration, type: "thinking", ts: Date.now(), content: full });
           setContextLogs(prev => [...prev, {
             time: new Date(),
             type: "thinking",
@@ -1129,15 +1633,47 @@ export default function AiAssistantPage() {
         thinkingTail = "";
       },
       onToolCallsStart: (calls) => {
+        trace.toolCallCount += calls.length;
         setAgentStatus({
           phase: "calling_tools",
           detail: `Calling ${calls.length} tool${calls.length > 1 ? "s" : ""}: ${calls.map(c => c.name).join(", ")}`,
           tools: calls.map(c => c.name),
         });
       },
-      onToolStart: () => { /* per-call logging happens in callToolForAgent */ },
-      onToolResult: () => { /* logged in wrapper */ },
-      onToolError: () => { /* logged in wrapper */ },
+      onToolStart: (call) => {
+        toolStartTimes.set(call, performance.now());
+        pushStep({
+          iteration: trace.iterations,
+          type: "tool_call",
+          ts: Date.now(),
+          toolName: call.name,
+          args: call.arguments,
+        });
+      },
+      onToolResult: (call, data) => {
+        const start = toolStartTimes.get(call) ?? performance.now();
+        const durationMs = performance.now() - start;
+        pushStep({
+          iteration: trace.iterations,
+          type: "tool_result",
+          ts: Date.now(),
+          toolName: call.name,
+          data,
+          durationMs,
+        });
+      },
+      onToolError: (call, error) => {
+        const start = toolStartTimes.get(call) ?? performance.now();
+        const durationMs = performance.now() - start;
+        pushStep({
+          iteration: trace.iterations,
+          type: "tool_error",
+          ts: Date.now(),
+          toolName: call.name,
+          error,
+          durationMs,
+        });
+      },
       onAnswerStart: () => {
         setAgentStatus({ phase: "responding", detail: "Streaming response…" });
         setMessages(prev => {
@@ -1163,8 +1699,8 @@ export default function AiAssistantPage() {
         provider,
         engine: engineRef.current,
         apiKey: provider === "byok" ? byokKey : undefined,
-        history: historyBeforeTurn,
-        userInput: trimmed,
+        history,
+        userInput: userText,
         tools: AI_TOOLS,
         callTool: (name, args) => callToolForAgent(name, args),
         signal: abort.signal,
@@ -1172,19 +1708,17 @@ export default function AiAssistantPage() {
         maxIterations: 8,
       });
 
-      // Reconcile final state: if streaming UI never started (e.g. fallback
-      // path), append the final answer now. Otherwise normalize the streamed
-      // bubble to the canonical final answer (covers cases where post-end
-      // whitespace differs).
+      trace.endedAt = Date.now();
+
       setMessages(prev => {
         let next: ChatMessage[];
+        const finalMsg: ChatMessage = { role: "assistant", content: finalAnswer, trace };
         if (assistantIndex === null) {
-          next = [...prev, { role: "assistant", content: finalAnswer }];
+          next = [...prev, finalMsg];
         } else {
           next = prev.slice();
-          next[assistantIndex] = { role: "assistant", content: finalAnswer };
+          next[assistantIndex] = finalMsg;
         }
-        // Persist clean state asynchronously.
         saveChat(chatId, next).catch(err =>
           console.warn("[Senzor Intelligence] saveChat failed:", err)
         );
@@ -1192,11 +1726,26 @@ export default function AiAssistantPage() {
       });
     } catch (err: any) {
       if (err?.name === "AbortError") {
+        trace.endedAt = Date.now();
+        // Keep whatever was streamed; attach the partial trace so the user
+        // can still inspect what happened. Drop the bubble only if it never
+        // produced any content.
+        setMessages(prev => {
+          if (assistantIndex === null) return prev;
+          const copy = prev.slice();
+          const current = copy[assistantIndex];
+          if (current && !current.content) {
+            copy.splice(assistantIndex, 1);
+          } else if (current) {
+            copy[assistantIndex] = { ...current, trace };
+          }
+          saveChat(chatId, copy).catch(() => {});
+          return copy;
+        });
         toast.info("Generation cancelled");
       } else {
         console.error("[Senzor Intelligence] runAgent error:", err);
         toast.error("Generation failed: " + (err?.message || "Unknown error"));
-        // Don't leave a dangling empty assistant bubble in the chat.
         setMessages(prev => {
           if (assistantIndex === null) return prev;
           const copy = prev.slice();
@@ -1209,8 +1758,52 @@ export default function AiAssistantPage() {
     } finally {
       setIsGenerating(false);
       setAgentStatus(null);
+      setLiveTrace(null);
       abortRef.current = null;
     }
+  }, [provider, byokKey, selectedModel, chatId, callToolForAgent]);
+
+  // --- Agentic Send ---
+  const handleSendMessage = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isGenerating) return;
+
+    const userMessage: ChatMessage = { role: "user", content: trimmed };
+    const historyBeforeTurn = messages;
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    await runTurn(trimmed, historyBeforeTurn);
+  };
+
+  /** Submit a suggested prompt from the empty state. */
+  const handleSuggestedPrompt = (prompt: string) => {
+    if (isGenerating) return;
+    const userMessage: ChatMessage = { role: "user", content: prompt };
+    const historyBeforeTurn = messages;
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    runTurn(prompt, historyBeforeTurn);
+  };
+
+  /** Re-run the most recent user message, replacing the last assistant turn. */
+  const handleRegenerate = async () => {
+    if (isGenerating) return;
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx < 0) return;
+    const lastUserText = messages[lastUserIdx].content;
+    // Drop everything after (and including) the assistant turn(s) that follow.
+    const truncated = messages.slice(0, lastUserIdx + 1);
+    const historyBeforeTurn = messages.slice(0, lastUserIdx);
+    setMessages(truncated);
+    await runTurn(lastUserText, historyBeforeTurn);
+  };
+
+  /** Abort an in-flight generation. */
+  const handleStop = () => {
+    abortRef.current?.abort();
   };
 
   // --- History Management ---
@@ -1266,9 +1859,14 @@ export default function AiAssistantPage() {
           <Card className="max-w-2xl w-full border-border/60 shadow-xl bg-card rounded-xl overflow-hidden">
             
             <div className="p-6 border-b border-border/40">
-              <h1 className="text-xl font-bold text-foreground mb-1">Operational Intelligence</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <h1 className="text-xl font-bold text-foreground">Senzor Intelligence</h1>
+              </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Configure your execution engine. Process telemetry natively in your browser for absolute privacy, or use a cloud API for performance.
+                Configure your execution engine. Process telemetry natively in your browser for absolute privacy, or use a cloud API for higher throughput.
               </p>
             </div>
 
@@ -1422,33 +2020,76 @@ export default function AiAssistantPage() {
   // Filter messages for the main UI so we don't display raw tool payloads in the chat bubbles
   const displayMessages = messages.filter(m => m.role === "user" || m.role === "assistant");
 
+  let lastAssistantIdx = -1;
+  for (let i = displayMessages.length - 1; i >= 0; i--) {
+    if (displayMessages[i].role === "assistant") { lastAssistantIdx = i; break; }
+  }
+
+  const activeModelLabel = provider === "webllm"
+    ? (LOCAL_MODELS.find(m => m.id === selectedModel)?.name?.split(" - ")[0] ?? "Local Model")
+    : "GPT-4o (Cloud)";
+
   return (
     <DashboardLayout>
       <div className="flex h-full flex-col overflow-hidden bg-background">
         
         {/* Header */}
         <header className="h-14 border-b border-border/40 bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 shrink-0 z-10">
-          <div className="flex items-center gap-3">
-            <Bot className="h-5 w-5 text-primary" />
-            <h1 className="text-sm font-bold text-foreground">Operational Intelligence</h1>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative shrink-0 w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span
+                className={cn(
+                  "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-card",
+                  isGenerating ? "bg-amber-500 animate-pulse" : "bg-emerald-500",
+                )}
+              />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold text-foreground leading-tight">Senzor Intelligence</h1>
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
+                <span className={cn("inline-flex items-center gap-1 font-mono uppercase tracking-wider font-semibold", isGenerating ? "text-amber-500" : "text-emerald-500")}>
+                  {isGenerating ? "Working" : "Ready"}
+                </span>
+                <span className="opacity-50">·</span>
+                <span className="font-mono truncate max-w-[180px]" title={activeModelLabel}>{activeModelLabel}</span>
+              </div>
+            </div>
           </div>
           
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[10px] text-muted-foreground mr-3 hidden md:block border-r border-border/60 pr-3 uppercase font-bold tracking-wider">
-              {provider}
-            </span>
-            <Button variant="ghost" size="sm" onClick={() => setIsInspectorOpen(!isInspectorOpen)} className="h-8 text-xs font-medium text-blue-500 hover:text-blue-600 hover:bg-blue-500/10">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isGenerating && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStop}
+                className="h-8 text-xs font-medium border-rose-500/30 text-rose-500 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/50"
+              >
+                <Square className="h-3 w-3 mr-1.5 fill-current" /> Stop
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsInspectorOpen(!isInspectorOpen)}
+              className={cn("h-8 text-xs font-medium hidden sm:inline-flex", isInspectorOpen ? "text-blue-500 bg-blue-500/10 hover:bg-blue-500/15 hover:text-blue-500" : "text-muted-foreground hover:text-foreground")}
+            >
               {isInspectorOpen ? <PanelRightClose className="h-3.5 w-3.5 mr-1.5"/> : <PanelRightOpen className="h-3.5 w-3.5 mr-1.5"/>}
-              Context
+              Inspector
             </Button>
-            <div className="w-px h-4 bg-border mx-1" />
-            <Button variant="ghost" size="sm" onClick={handleExport} className="h-8 text-xs font-medium"><Download className="h-3.5 w-3.5 mr-1.5"/> Export</Button>
+            <div className="w-px h-4 bg-border mx-0.5 hidden sm:block" />
+            <Button variant="ghost" size="icon" onClick={handleExport} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Export chat">
+              <Download className="h-3.5 w-3.5"/>
+            </Button>
             <div className="relative">
               <input type="file" id="import-chat" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".json" onChange={handleImport} />
-              <Button variant="ghost" size="sm" className="h-8 text-xs font-medium pointer-events-none"><Upload className="h-3.5 w-3.5 mr-1.5"/> Import</Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground pointer-events-none" title="Import chat">
+                <Upload className="h-3.5 w-3.5"/>
+              </Button>
             </div>
-            <div className="w-px h-4 bg-border mx-1" />
-            <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8 text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4"/></Button>
+            <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Clear conversation">
+              <Trash2 className="h-3.5 w-3.5"/>
+            </Button>
           </div>
         </header>
 
@@ -1456,118 +2097,107 @@ export default function AiAssistantPage() {
         <div className="flex-1 flex flex-row min-h-0 overflow-hidden relative w-full">
           
           {/* Left Pane: Chat Interface */}
-          <div className="flex-1 overflow-y-auto flex flex-col h-full bg-background relative z-0">
+          <div className="flex-1 flex flex-col h-full bg-background relative z-0 min-w-0">
             
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth">
-              {displayMessages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-                  <Bot className="h-12 w-12 mb-4 text-muted-foreground" />
-                  <h2 className="text-base font-bold text-foreground">How can I help you investigate?</h2>
-                  <p className="text-xs text-muted-foreground mt-2 max-w-sm leading-relaxed">
-                    I can analyze system logs, aggregate metrics, and execute Root Cause Analysis securely.
-                  </p>
-                </div>
-              ) : (
-                displayMessages.map((msg, idx) => (
-                  <div key={idx} className={cn("flex items-start gap-4", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
-                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm", msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border border-border")}>
-                      {msg.role === "user" ? <span className="text-xs font-bold">You</span> : <Bot className="h-4 w-4 text-primary" />}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth">
+              <div className="max-w-3xl mx-auto space-y-6">
+                {displayMessages.length === 0 && !isGenerating ? (
+                  <EmptyState onSelect={handleSuggestedPrompt} disabled={isGenerating} />
+                ) : (
+                  displayMessages.map((msg, idx) => (
+                    <MessageBubble
+                      key={idx}
+                      msg={msg}
+                      isLastAssistant={idx === lastAssistantIdx}
+                      isGenerating={isGenerating}
+                      onRegenerate={handleRegenerate}
+                    />
+                  ))
+                )}
+                {isGenerating && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 shadow-sm">
+                      <Bot className="h-4 w-4 text-primary animate-pulse" />
                     </div>
-                    <div className={cn("max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm", msg.role === "user" ? "bg-primary/10 text-foreground rounded-tr-sm" : "bg-card border border-border/60 text-foreground rounded-tl-sm whitespace-pre-wrap")}>
-                      {msg.content}
+                    <div className="flex-1 min-w-0 max-w-[92%]">
+                      <LiveAgentTimeline status={agentStatus} trace={liveTrace} />
                     </div>
                   </div>
-                ))
-              )}
-              {isGenerating && (
-                <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 shadow-sm">
-                    <Bot className="h-4 w-4 text-primary animate-pulse" />
-                  </div>
-                  <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm px-5 py-4 text-sm w-fit shadow-sm space-y-2">
-                    <div className="flex items-center gap-3">
-                      <div className="flex space-x-1.5 items-center justify-center h-2">
-                        <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '-0.3s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '-0.15s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce"></div>
-                      </div>
-                      {agentStatus?.detail && (
-                        <span className="text-xs text-muted-foreground font-medium">{agentStatus.detail}</span>
-                      )}
-                    </div>
-                    {agentStatus?.tools && agentStatus.tools.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {agentStatus.tools.map((tool, i) => (
-                          <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{tool}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
+                )}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
 
-            <div className="p-4 bg-background border-t border-border/40 shrink-0 relative z-10">
-              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative max-w-4xl mx-auto flex items-end gap-2">
-                <textarea
-                  className="w-full bg-card border border-border/60 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 shadow-sm resize-none pr-12 min-h-[52px] max-h-40 no-scrollbar"
-                  placeholder="Ask about logs, an APM service, or paste an error stack..."
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
-                  }}
-                  rows={1}
-                />
-                <Button type="submit" disabled={!input.trim() || isGenerating} size="icon" className="absolute right-2 bottom-2 h-9 w-9 rounded-lg shadow-sm">
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+            <div className="px-4 pb-4 pt-2 bg-background border-t border-border/40 shrink-0 relative z-10">
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                className="relative max-w-3xl mx-auto"
+              >
+                <div className={cn(
+                  "relative bg-card border border-border/60 rounded-2xl shadow-sm transition-all",
+                  "focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15",
+                  isGenerating && "opacity-90",
+                )}>
+                  <textarea
+                    className="w-full bg-transparent rounded-2xl px-4 py-3.5 text-sm focus:outline-none resize-none pr-14 min-h-[52px] max-h-40 no-scrollbar placeholder:text-muted-foreground"
+                    placeholder={isGenerating ? "Generating response — press Stop to cancel…" : "Ask about errors, performance, infrastructure, or billing…"}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
+                    }}
+                    rows={1}
+                    disabled={isGenerating}
+                  />
+                  {isGenerating ? (
+                    <Button
+                      type="button"
+                      onClick={handleStop}
+                      size="icon"
+                      variant="destructive"
+                      className="absolute right-2 bottom-2 h-9 w-9 rounded-xl shadow-sm"
+                      title="Stop generating"
+                    >
+                      <Square className="h-3.5 w-3.5 fill-current" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={!input.trim()}
+                      size="icon"
+                      className="absolute right-2 bottom-2 h-9 w-9 rounded-xl shadow-sm"
+                      title="Send message"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-2 px-1">
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                    <Lock className="h-2.5 w-2.5 text-emerald-500" />
+                    {provider === "webllm" ? "Runs locally on your device" : "Routed via your OpenAI key"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground hidden sm:flex items-center gap-2">
+                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">Enter</kbd>
+                    <span>to send</span>
+                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">Shift</kbd>
+                    <span>+</span>
+                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">Enter</kbd>
+                    <span>for newline</span>
+                  </span>
+                </div>
               </form>
-              <div className="text-center mt-3">
-                <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Data stays strictly on your device</span>
-              </div>
             </div>
           </div>
 
           {/* Right Pane: Context Inspector (Elastic) */}
-          <div className={cn("flex flex-col h-full bg-muted/5 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] border-l border-border/40 shrink-0", isInspectorOpen ? "w-full md:w-[400px] lg:w-[450px] opacity-100" : "w-0 opacity-0 border-none")}>
-            <div className="w-full md:w-[400px] lg:w-[450px] h-full flex flex-col">
-              <div className="p-4 border-b border-border/40 bg-background/50 flex items-center justify-between shrink-0 whitespace-nowrap">
-                <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
-                  <Code2 className="h-4 w-4 text-blue-500" /> Context Inspector
-                </h3>
-                <Button variant="ghost" size="icon" className="h-6 w-6 md:hidden" onClick={() => setIsInspectorOpen(false)}>
-                  <X className="h-4 w-4"/>
-                </Button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {contextLogs.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center opacity-40 whitespace-normal px-4">
-                    <Database className="h-10 w-10 mb-3 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Network API calls and payloads will stream here for auditability.</p>
-                  </div>
-                ) : (
-                  contextLogs.map((log, i) => (
-                    <div key={i} className="bg-[#0d1117] border border-border/60 rounded-lg overflow-hidden shadow-sm">
-                      <div className={cn("px-3 py-2 text-xs font-bold font-mono border-b flex items-center justify-between", log.type === "tool_call" ? "bg-blue-500/10 text-[#79c0ff] border-blue-500/20" : log.type === "tool_error" ? "bg-destructive/10 text-[#ff7b72] border-destructive/20" : log.type === "thinking" ? "bg-violet-500/10 text-[#c4a8ff] border-violet-500/20" : "bg-emerald-500/10 text-[#3fb950] border-emerald-500/20")}>
-                        <span className="whitespace-nowrap truncate mr-2">{log.type === "tool_call" ? `> CALL ${log.name}` : log.type === "thinking" ? `~ THOUGHT ${log.name}` : `< RESULT ${log.name}`}</span>
-                        <span className="text-[9px] opacity-70 text-gray-400 whitespace-nowrap">{log.time.toLocaleTimeString()}</span>
-                      </div>
-                      <div className="p-3 overflow-x-auto max-h-48 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                        {log.type === "thinking" ? (
-                          <pre className="text-[10px] font-mono text-[#e6edf3] whitespace-pre-wrap">{log.content}</pre>
-                        ) : (
-                          <pre className="text-[10px] font-mono text-[#e6edf3]">
-                            {JSON.stringify(log.type === "tool_call" ? log.args : log.type === "tool_error" ? log.error : log.data, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+          <div className={cn("flex flex-col h-full bg-muted/10 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] border-l border-border/40 shrink-0", isInspectorOpen ? "w-full md:w-[420px] lg:w-[460px] opacity-100" : "w-0 opacity-0 border-none")}>
+            <div className="w-full md:w-[420px] lg:w-[460px] h-full flex flex-col">
+              <ContextInspector
+                logs={contextLogs}
+                onClose={() => setIsInspectorOpen(false)}
+                onClear={() => setContextLogs([])}
+              />
             </div>
           </div>
           
@@ -1576,3 +2206,203 @@ export default function AiAssistantPage() {
     </DashboardLayout>
   );
 }
+
+// ============================================================================
+// 12. EMPTY STATE & CONTEXT INSPECTOR
+// ============================================================================
+
+const EmptyState: React.FC<{
+  onSelect: (prompt: string) => void;
+  disabled?: boolean;
+}> = ({ onSelect, disabled }) => (
+  <div className="h-full flex flex-col items-center justify-center py-10 px-2">
+    <div className="relative w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
+      <Sparkles className="h-7 w-7 text-primary" />
+      <span className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-background" />
+    </div>
+    <h2 className="text-lg font-bold text-foreground tracking-tight">How can I help you investigate?</h2>
+    <p className="text-sm text-muted-foreground mt-1.5 max-w-md text-center leading-relaxed">
+      I can analyze logs, traces, errors, infrastructure, and billing across your Senzor workspace. Ask anything — I'll plan the steps, call the right tools, and summarize the findings.
+    </p>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
+      {SUGGESTED_PROMPTS.map((category) => {
+        const Icon = category.icon;
+        return (
+          <div
+            key={category.category}
+            className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:border-border transition-colors"
+          >
+            <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 bg-muted/20">
+              <div className={cn("w-5 h-5 rounded-md border flex items-center justify-center shrink-0", category.accent)}>
+                <Icon className="h-3 w-3" />
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-foreground">{category.category}</span>
+            </div>
+            <div className="p-1">
+              {category.prompts.map((p, i) => (
+                <button
+                  type="button"
+                  key={i}
+                  disabled={disabled}
+                  onClick={() => onSelect(p)}
+                  className="group/p w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted/40 transition-colors flex items-start gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <ArrowRight className="h-3 w-3 text-muted-foreground mt-1 shrink-0 group-hover/p:text-primary group-hover/p:translate-x-0.5 transition-all" />
+                  <span className="text-xs text-muted-foreground group-hover/p:text-foreground leading-relaxed">{p}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+const ContextInspector: React.FC<{
+  logs: LogEntry[];
+  onClose: () => void;
+  onClear: () => void;
+}> = ({ logs, onClose, onClear }) => {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    if (!query.trim()) return logs;
+    const q = query.toLowerCase();
+    return logs.filter((l) => {
+      if (l.name.toLowerCase().includes(q)) return true;
+      if (l.type === "thinking") return l.content.toLowerCase().includes(q);
+      if (l.type === "tool_error") return l.error.toLowerCase().includes(q);
+      try {
+        const payload = l.type === "tool_call" ? l.args : (l as any).data;
+        return JSON.stringify(payload).toLowerCase().includes(q);
+      } catch {
+        return false;
+      }
+    });
+  }, [logs, query]);
+
+  const counts = useMemo(() => ({
+    calls: logs.filter(l => l.type === "tool_call").length,
+    results: logs.filter(l => l.type === "tool_result").length,
+    errors: logs.filter(l => l.type === "tool_error").length,
+    thoughts: logs.filter(l => l.type === "thinking").length,
+  }), [logs]);
+
+  return (
+    <>
+      <div className="px-4 py-3 border-b border-border/40 bg-background/60 shrink-0 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
+            <Code2 className="h-4 w-4 text-blue-500" /> Inspector
+          </h3>
+          <div className="flex items-center gap-1">
+            {logs.length > 0 && (
+              <button
+                type="button"
+                onClick={onClear}
+                className="text-[10px] font-medium text-muted-foreground hover:text-destructive transition-colors px-2 py-0.5 rounded hover:bg-muted"
+                title="Clear inspector logs"
+              >
+                Clear
+              </button>
+            )}
+            <Button variant="ghost" size="icon" className="h-6 w-6 md:hidden" onClick={onClose}>
+              <X className="h-4 w-4"/>
+            </Button>
+          </div>
+        </div>
+        {logs.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                <Wrench className="h-2.5 w-2.5" />
+                {counts.calls} calls
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                {counts.results} results
+              </span>
+              {counts.errors > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                  <AlertCircle className="h-2.5 w-2.5" />
+                  {counts.errors} errors
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500 border border-violet-500/20">
+                <Brain className="h-2.5 w-2.5" />
+                {counts.thoughts} thoughts
+              </span>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Filter by tool name, payload, or message…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="h-8 text-xs pl-7"
+              />
+            </div>
+          </>
+        )}
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {filtered.length === 0 ? (
+          logs.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-4 py-10 text-muted-foreground/60">
+              <div className="w-12 h-12 rounded-xl bg-muted/40 border border-border/50 flex items-center justify-center mb-3">
+                <Database className="h-5 w-5" />
+              </div>
+              <p className="text-xs leading-relaxed max-w-[240px]">Tool calls, results, and reasoning will stream here for full auditability.</p>
+            </div>
+          ) : (
+            <div className="text-xs text-center text-muted-foreground py-8">No entries match "{query}".</div>
+          )
+        ) : (
+          filtered.map((log, i) => <ContextInspectorRow key={i} log={log} />)
+        )}
+      </div>
+    </>
+  );
+};
+
+const ContextInspectorRow: React.FC<{ log: LogEntry }> = ({ log }) => {
+  const meta = (() => {
+    if (log.type === "tool_call") return { Icon: Wrench, label: "Call", chip: "bg-blue-500/10 text-blue-400 border-blue-500/20" };
+    if (log.type === "tool_result") return { Icon: CheckCircle2, label: "Result", chip: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
+    if (log.type === "tool_error") return { Icon: AlertCircle, label: "Error", chip: "bg-rose-500/10 text-rose-400 border-rose-500/20" };
+    return { Icon: Brain, label: "Thought", chip: "bg-violet-500/10 text-violet-400 border-violet-500/20" };
+  })();
+  const { Icon } = meta;
+
+  const payload = log.type === "thinking"
+    ? log.content
+    : JSON.stringify(
+        log.type === "tool_call" ? log.args : log.type === "tool_error" ? log.error : log.data,
+        null,
+        2,
+      );
+
+  return (
+    <div className="bg-[#0d1117] border border-border/60 rounded-lg overflow-hidden shadow-sm group">
+      <div className={cn("px-3 py-2 text-[11px] font-bold font-mono border-b flex items-center justify-between gap-2", meta.chip)}>
+        <span className="flex items-center gap-2 min-w-0">
+          <Icon className="h-3 w-3 shrink-0" />
+          <span className="uppercase tracking-wider opacity-90 shrink-0">{meta.label}</span>
+          <span className="truncate text-slate-200/80 normal-case">{log.name}</span>
+        </span>
+        <span className="flex items-center gap-1 shrink-0">
+          <span className="text-[9px] text-slate-500 whitespace-nowrap font-normal">
+            <Clock className="h-2.5 w-2.5 inline mr-0.5" />
+            {log.time.toLocaleTimeString()}
+          </span>
+          <CopyButton value={payload} className="text-slate-400 hover:text-slate-100 hover:bg-white/10 opacity-0 group-hover:opacity-100" />
+        </span>
+      </div>
+      <div className="p-3 overflow-x-auto max-h-56">
+        <pre className="text-[10px] font-mono text-[#e6edf3] whitespace-pre-wrap break-all">{payload}</pre>
+      </div>
+    </div>
+  );
+};
