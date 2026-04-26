@@ -639,11 +639,9 @@ export default function AiAssistantPage() {
               const choice = reply.choices[0];
               const assistantMsg = choice.message;
 
-              // Push assistant message to both agent context and persistable context
+              // Push assistant message to agent context only. We do not push to
+              // currentChatContext to prevent empty chat bubbles rendering in the UI.
               agentMessages.push(assistantMsg);
-              if (assistantMsg.tool_calls?.length) {
-                currentChatContext.push(assistantMsg);
-              }
 
               // If model produced a text response (no tool calls), we're done
               if (choice.finish_reason !== "tool_calls" || !assistantMsg.tool_calls?.length) {
@@ -709,13 +707,16 @@ export default function AiAssistantPage() {
                   contentStr = contentStr.substring(0, MAX_TOOL_OUTPUT_LENGTH) + '\n\n... [TRUNCATED DUE TO LENGTH]';
                 }
 
+                // Hermes-2-Pro expects tool results wrapped in specific XML tags with the name.
+                // WebLLM's internal formatter omits this, causing the model to lose context and fail.
+                const hermesFormattedResult = `<tool_response>\n${JSON.stringify({ name: toolCalls[i].function.name, content: contentStr })}\n</tool_response>`;
+
                 const toolMsg = {
                   role: "tool" as const,
                   tool_call_id: settled.status === "fulfilled" ? settled.value.toolCallId : toolCalls[i].id,
-                  content: contentStr
+                  content: hermesFormattedResult
                 };
                 agentMessages.push(toolMsg);
-                currentChatContext.push(toolMsg);
               }
 
               setAgentStatus({ phase: "analyzing", detail: `Processing results (step ${iteration}/${MAX_ITERATIONS})...` });
