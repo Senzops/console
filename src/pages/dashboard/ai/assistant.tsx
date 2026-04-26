@@ -226,6 +226,17 @@ Instructions:
 - Be thorough but concise`
 };
 
+/**
+ * WebLLM Hermes models inject their own system prompt for tool-calling format
+ * adherence and throw CustomSystemPromptError if a custom system message is
+ * provided alongside tools. This user-role preamble is the standard workaround:
+ * it provides domain context without conflicting with the internal system prompt.
+ */
+const WEBLLM_TOOL_CONTEXT = {
+  role: "user" as const,
+  content: `[CONTEXT] You are Senzor Operational Intelligence, an enterprise SRE assistant. When tools are available, use them to fetch real telemetry data before answering. Summarize data into concise, actionable insights. Never fabricate metrics. If data appears anomalous, explain potential root causes. Correlate signals across APM, logs, errors, and infrastructure when relevant. [/CONTEXT]`
+};
+
 /** Keyword-based intent classifier — instant, deterministic, no model call needed */
 const classifyIntentByKeywords = (message: string): string[] => {
   const lower = message.toLowerCase();
@@ -516,7 +527,9 @@ export default function AiAssistantPage() {
             tools: toolSubset.map((t: any) => t.function.name)
           });
 
-          const agentMessages: any[] = [AGENT_SYSTEM_PROMPT, ...currentChatContext];
+          // Hermes models forbid custom system prompts when tools are active;
+          // inject domain context as a user-role preamble instead
+          const agentMessages: any[] = [WEBLLM_TOOL_CONTEXT, ...currentChatContext];
           const MAX_ITERATIONS = 5;
           let iteration = 0;
           let loopCompleted = false;
