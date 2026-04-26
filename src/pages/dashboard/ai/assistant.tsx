@@ -1,14 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import { api, useAuth } from "../../../lib/auth";
-import { useTheme } from "../../../lib/theme";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { api } from "../../../lib/auth";
 import { DashboardLayout } from "../../../components/Layout";
 import {
   Card,
   Button,
   Spinner,
-  Badge,
   Select,
   Input,
   cn,
@@ -32,7 +28,7 @@ import {
 import { toast } from "sonner";
 
 // ============================================================================
-// 1. NATIVE INDEXED-DB STORAGE
+// 1. NATIVE INDEXED-DB STORAGE (clean: only user/assistant text persists)
 // ============================================================================
 const DB_NAME = "senzor_ai_local";
 const STORE_NAME = "chat_history";
@@ -50,13 +46,13 @@ const initDB = (): Promise<IDBDatabase> => {
   });
 };
 
-const saveChat = async (id: string, messages: any[]) => {
+const saveChat = async (id: string, messages: ChatMessage[]) => {
   const db = await initDB();
   const tx = db.transaction(STORE_NAME, "readwrite");
   tx.objectStore(STORE_NAME).put({ id, messages, updatedAt: Date.now() });
 };
 
-const loadChat = async (id: string): Promise<any[]> => {
+const loadChat = async (id: string): Promise<ChatMessage[]> => {
   const db = await initDB();
   return new Promise((resolve) => {
     const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(id);
@@ -70,7 +66,7 @@ const clearChat = async (id: string) => {
 };
 
 // ============================================================================
-// 2. MODELS & ENTERPRISE TOOLS (Strictly Function-Calling Supported Models)
+// 2. MODELS
 // ============================================================================
 const LOCAL_MODELS = [
   { id: "Hermes-3-Llama-3.1-8B-q4f32_1-MLC", name: "Hermes 3 (8B) - High Quality", vramReq: 8 },
@@ -78,7 +74,23 @@ const LOCAL_MODELS = [
   { id: "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC", name: "Hermes 2 Pro (7B) - Fast Spec", vramReq: 4 },
 ];
 
-const AI_TOOLS: any = [
+// ============================================================================
+// 3. TOOL DEFINITIONS (used to build the agent system prompt)
+// ============================================================================
+type ToolSchema = {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, { type: string; description?: string }>;
+      required?: string[];
+    };
+  };
+};
+
+const AI_TOOLS: ToolSchema[] = [
   // --- APM Tools ---
   { type: "function", function: { name: "apm_list_services", description: "List all active APM (Backend) services and their IDs.", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "apm_get_stats", description: "Get performance aggregations (latency, RPS) for an APM service.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
@@ -140,228 +152,794 @@ const AI_TOOLS: any = [
   { type: "function", function: { name: "billing_get_subscription", description: "Get the user's current active subscription details, tier, and status.", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "billing_get_transactions", description: "Get the user's billing transaction and payment history.", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "billing_get_transaction_receipt", description: "Get the downloadable receipt details or link for a specific billing transaction.", parameters: { type: "object", properties: { transactionId: { type: "string" } }, required: ["transactionId"] } } },
-  { type: "function", function: { name: "billing_get_active_plans", description: "List all currently available public pricing tiers and platform plans.", parameters: { type: "object", properties: {} } } }
+  { type: "function", function: { name: "billing_get_active_plans", description: "List all currently available public pricing tiers and platform plans.", parameters: { type: "object", properties: {} } } },
 ];
 
 // ============================================================================
-// 3. TOOL CATEGORY ROUTING & AGENTIC ORCHESTRATION
+// 4. AGENT PROTOCOL — ReAct-style XML tags, parsed incrementally from a stream
 // ============================================================================
+//
+// Why we don't use WebLLM's native function-calling:
+//   * Hermes function-calling in WebLLM has known bugs (content:null on tool_calls
+//     round-trip, ContentTypeError on history replay, custom system prompt rejection).
+//   * Forcing a keyword pre-classifier defeats the entire point of an agent.
+//   * Streaming + native tool_calls don't compose cleanly today.
+//
+// Instead we use a battle-tested text protocol that the model emits inside its
+// normal chat response. This is exactly how Cursor / Aider / Cline / Continue
+// run local models against tools today. Bypasses every WebLLM/Hermes bug class
+// and gives us free verbose reasoning.
+//
+// Per turn the model MUST emit ONE of:
+//   <thinking>...</thinking><tool_calls>[{name, arguments}, ...]</tool_calls>
+//   <thinking>...</thinking><answer>...markdown...</answer>
+//
+// We feed tool results back as a synthetic user turn wrapping JSON in
+// <observations>...</observations>. Iterate until the model emits <answer>.
+
+const PROTOCOL_TAGS = {
+  THINKING_OPEN: "<thinking>",
+  THINKING_CLOSE: "</thinking>",
+  TOOL_CALLS_OPEN: "<tool_calls>",
+  TOOL_CALLS_CLOSE: "</tool_calls>",
+  ANSWER_OPEN: "<answer>",
+  ANSWER_CLOSE: "</answer>",
+} as const;
+
+interface ParsedToolCall {
+  name: string;
+  arguments: Record<string, any>;
+}
+
+type ParseEvent =
+  | { kind: "thinking_delta"; text: string }
+  | { kind: "thinking_end" }
+  | { kind: "tool_calls"; calls: ParsedToolCall[] }
+  | { kind: "tool_calls_error"; raw: string; error: string }
+  | { kind: "answer_delta"; text: string }
+  | { kind: "answer_end" };
 
 /**
- * Tool categories for intent-based routing. Instead of sending all 37 tools
- * to a small local model (which overwhelms it), we classify the user's intent
- * via keyword matching and only send the relevant 2-6 tools.
+ * Streaming, single-pass parser that emits structured events as token chunks
+ * arrive. Holds back partial-tag tails to avoid emitting half a closing tag
+ * as visible content. Tolerant: free-form text outside tags is silently
+ * discarded (the model occasionally emits leading whitespace or commentary).
  */
-const TOOL_CATEGORIES: Record<string, { description: string; tools: string[] }> = {
-  apm: {
-    description: "Backend APM services, performance, latency, RPS, HTTP traces",
-    tools: ["apm_list_services", "apm_get_stats", "apm_get_invocations", "apm_get_trace_detail"]
-  },
-  rum: {
-    description: "Frontend/RUM web performance, Web Vitals, page views",
-    tools: ["rum_list_services", "rum_get_dashboard", "rum_get_trace_detail"]
-  },
-  tasks: {
-    description: "Background tasks, job execution, cron jobs, task queues",
-    tools: ["task_list_services", "task_get_dashboard", "task_get_entity_detail", "task_get_run_detail"]
-  },
-  logs: {
-    description: "System logs, log search, log queries",
-    tools: ["logs_query", "logs_get_by_id", "logs_get_by_trace"]
-  },
-  errors: {
-    description: "Error tracking, exceptions, error groups",
-    tools: ["error_get_global", "error_get_group_detail", "error_get_trace_errors"]
-  },
-  web_analytics: {
-    description: "Website analytics, pageviews, visitors, referrers",
-    tools: ["web_list_websites", "web_get_stats"]
-  },
-  uptime: {
-    description: "Uptime monitoring, health checks, endpoint status",
-    tools: ["uptime_list_monitors", "uptime_get_stats"]
-  },
-  infrastructure: {
-    description: "VPS servers, CPU, RAM, disk, network, Docker metrics",
-    tools: ["vps_list", "vps_get_stats"]
-  },
-  database: {
-    description: "Database monitoring, MongoDB, Redis, throughput, latency",
-    tools: ["database_list", "database_get_stats"]
-  },
-  alerts: {
-    description: "Alert policies, incidents, alert destinations",
-    tools: ["alerts_list_destinations", "alerts_list_policies", "alerts_get_policy_details"]
-  },
-  dashboards: {
-    description: "Custom dashboards, saved views, widgets",
-    tools: ["views_list_dashboards", "views_get_dashboard", "views_get_widget_data"]
-  },
-  schema: {
-    description: "Telemetry data schema, dynamic field mapping",
-    tools: ["schema_get_dynamic"]
-  },
-  billing: {
-    description: "Billing, subscription, storage, plans, transactions",
-    tools: ["billing_get_storage_stats", "billing_get_subscription", "billing_get_transactions", "billing_get_transaction_receipt", "billing_get_active_plans"]
+class ProtocolParser {
+  private buffer = "";
+  private state: "idle" | "thinking" | "tool_calls" | "answer" = "idle";
+
+  feed(chunk: string): ParseEvent[] {
+    this.buffer += chunk;
+    return this.process();
   }
-};
 
-const AGENT_SYSTEM_PROMPT = {
-  role: "system" as const,
-  content: `You are Senzor Operational Intelligence, an enterprise SRE assistant for infrastructure monitoring and observability.
-
-Capabilities:
-- Analyze system telemetry (APM traces, logs, errors, metrics)
-- Diagnose performance issues and identify root causes
-- Provide actionable remediation recommendations
-- Correlate data across multiple observability signals
-
-Instructions:
-- Use the provided tools to fetch real data before answering
-- Always summarize telemetry into concise, actionable insights
-- If data seems anomalous, explain potential root causes
-- Never fabricate metrics or telemetry data
-- If you need data, call the appropriate tool
-- Be thorough but concise`
-};
-
-/** Domain context string injected into the user message for tool-calling turns
- * (Hermes forbids custom system prompts when tools are active) */
-const WEBLLM_TOOL_CONTEXT = `[CONTEXT] You are Senzor Operational Intelligence, an enterprise SRE assistant. Use the provided tools to fetch real telemetry data before answering. Summarize data into concise, actionable insights. Never fabricate metrics. Correlate signals across APM, logs, errors, and infrastructure when relevant. [/CONTEXT]`;
-
-/**
- * Sanitize persisted chat history for WebLLM Hermes compatibility.
- *
- * Hermes validates the ENTIRE message array:
- *  - No `system` role messages (Hermes injects its own for tool calling)
- *  - No `tool` role messages from prior turns
- *  - No `assistant` messages with `tool_calls` property from prior turns
- *  - Last message must be `user` or `tool` role
- *  - No consecutive same-role messages
- *
- * This strips tool-calling artifacts from history, keeping only clean
- * user/assistant text pairs. Tool messages from the CURRENT agentic loop
- * iteration are added separately after sanitization.
- */
-const sanitizeHistoryForHermes = (
-  messages: any[],
-  opts?: { embedToolContext?: boolean }
-): any[] => {
-  const clean: any[] = [];
-  for (const msg of messages) {
-    // Drop tool results and system prompts from history
-    if (msg.role === "tool" || msg.role === "system") continue;
-    // Strip tool_calls from assistant messages, keep only text content
-    if (msg.role === "assistant") {
-      if (!msg.content) continue; // Skip empty assistant msgs (tool-call-only)
-      clean.push({ role: "assistant", content: msg.content });
-      continue;
+  flush(): ParseEvent[] {
+    const events = this.process();
+    // If we end mid-tag, surface remaining text from streaming sections so the
+    // user sees the tail. Tool-calls JSON without a closer is dropped (would
+    // be invalid JSON anyway).
+    if (this.state === "thinking" && this.buffer.length > 0) {
+      events.push({ kind: "thinking_delta", text: this.buffer });
+      events.push({ kind: "thinking_end" });
+    } else if (this.state === "answer" && this.buffer.length > 0) {
+      events.push({ kind: "answer_delta", text: this.buffer });
+      events.push({ kind: "answer_end" });
     }
-    clean.push(msg);
+    this.buffer = "";
+    this.state = "idle";
+    return events;
   }
 
-  // Collapse consecutive same-role messages (can happen after stripping)
-  const collapsed: any[] = [];
-  for (const msg of clean) {
-    const prev = collapsed[collapsed.length - 1];
-    if (prev && prev.role === msg.role) {
-      prev.content = prev.content + "\n" + msg.content;
+  /** Whatever is currently buffered but not yet emitted. */
+  remainder(): string { return this.buffer; }
+
+  private process(): ParseEvent[] {
+    const events: ParseEvent[] = [];
+    let progressed = true;
+
+    while (progressed) {
+      progressed = false;
+
+      if (this.state === "idle") {
+        const candidates: Array<{ tag: string; next: "thinking" | "tool_calls" | "answer" }> = [
+          { tag: PROTOCOL_TAGS.THINKING_OPEN, next: "thinking" },
+          { tag: PROTOCOL_TAGS.TOOL_CALLS_OPEN, next: "tool_calls" },
+          { tag: PROTOCOL_TAGS.ANSWER_OPEN, next: "answer" },
+        ];
+        let earliest: { tag: string; next: "thinking" | "tool_calls" | "answer"; idx: number } | null = null;
+        for (const c of candidates) {
+          const idx = this.buffer.indexOf(c.tag);
+          if (idx >= 0 && (earliest === null || idx < earliest.idx)) {
+            earliest = { ...c, idx };
+          }
+        }
+        if (earliest) {
+          this.buffer = this.buffer.slice(earliest.idx + earliest.tag.length);
+          this.state = earliest.next;
+          progressed = true;
+        }
+      } else if (this.state === "thinking") {
+        const closeIdx = this.buffer.indexOf(PROTOCOL_TAGS.THINKING_CLOSE);
+        if (closeIdx >= 0) {
+          if (closeIdx > 0) events.push({ kind: "thinking_delta", text: this.buffer.slice(0, closeIdx) });
+          events.push({ kind: "thinking_end" });
+          this.buffer = this.buffer.slice(closeIdx + PROTOCOL_TAGS.THINKING_CLOSE.length);
+          this.state = "idle";
+          progressed = true;
+        } else {
+          const safeLen = Math.max(0, this.buffer.length - PROTOCOL_TAGS.THINKING_CLOSE.length);
+          if (safeLen > 0) {
+            events.push({ kind: "thinking_delta", text: this.buffer.slice(0, safeLen) });
+            this.buffer = this.buffer.slice(safeLen);
+          }
+        }
+      } else if (this.state === "tool_calls") {
+        const closeIdx = this.buffer.indexOf(PROTOCOL_TAGS.TOOL_CALLS_CLOSE);
+        if (closeIdx >= 0) {
+          const raw = this.buffer.slice(0, closeIdx).trim();
+          try {
+            const parsed = JSON.parse(raw);
+            const arr = Array.isArray(parsed) ? parsed : [parsed];
+            const calls: ParsedToolCall[] = arr
+              .filter((c: any) => c && typeof c === "object" && typeof c.name === "string")
+              .map((c: any) => ({
+                name: String(c.name),
+                arguments: (c.arguments && typeof c.arguments === "object") ? c.arguments : {},
+              }));
+            events.push({ kind: "tool_calls", calls });
+          } catch (e: any) {
+            events.push({ kind: "tool_calls_error", raw, error: e?.message ?? "JSON parse error" });
+          }
+          this.buffer = this.buffer.slice(closeIdx + PROTOCOL_TAGS.TOOL_CALLS_CLOSE.length);
+          this.state = "idle";
+          progressed = true;
+        }
+      } else if (this.state === "answer") {
+        const closeIdx = this.buffer.indexOf(PROTOCOL_TAGS.ANSWER_CLOSE);
+        if (closeIdx >= 0) {
+          if (closeIdx > 0) events.push({ kind: "answer_delta", text: this.buffer.slice(0, closeIdx) });
+          events.push({ kind: "answer_end" });
+          this.buffer = this.buffer.slice(closeIdx + PROTOCOL_TAGS.ANSWER_CLOSE.length);
+          this.state = "idle";
+          progressed = true;
+        } else {
+          const safeLen = Math.max(0, this.buffer.length - PROTOCOL_TAGS.ANSWER_CLOSE.length);
+          if (safeLen > 0) {
+            events.push({ kind: "answer_delta", text: this.buffer.slice(0, safeLen) });
+            this.buffer = this.buffer.slice(safeLen);
+          }
+        }
+      }
+    }
+
+    return events;
+  }
+}
+
+// ============================================================================
+// 5. SYSTEM PROMPT BUILDER
+// ============================================================================
+const buildToolListForPrompt = (tools: ToolSchema[]): string => {
+  return tools.map(t => {
+    const fn = t.function;
+    const props = fn.parameters?.properties ?? {};
+    const required = new Set(fn.parameters?.required ?? []);
+    const argParts = Object.entries(props).map(([key, schema]: [string, any]) => {
+      const opt = required.has(key) ? "" : "?";
+      return `${key}${opt}: ${schema.type ?? "any"}`;
+    });
+    const sig = argParts.length ? `(${argParts.join(", ")})` : "()";
+    return `- ${fn.name}${sig} — ${fn.description}`;
+  }).join("\n");
+};
+
+const buildAgentSystemPrompt = (tools: ToolSchema[]): string => {
+  const toolList = buildToolListForPrompt(tools);
+  return `You are Senzor Operational Intelligence — an enterprise SRE assistant for infrastructure monitoring and observability. You analyze APM, RUM, logs, errors, and infrastructure metrics to help the user diagnose issues, understand system behavior, and make data-driven decisions.
+
+You operate as an autonomous agent with access to live telemetry tools. Reason step-by-step, fetch real data with tools, then synthesize a clear answer.
+
+# Tools
+
+${toolList}
+
+# Protocol
+
+You MUST communicate using XML-style tags. Each turn must follow ONE of these patterns exactly. Never mix patterns in a single turn. Never emit text outside the tags.
+
+## Pattern A — gather data with tools
+
+<thinking>
+One short paragraph: what data do you need and which tools will get it? Be specific.
+</thinking>
+<tool_calls>
+[
+  {"name": "tool_name", "arguments": { "key": "value" }}
+]
+</tool_calls>
+
+## Pattern B — provide the final answer
+
+<thinking>
+One short paragraph: what does the gathered data show?
+</thinking>
+<answer>
+Your markdown response to the user. Cite real values from the observations.
+</answer>
+
+# Rules
+
+1. ALWAYS open with a <thinking> block. Keep it 1-3 sentences.
+2. Each turn outputs EXACTLY ONE pattern — either <tool_calls> OR <answer>, never both, never neither.
+3. The <tool_calls> body MUST be a valid JSON array. Multiple tools execute in parallel, so include independent fetches together.
+4. NEVER invent metrics, IDs, or values. Only cite data that appeared in an <observations> block in the conversation.
+5. If a tool returns ok:false or empty data, acknowledge it in your next <thinking> and adapt (try a different tool, or answer with what you have).
+6. If the user's request is conversational (greeting, capability question, clarification), skip <tool_calls> and answer directly with <answer>.
+7. If you cannot make further progress, write a clear <answer> explaining what you found and what is missing.
+8. Format <answer> in clean markdown: headings, bullet lists, tables, fenced code blocks where useful. Keep it scannable.
+9. Be concise. SREs are busy.
+
+# Example
+
+User: "Is my main API healthy?"
+
+<thinking>
+I need the user's APM services and the main one's recent latency plus unresolved errors.
+</thinking>
+<tool_calls>
+[{"name": "apm_list_services", "arguments": {}}]
+</tool_calls>
+
+<observations>
+[1] apm_list_services (ok)
+{"services":[{"id":"svc_42","name":"main-api"}]}
+</observations>
+
+<thinking>
+Found "main-api" (svc_42). Fetching stats and unresolved errors in parallel.
+</thinking>
+<tool_calls>
+[
+  {"name": "apm_get_stats", "arguments": {"id": "svc_42", "range": "24h"}},
+  {"name": "error_get_global", "arguments": {}}
+]
+</tool_calls>
+
+<observations>
+[1] apm_get_stats (ok)
+{"p50":110,"p95":420,"p99":880,"rps":18,"errorRate":0.4}
+[2] error_get_global (ok)
+{"errors":[]}
+</observations>
+
+<thinking>
+Latency healthy (p95 420ms), 18 RPS sustained, error rate < 1%, no unresolved exception groups. The service is healthy.
+</thinking>
+<answer>
+## main-api — Healthy
+
+| Metric | Value |
+|--------|-------|
+| p50 latency | 110ms |
+| p95 latency | 420ms |
+| p99 latency | 880ms |
+| Throughput | 18 RPS |
+| Error rate | 0.4% |
+| Unresolved errors | 0 |
+
+No action needed. The service is operating within normal parameters.
+</answer>`;
+};
+
+// ============================================================================
+// 6. OBSERVATION FORMATTER (context-budget-aware)
+// ============================================================================
+interface ToolExecutionResult {
+  tool: string;
+  args: Record<string, any>;
+  ok: boolean;
+  data?: any;
+  error?: string;
+}
+
+const formatObservations = (
+  results: ToolExecutionResult[],
+  budget: { perTool: number; total: number } = { perTool: 3500, total: 14000 },
+): string => {
+  const safeStringify = (val: any): string => {
+    try { return JSON.stringify(val); } catch { return String(val); }
+  };
+
+  const blocks: string[] = [];
+  let totalLen = 0;
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    let body: string;
+    if (r.ok) {
+      let payload = safeStringify(r.data);
+      if (payload.length > budget.perTool) {
+        payload = payload.slice(0, budget.perTool) + ` …[truncated ${payload.length - budget.perTool} chars]`;
+      }
+      body = payload;
     } else {
-      collapsed.push({ ...msg });
+      body = `ERROR: ${r.error || "Unknown error"}`;
     }
+    const block = `[${i + 1}] ${r.tool} (${r.ok ? "ok" : "fail"})\n${body}`;
+    if (totalLen + block.length > budget.total) {
+      blocks.push(`[${i + 1}+] ${results.length - i} additional results omitted (context budget exceeded)`);
+      break;
+    }
+    blocks.push(block);
+    totalLen += block.length;
+  }
+  return `<observations>\n${blocks.join("\n\n")}\n</observations>`;
+};
+
+// ============================================================================
+// 7. STREAMING COMPLETION ADAPTER (WebLLM + OpenAI BYOK behind one signature)
+// ============================================================================
+type ChatRole = "system" | "user" | "assistant";
+interface ChatMessage { role: ChatRole; content: string; }
+
+interface StreamOpts {
+  provider: "webllm" | "byok";
+  engine: any;
+  apiKey?: string;
+  byokModel?: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  signal: AbortSignal;
+}
+
+async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void, void> {
+  if (opts.provider === "webllm") {
+    if (!opts.engine) throw new Error("WebLLM engine is not initialized.");
+    const stream = (await opts.engine.chat.completions.create({
+      messages: opts.messages,
+      stream: true,
+      temperature: opts.temperature ?? 0.3,
+      max_tokens: opts.maxTokens ?? 2048,
+    })) as AsyncIterable<any>;
+
+    for await (const chunk of stream) {
+      if (opts.signal.aborted) {
+        try { await opts.engine.interruptGenerate?.(); } catch { /* best effort */ }
+        throw new DOMException("Aborted", "AbortError");
+      }
+      const delta = chunk?.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta.length > 0) yield delta;
+    }
+    return;
   }
 
-  // Embed tool context into the last user message if requested
-  if (opts?.embedToolContext && collapsed.length > 0) {
-    const last = collapsed[collapsed.length - 1];
-    if (last.role === "user") {
-      last.content = `${WEBLLM_TOOL_CONTEXT}\n\n${last.content}`;
+  // BYOK: OpenAI streaming via fetch SSE
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    signal: opts.signal,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${opts.apiKey ?? ""}`,
+    },
+    body: JSON.stringify({
+      model: opts.byokModel ?? "gpt-4o",
+      messages: opts.messages,
+      stream: true,
+      temperature: opts.temperature ?? 0.3,
+      max_tokens: opts.maxTokens ?? 2048,
+    }),
+  });
+
+  if (!res.ok || !res.body) {
+    let detail = "";
+    try {
+      const errBody = await res.json();
+      detail = errBody?.error?.message ?? JSON.stringify(errBody);
+    } catch {
+      detail = await res.text().catch(() => "");
     }
+    throw new Error(`OpenAI API error (${res.status}): ${detail || res.statusText}`);
   }
 
-  // Final safety: ensure last message is user or tool (WebLLM requirement)
-  if (collapsed.length > 0) {
-    const last = collapsed[collapsed.length - 1];
-    if (last.role !== "user" && last.role !== "tool") {
-      // Strip trailing non-user/non-tool messages
-      while (collapsed.length > 0) {
-        const tail = collapsed[collapsed.length - 1];
-        if (tail.role === "user" || tail.role === "tool") break;
-        collapsed.pop();
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    if (opts.signal.aborted) {
+      try { await reader.cancel(); } catch { /* noop */ }
+      throw new DOMException("Aborted", "AbortError");
+    }
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // OpenAI SSE: events separated by \n\n, lines start with "data: "
+    let nlIdx;
+    while ((nlIdx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, nlIdx).trim();
+      buffer = buffer.slice(nlIdx + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (!data) continue;
+      if (data === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(data);
+        const delta = parsed?.choices?.[0]?.delta?.content;
+        if (typeof delta === "string" && delta.length > 0) yield delta;
+      } catch {
+        // tolerate malformed event
       }
     }
   }
+}
 
-  return collapsed;
-};
+// ============================================================================
+// 8. AGENT ORCHESTRATOR
+// ============================================================================
+type AgentPhase = "thinking" | "selecting_tools" | "calling_tools" | "analyzing" | "responding" | "idle";
 
-/** Keyword-based intent classifier — instant, deterministic, no model call needed */
-const classifyIntentByKeywords = (message: string): string[] => {
-  const lower = message.toLowerCase();
-  const matched: string[] = [];
+interface AgentCallbacks {
+  onIterationStart: (iteration: number) => void;
+  onPhase: (phase: AgentPhase, detail?: string, tools?: string[]) => void;
+  onThinkingDelta: (text: string) => void;
+  onThinkingEnd: (full: string, iteration: number) => void;
+  onToolCallsStart: (calls: ParsedToolCall[]) => void;
+  onToolStart: (call: ParsedToolCall) => void;
+  onToolResult: (call: ParsedToolCall, data: any) => void;
+  onToolError: (call: ParsedToolCall, error: string) => void;
+  onAnswerStart: () => void;
+  onAnswerDelta: (text: string) => void;
+  onAnswerEnd: (full: string) => void;
+}
 
-  const keywordMap: Record<string, string[]> = {
-    apm: ["apm", "backend service", "latency", "rps", "trace", "request per", "response time", "api performance", "endpoint performance", "p99", "p95", "throughput"],
-    rum: ["rum", "frontend", "web vital", "lcp", "inp", "cls", "page view", "web performance", "core web vital", "first contentful"],
-    tasks: ["task", "job", "cron", "queue", "background", "worker", "scheduled", "celery", "sidekiq"],
-    logs: ["log", "logging", "syslog", "stdout", "stderr", "debug log", "warn log", "search logs"],
-    errors: ["error", "exception", "crash", "bug", "failure", "failed", "unresolved", "stack trace", "traceback"],
-    web_analytics: ["analytics", "pageview", "visitor", "referrer", "traffic", "web stats", "bounce rate"],
-    uptime: ["uptime", "downtime", "health check", "ping", "monitor", "availability", "status check"],
-    infrastructure: ["vps", "server", "cpu", "ram", "memory", "disk", "docker", "container", "network", "infrastructure", "linux"],
-    database: ["database", "mongodb", "mongo", "redis", "db throughput", "db latency", "query performance"],
-    alerts: ["alert", "incident", "notification", "policy", "trigger", "threshold", "on-call"],
-    dashboards: ["dashboard", "widget", "saved view", "canvas", "custom chart"],
-    schema: ["schema", "field map", "telemetry type", "attribute"],
-    billing: ["billing", "subscription", "plan", "payment", "invoice", "receipt", "storage usage", "pricing", "tier", "cost"]
-  };
+interface RunAgentOpts {
+  provider: "webllm" | "byok";
+  engine: any;
+  apiKey?: string;
+  byokModel?: string;
+  history: ChatMessage[];
+  userInput: string;
+  tools: ToolSchema[];
+  callTool: (name: string, args: any) => Promise<any>;
+  signal: AbortSignal;
+  callbacks: AgentCallbacks;
+  maxIterations?: number;
+}
 
-  for (const [category, keywords] of Object.entries(keywordMap)) {
-    if (keywords.some(kw => lower.includes(kw))) {
-      matched.push(category);
+async function runAgent(opts: RunAgentOpts): Promise<string> {
+  const maxIter = opts.maxIterations ?? 8;
+  const systemPrompt = buildAgentSystemPrompt(opts.tools);
+
+  const conversation: ChatMessage[] = [
+    { role: "system", content: systemPrompt },
+    ...opts.history
+      .filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.length > 0)
+      .map(m => ({ role: m.role, content: m.content })),
+    { role: "user", content: opts.userInput },
+  ];
+
+  let finalAnswer = "";
+  let iteration = 0;
+
+  while (iteration < maxIter) {
+    iteration++;
+    if (opts.signal.aborted) throw new DOMException("Aborted", "AbortError");
+
+    opts.callbacks.onIterationStart(iteration);
+    opts.callbacks.onPhase("thinking", `Reasoning (step ${iteration})…`);
+
+    const parser = new ProtocolParser();
+    let assistantOutput = "";
+    // State holder: object property writes survive control-flow narrowing,
+    // which `let` reassigned inside a closure does not.
+    const turn: {
+      pendingToolCalls: ParsedToolCall[] | null;
+      toolCallsError: { raw: string; error: string } | null;
+      answerStarted: boolean;
+      answerComplete: boolean;
+      answerBuffer: string;
+      thinkingBuffer: string;
+    } = {
+      pendingToolCalls: null,
+      toolCallsError: null,
+      answerStarted: false,
+      answerComplete: false,
+      answerBuffer: "",
+      thinkingBuffer: "",
+    };
+
+    const handleEvents = (events: ParseEvent[]) => {
+      for (const ev of events) {
+        if (ev.kind === "thinking_delta") {
+          turn.thinkingBuffer += ev.text;
+          opts.callbacks.onThinkingDelta(ev.text);
+        } else if (ev.kind === "thinking_end") {
+          opts.callbacks.onThinkingEnd(turn.thinkingBuffer.trim(), iteration);
+          turn.thinkingBuffer = "";
+        } else if (ev.kind === "tool_calls") {
+          turn.pendingToolCalls = ev.calls;
+        } else if (ev.kind === "tool_calls_error") {
+          turn.toolCallsError = { raw: ev.raw, error: ev.error };
+        } else if (ev.kind === "answer_delta") {
+          if (!turn.answerStarted) {
+            turn.answerStarted = true;
+            opts.callbacks.onAnswerStart();
+            opts.callbacks.onPhase("responding", "Streaming response…");
+          }
+          turn.answerBuffer += ev.text;
+          opts.callbacks.onAnswerDelta(ev.text);
+        } else if (ev.kind === "answer_end") {
+          turn.answerComplete = true;
+          opts.callbacks.onAnswerEnd(turn.answerBuffer.trim());
+        }
+      }
+    };
+
+    try {
+      for await (const delta of streamCompletion({
+        provider: opts.provider,
+        engine: opts.engine,
+        apiKey: opts.apiKey,
+        byokModel: opts.byokModel,
+        messages: conversation,
+        temperature: 0.3,
+        maxTokens: 2048,
+        signal: opts.signal,
+      })) {
+        assistantOutput += delta;
+        handleEvents(parser.feed(delta));
+
+        // Once we've fully captured a tool_calls or answer block, halt the
+        // stream early to save compute. The model's contract is "exactly one
+        // pattern per turn" so anything after is throwaway.
+        if (turn.pendingToolCalls || turn.toolCallsError || turn.answerComplete) {
+          if (opts.provider === "webllm" && opts.engine?.interruptGenerate) {
+            try { await opts.engine.interruptGenerate(); } catch { /* best effort */ }
+          }
+          break;
+        }
+      }
+      handleEvents(parser.flush());
+    } catch (err: any) {
+      if (err?.name === "AbortError") throw err;
+      // Network/engine error during streaming — bubble up so caller can show toast
+      throw err;
     }
+
+    // Persist this turn into the agent's working memory (system + assistant raw)
+    conversation.push({ role: "assistant", content: assistantOutput });
+
+    if (turn.answerComplete && turn.answerBuffer.trim()) {
+      finalAnswer = turn.answerBuffer.trim();
+      break;
+    }
+
+    if (turn.pendingToolCalls && turn.pendingToolCalls.length > 0) {
+      const calls: ParsedToolCall[] = turn.pendingToolCalls;
+      opts.callbacks.onPhase(
+        "calling_tools",
+        `Executing ${calls.length} tool${calls.length > 1 ? "s" : ""}…`,
+        calls.map(c => c.name),
+      );
+      opts.callbacks.onToolCallsStart(calls);
+
+      const results: ToolExecutionResult[] = await Promise.all(
+        calls.map(async (call) => {
+          opts.callbacks.onToolStart(call);
+          try {
+            const data = await opts.callTool(call.name, call.arguments || {});
+            opts.callbacks.onToolResult(call, data);
+            return { tool: call.name, args: call.arguments || {}, ok: true, data };
+          } catch (e: any) {
+            const message = e?.message || String(e);
+            opts.callbacks.onToolError(call, message);
+            return { tool: call.name, args: call.arguments || {}, ok: false, error: message };
+          }
+        }),
+      );
+
+      conversation.push({ role: "user", content: formatObservations(results) });
+      opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length > 1 ? "s" : ""}…`);
+      continue;
+    }
+
+    if (turn.toolCallsError) {
+      // Tell the model its JSON was bad — it will retry.
+      conversation.push({
+        role: "user",
+        content: `<observations>\n[1] system (fail)\nERROR: Could not parse your <tool_calls> JSON (${turn.toolCallsError.error}). Retry with a valid JSON array, or skip tools and provide an <answer>.\n</observations>`,
+      });
+      continue;
+    }
+
+    // Model produced text but neither pattern parsed — graceful fallback:
+    // treat the whole raw output as the answer if it looks like prose.
+    const fallback = assistantOutput.trim();
+    if (fallback) {
+      finalAnswer = fallback;
+      break;
+    }
+
+    // Empty output — bail to avoid infinite loop.
+    finalAnswer = "I was unable to generate a response. Please try rephrasing.";
+    break;
   }
 
-  return matched;
-};
+  // Hit iteration cap without a final <answer> — force synthesis
+  if (!finalAnswer) {
+    if (opts.signal.aborted) throw new DOMException("Aborted", "AbortError");
+    opts.callbacks.onPhase("responding", "Synthesizing final answer…");
+    conversation.push({
+      role: "user",
+      content: `<observations>\n[1] system (info)\nYou have used the maximum number of tool iterations. Provide your <answer> now using only the data already gathered. Do NOT call any more tools.\n</observations>`,
+    });
 
-/** Resolve AI_TOOLS subset from matched categories, capped to prevent model overload */
-const resolveToolSubset = (categories: string[]): any[] => {
-  if (categories.length === 0) return [];
-  const toolNames = new Set<string>();
-  for (const cat of categories) {
-    TOOL_CATEGORIES[cat]?.tools.forEach(t => toolNames.add(t));
+    const parser = new ProtocolParser();
+    let buf = "";
+    let answered = false;
+    let raw = "";
+    try {
+      for await (const delta of streamCompletion({
+        provider: opts.provider,
+        engine: opts.engine,
+        apiKey: opts.apiKey,
+        byokModel: opts.byokModel,
+        messages: conversation,
+        temperature: 0.4,
+        maxTokens: 2048,
+        signal: opts.signal,
+      })) {
+        raw += delta;
+        for (const ev of parser.feed(delta)) {
+          if (ev.kind === "answer_delta") {
+            if (!answered) { answered = true; opts.callbacks.onAnswerStart(); }
+            buf += ev.text;
+            opts.callbacks.onAnswerDelta(ev.text);
+          } else if (ev.kind === "answer_end") {
+            opts.callbacks.onAnswerEnd(buf.trim());
+          }
+        }
+      }
+      for (const ev of parser.flush()) {
+        if (ev.kind === "answer_delta") {
+          if (!answered) { answered = true; opts.callbacks.onAnswerStart(); }
+          buf += ev.text;
+          opts.callbacks.onAnswerDelta(ev.text);
+        } else if (ev.kind === "answer_end") {
+          opts.callbacks.onAnswerEnd(buf.trim());
+        }
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError") throw err;
+      // fall through with whatever we have
+    }
+    finalAnswer = buf.trim() || raw.trim() || "I gathered some data but could not finalize a response. Please try rephrasing your question.";
   }
-  const MAX_TOOLS = 12;
-  return AI_TOOLS.filter((t: any) => toolNames.has(t.function.name)).slice(0, MAX_TOOLS);
+
+  return finalAnswer;
+}
+
+// ============================================================================
+// 9. TOOL EXECUTION (pure data fetcher; UI logging happens in callTool wrapper)
+// ============================================================================
+const TOOL_RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
+const fetchToolData = async (toolName: string, args: any): Promise<any> => {
+  const params = { range: args?.range || "24h" };
+
+  switch (toolName) {
+    // --- APM ---
+    case "apm_list_services": return (await api.get('/apm/list')).data;
+    case "apm_get_stats": return (await api.get(`/apm/${args.id}/stats`, { params })).data;
+    case "apm_get_invocations": return (await api.get(`/apm/${args.id}/invocations`, { params: { limit: 10 } })).data;
+    case "apm_get_trace_detail": return (await api.get(`/apm/${args.id}/trace/${args.traceId}`)).data;
+
+    // --- RUM ---
+    case "rum_list_services": return (await api.get('/rum/list')).data;
+    case "rum_get_dashboard": return (await api.get(`/rum/${args.id}/dashboard`, { params })).data;
+    case "rum_get_trace_detail": return (await api.get(`/rum/${args.id}/trace/${args.traceId}`)).data;
+
+    // --- Tasks ---
+    case "task_list_services": return (await api.get('/task/list')).data;
+    case "task_get_dashboard": return (await api.get(`/task/${args.id}/dashboard`, { params })).data;
+    case "task_get_entity_detail": return (await api.get(`/task/${args.id}/entity/${encodeURIComponent(args.taskName)}`, { params })).data;
+    case "task_get_run_detail": return (await api.get(`/task/${args.id}/run/${args.runId}`)).data;
+
+    // --- Infra & DB ---
+    case "vps_list": return (await api.get('/vps/list')).data;
+    case "vps_get_stats": return (await api.get(`/vps/${args.id}/stats`, { params })).data;
+    case "database_list": return (await api.get('/database/list')).data;
+    case "database_get_stats": return (await api.get(`/database/${args.id}/stats`, { params })).data;
+
+    // --- Logs & Errors ---
+    case "logs_query": return (await api.get('/logs', { params: { search: args?.search || "", limit: args?.limit || 15, range: args?.range || "24h" } })).data;
+    case "logs_get_by_id": return (await api.get(`/logs/${args.id}`)).data;
+    case "logs_get_by_trace": return (await api.get(`/apm/${args.id}/trace/${args.traceId}/logs`)).data;
+
+    case "error_get_global": return (await api.get('/errors', { params: { limit: 15, status: 'unresolved' } })).data;
+    case "error_get_group_detail": return (await api.get(`/errors/${args.groupId}`, { params })).data;
+    case "error_get_trace_errors": return (await api.get(`/apm/${args.id}/trace/${args.traceId}/errors`)).data;
+
+    // --- Web Analytics & Monitors ---
+    case "web_list_websites": return (await api.get('/web/list')).data;
+    case "web_get_stats": return (await api.get(`/web/${args.id}/stats`, { params })).data;
+    case "uptime_list_monitors": return (await api.get('/uptime/list')).data;
+    case "uptime_get_stats": return (await api.get(`/uptime/${args.id}/stats`, { params })).data;
+
+    // --- Alerts & Views ---
+    case "alerts_list_destinations": return (await api.get('/alerts/destinations')).data;
+    case "alerts_list_policies": return (await api.get('/alerts/policies')).data;
+    case "alerts_get_policy_details": return (await api.get(`/alerts/policies/${args.id}`)).data;
+    case "views_list_dashboards": return (await api.get('/views')).data;
+    case "views_get_dashboard": return (await api.get(`/views/${args.id}`)).data;
+    case "views_get_widget_data": return (await api.get(`/views/widgets/${args.id}/data`, { params })).data;
+
+    // --- Schema & Billing ---
+    case "schema_get_dynamic": return (await api.get('/schema')).data;
+    case "billing_get_storage_stats": return (await api.get('/billing/storage-stats')).data;
+    case "billing_get_subscription": return (await api.get('/billing/subscription')).data;
+    case "billing_get_transactions": return (await api.get('/billing/transactions')).data;
+    case "billing_get_transaction_receipt": return (await api.get(`/billing/transactions/${args.transactionId}/receipt`)).data;
+    case "billing_get_active_plans": return (await api.get('/billing/plans')).data;
+
+    default:
+      throw new Error(`Unknown tool: ${toolName}`);
+  }
 };
 
+const fetchToolDataWithRetry = async (toolName: string, args: any): Promise<any> => {
+  try {
+    return await fetchToolData(toolName, args);
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status && TOOL_RETRYABLE_STATUSES.has(status)) {
+      await new Promise(r => setTimeout(r, 600));
+      return await fetchToolData(toolName, args);
+    }
+    // Surface the most useful error message available
+    const apiMsg = err?.response?.data?.message || err?.response?.data?.error;
+    if (apiMsg) throw new Error(apiMsg);
+    throw err;
+  }
+};
+
+// ============================================================================
+// 10. REACT COMPONENT
+// ============================================================================
 interface AgentStatus {
-  phase: "thinking" | "selecting_tools" | "calling_tools" | "analyzing" | "responding" | "idle";
+  phase: AgentPhase;
   detail?: string;
   tools?: string[];
 }
+
+type LogEntry =
+  | { time: Date; type: "thinking"; name: string; content: string }
+  | { time: Date; type: "tool_call"; name: string; args: any }
+  | { time: Date; type: "tool_result"; name: string; data: any }
+  | { time: Date; type: "tool_error"; name: string; error: string };
 
 export default function AiAssistantPage() {
   // --- Engine & State ---
   const [engineMode, setEngineMode] = useState<"setup" | "loading" | "ready">("setup");
   const [provider, setProvider] = useState<"webllm" | "byok">("webllm");
   const [hardwareProfile, setHardwareProfile] = useState<any>(null);
-  const [selectedModel, setSelectedModel] = useState(LOCAL_MODELS[1].id); 
+  const [selectedModel, setSelectedModel] = useState(LOCAL_MODELS[1].id);
   const [byokKey, setByokKey] = useState("");
-  
+
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [loadProgress, setLoadProgress] = useState({ text: "", progress: 0, stats: null as any });
   const [chatId] = useState("default-session");
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [contextLogs, setContextLogs] = useState<any[]>([]);
+  const [contextLogs, setContextLogs] = useState<LogEntry[]>([]);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
-  
+
   const engineRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -369,34 +947,47 @@ export default function AiAssistantPage() {
 
   useEffect(() => {
     loadChat(chatId).then(msgs => {
-      if (msgs.length > 0) setMessages(msgs);
+      // Defensive: only accept clean user/assistant text from disk. Older
+      // builds persisted tool / assistant-with-tool_calls messages; strip them.
+      const cleaned = (Array.isArray(msgs) ? msgs : [])
+        .filter((m: any) =>
+          m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string"
+        ) as ChatMessage[];
+      if (cleaned.length > 0) setMessages(cleaned);
     });
   }, [chatId]);
+
+  useEffect(() => {
+    return () => {
+      // Abort any in-flight generation when the component unmounts.
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // --- Hardware Profiler ---
   useEffect(() => {
     if (engineMode !== "setup") return;
-    
+
     const checkHardware = async () => {
       if (!navigator.gpu) {
         setHardwareProfile({ supported: false, reason: "WebGPU is not enabled in this browser." });
-        setProvider("byok"); 
+        setProvider("byok");
         return;
       }
       try {
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) throw new Error("No adapter found");
-        
-        let vramEstimate = 4; 
+
+        let vramEstimate = 4;
         if (adapter.limits.maxStorageBufferBindingSize > 2 * 1024 * 1024 * 1024) vramEstimate = 8;
         else if (adapter.limits.maxStorageBufferBindingSize < 1024 * 1024 * 1024) vramEstimate = 2;
 
-        setHardwareProfile({ 
-          supported: true, 
+        setHardwareProfile({
+          supported: true,
           vramEstimate,
           name: adapter.info?.isFallbackAdapter ? "Software Renderer" : "Hardware GPU"
         });
-        
+
         if (vramEstimate >= 8) setSelectedModel(LOCAL_MODELS[0].id);
         else if (vramEstimate >= 4) setSelectedModel(LOCAL_MODELS[1].id);
         else setSelectedModel(LOCAL_MODELS[2].id);
@@ -421,13 +1012,12 @@ export default function AiAssistantPage() {
     if (provider === "webllm") {
       try {
         const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
-        
+
         engineRef.current = await CreateMLCEngine(selectedModel, {
           initProgressCallback: (report: any) => {
             let cleanText = "Initializing Engine...";
-            let stats:any = null;
-            
-            // Professional regex parsing of the console progress output
+            let stats: any = null;
+
             if (report.text.includes("Fetching param cache")) {
               cleanText = "Downloading Neural Network Weights";
               const chunks = report.text.match(/\[(\d+\/\d+)\]/)?.[1] || "-";
@@ -460,382 +1050,166 @@ export default function AiAssistantPage() {
     }
   };
 
-  // --- Multi-Tool Orchestrator ---
-  const executeFrontendTool = async (toolName: string, args: any) => {
-    setContextLogs(prev => [...prev, { time: new Date(), type: "tool_call", name: toolName, args }]);
-    setIsInspectorOpen(true); 
-
+  // --- UI-aware tool caller (logs to inspector + retries on transient failures) ---
+  const callToolForAgent = useCallback(async (name: string, args: any): Promise<any> => {
+    setContextLogs(prev => [...prev, { time: new Date(), type: "tool_call", name, args }]);
+    setIsInspectorOpen(true);
     try {
-      let data;
-      const params = { range: args.range || "24h" };
-
-      switch (toolName) {
-        // --- APM ---
-        case "apm_list_services": data = await api.get('/apm/list').then(res => res.data); break;
-        case "apm_get_stats": data = await api.get(`/apm/${args.id}/stats`, { params }).then(res => res.data); break;
-        case "apm_get_invocations": data = await api.get(`/apm/${args.id}/invocations`, { params: { limit: 10 } }).then(res => res.data); break;
-        case "apm_get_trace_detail": data = await api.get(`/apm/${args.id}/trace/${args.traceId}`).then(res => res.data); break;
-        
-        // --- RUM ---
-        case "rum_list_services": data = await api.get('/rum/list').then(res => res.data); break;
-        case "rum_get_dashboard": data = await api.get(`/rum/${args.id}/dashboard`, { params }).then(res => res.data); break;
-        case "rum_get_trace_detail": data = await api.get(`/rum/${args.id}/trace/${args.traceId}`).then(res => res.data); break;
-        
-        // --- Tasks ---
-        case "task_list_services": data = await api.get('/task/list').then(res => res.data); break;
-        case "task_get_dashboard": data = await api.get(`/task/${args.id}/dashboard`, { params }).then(res => res.data); break;
-        case "task_get_entity_detail": data = await api.get(`/task/${args.id}/entity/${encodeURIComponent(args.taskName)}`, { params }).then(res => res.data); break;
-        case "task_get_run_detail": data = await api.get(`/task/${args.id}/run/${args.runId}`).then(res => res.data); break;
-
-        // --- Infra & DB ---
-        case "vps_list": data = await api.get('/vps/list').then(res => res.data); break;
-        case "vps_get_stats": data = await api.get(`/vps/${args.id}/stats`, { params }).then(res => res.data); break;
-        case "database_list": data = await api.get('/database/list').then(res => res.data); break;
-        case "database_get_stats": data = await api.get(`/database/${args.id}/stats`, { params }).then(res => res.data); break;
-        
-        // --- Logs & Errors ---
-        case "logs_query": data = await api.get('/logs', { params: { search: args.search || "", limit: args.limit || 15, range: args.range || "24h" } }).then(res => res.data); break;
-        case "logs_get_by_id": data = await api.get(`/logs/${args.id}`).then(res => res.data); break;
-        case "logs_get_by_trace": data = await api.get(`/apm/${args.id}/trace/${args.traceId}/logs`).then(res => res.data); break;
-        
-        case "error_get_global": data = await api.get('/errors', { params: { limit: 15, status: 'unresolved' } }).then(res => res.data); break;
-        case "error_get_group_detail": data = await api.get(`/errors/${args.groupId}`, { params }).then(res => res.data); break;
-        case "error_get_trace_errors": data = await api.get(`/apm/${args.id}/trace/${args.traceId}/errors`).then(res => res.data); break;
-
-        // --- Web Analytics & Monitors ---
-        case "web_list_websites": data = await api.get('/web/list').then(res => res.data); break;
-        case "web_get_stats": data = await api.get(`/web/${args.id}/stats`, { params }).then(res => res.data); break;
-        case "uptime_list_monitors": data = await api.get('/uptime/list').then(res => res.data); break;
-        case "uptime_get_stats": data = await api.get(`/uptime/${args.id}/stats`, { params }).then(res => res.data); break;
-
-        // --- Alerts & Views ---
-        case "alerts_list_destinations": data = await api.get('/alerts/destinations').then(res => res.data); break;
-        case "alerts_list_policies": data = await api.get('/alerts/policies').then(res => res.data); break;
-        case "alerts_get_policy_details": data = await api.get(`/alerts/policies/${args.id}`).then(res => res.data); break;
-        case "views_list_dashboards": data = await api.get('/views').then(res => res.data); break;
-        case "views_get_dashboard": data = await api.get(`/views/${args.id}`).then(res => res.data); break;
-        case "views_get_widget_data": data = await api.get(`/views/widgets/${args.id}/data`, { params }).then(res => res.data); break;
-        
-        // --- Schema & Billing ---
-        case "schema_get_dynamic": data = await api.get('/schema').then(res => res.data); break;
-        case "billing_get_storage_stats": data = await api.get('/billing/storage-stats').then(res => res.data); break;
-        case "billing_get_subscription": data = await api.get('/billing/subscription').then(res => res.data); break;
-        case "billing_get_transactions": data = await api.get('/billing/transactions').then(res => res.data); break;
-        case "billing_get_transaction_receipt": data = await api.get(`/billing/transactions/${args.transactionId}/receipt`).then(res => res.data); break;
-        case "billing_get_active_plans": data = await api.get('/billing/plans').then(res => res.data); break;
-
-        default: data = { error: `Endpoint not mapped: ${toolName}` };
-      }
-
-      setContextLogs(prev => [...prev, { time: new Date(), type: "tool_result", name: toolName, data }]);
-      // Prevent OOM limits by truncating massive tool responses
-      return JSON.stringify(data).substring(0, 6000); 
+      const data = await fetchToolDataWithRetry(name, args);
+      setContextLogs(prev => [...prev, { time: new Date(), type: "tool_result", name, data }]);
+      return data;
     } catch (err: any) {
-      setContextLogs(prev => [...prev, { time: new Date(), type: "tool_error", name: toolName, error: err.message }]);
-      return JSON.stringify({ error: err.message });
+      const message = err?.message || String(err);
+      setContextLogs(prev => [...prev, { time: new Date(), type: "tool_error", name, error: message }]);
+      throw err;
     }
-  };
+  }, []);
 
-  // --- Agentic Orchestration Loop ---
+  // --- Agentic Send ---
   const handleSendMessage = async () => {
-    if (!input.trim() || isGenerating) return;
+    const trimmed = input.trim();
+    if (!trimmed || isGenerating) return;
 
-    const userInput = input;
-    const newUserMsg = { role: "user", content: userInput };
-    const currentChatContext: any[] = [...messages, newUserMsg];
+    if (provider === "webllm" && !engineRef.current) {
+      toast.error("Local engine is not ready.");
+      return;
+    }
+    if (provider === "byok" && !byokKey) {
+      toast.error("Please provide an OpenAI API Key.");
+      return;
+    }
 
-    setMessages(currentChatContext);
+    const userMessage: ChatMessage = { role: "user", content: trimmed };
+    const historyBeforeTurn = messages;
+    setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsGenerating(true);
-    setAgentStatus({ phase: "thinking", detail: "Analyzing your request..." });
+    setAgentStatus({ phase: "thinking", detail: "Analyzing your request…" });
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+
+    // Live-streaming assistant message: index inside `messages` is captured
+    // when streaming begins. We use a closure variable rather than chasing
+    // state because React batches setMessages and we need stable identity.
+    let assistantIndex: number | null = null;
+    let streamingContent = "";
+    let thinkingTail = "";
+
+    const callbacks: AgentCallbacks = {
+      onIterationStart: (iteration) => {
+        setAgentStatus({ phase: "thinking", detail: `Reasoning (step ${iteration})…` });
+        thinkingTail = "";
+      },
+      onPhase: (phase, detail, tools) => {
+        setAgentStatus(prev => ({
+          phase,
+          detail: detail ?? prev?.detail,
+          tools: tools ?? (phase === "calling_tools" ? prev?.tools : undefined),
+        }));
+      },
+      onThinkingDelta: (text) => {
+        thinkingTail = (thinkingTail + text).slice(-220);
+        // Surface live thinking in the status bubble.
+        setAgentStatus(prev => ({
+          phase: prev?.phase === "responding" ? prev.phase : "thinking",
+          detail: thinkingTail.trim(),
+          tools: prev?.tools,
+        }));
+      },
+      onThinkingEnd: (full, iteration) => {
+        if (full) {
+          setContextLogs(prev => [...prev, {
+            time: new Date(),
+            type: "thinking",
+            name: `Reasoning · step ${iteration}`,
+            content: full,
+          }]);
+        }
+        thinkingTail = "";
+      },
+      onToolCallsStart: (calls) => {
+        setAgentStatus({
+          phase: "calling_tools",
+          detail: `Calling ${calls.length} tool${calls.length > 1 ? "s" : ""}: ${calls.map(c => c.name).join(", ")}`,
+          tools: calls.map(c => c.name),
+        });
+      },
+      onToolStart: () => { /* per-call logging happens in callToolForAgent */ },
+      onToolResult: () => { /* logged in wrapper */ },
+      onToolError: () => { /* logged in wrapper */ },
+      onAnswerStart: () => {
+        setAgentStatus({ phase: "responding", detail: "Streaming response…" });
+        setMessages(prev => {
+          const next = [...prev, { role: "assistant" as const, content: "" }];
+          assistantIndex = next.length - 1;
+          return next;
+        });
+      },
+      onAnswerDelta: (text) => {
+        streamingContent += text;
+        setMessages(prev => {
+          if (assistantIndex === null || assistantIndex >= prev.length) return prev;
+          const copy = prev.slice();
+          copy[assistantIndex] = { role: "assistant", content: streamingContent };
+          return copy;
+        });
+      },
+      onAnswerEnd: () => { /* finalization happens after runAgent returns */ },
+    };
 
     try {
-      let finalAiResponse = "";
+      const finalAnswer = await runAgent({
+        provider,
+        engine: engineRef.current,
+        apiKey: provider === "byok" ? byokKey : undefined,
+        history: historyBeforeTurn,
+        userInput: trimmed,
+        tools: AI_TOOLS,
+        callTool: (name, args) => callToolForAgent(name, args),
+        signal: abort.signal,
+        callbacks,
+        maxIterations: 8,
+      });
 
-      if (provider === "webllm") {
-        // ── Phase 1: Instant keyword-based intent classification ──
-        setAgentStatus({ phase: "selecting_tools", detail: "Identifying relevant data sources..." });
-        const categories = classifyIntentByKeywords(userInput);
-        const toolSubset = resolveToolSubset(categories);
-
-        setContextLogs(prev => [...prev, {
-          time: new Date(), type: "tool_call", name: "__intent_classification",
-          args: { categories, toolCount: toolSubset.length, tools: toolSubset.map((t: any) => t.function.name) }
-        }]);
-        if (toolSubset.length > 0) setIsInspectorOpen(true);
-
-        if (toolSubset.length === 0) {
-          // ── No tools needed — direct conversational completion ──
-          setAgentStatus({ phase: "responding", detail: "Generating response..." });
-          try {
-            // Spread-copy: WebLLM may mutate the messages array internally
-            const reply = await engineRef.current.chat.completions.create({
-              messages: [...[AGENT_SYSTEM_PROMPT], ...sanitizeHistoryForHermes(currentChatContext)],
-              max_tokens: 2048,
-              temperature: 0.4
-            });
-            finalAiResponse = reply.choices[0].message.content || "No response generated.";
-          } catch (directErr: any) {
-            console.warn("[Senzor Intelligence] Direct completion error:", directErr);
-            finalAiResponse = "I encountered an error generating a response. Please try again.";
-          }
+      // Reconcile final state: if streaming UI never started (e.g. fallback
+      // path), append the final answer now. Otherwise normalize the streamed
+      // bubble to the canonical final answer (covers cases where post-end
+      // whitespace differs).
+      setMessages(prev => {
+        let next: ChatMessage[];
+        if (assistantIndex === null) {
+          next = [...prev, { role: "assistant", content: finalAnswer }];
         } else {
-          // ── Phase 2: Agentic tool-calling loop with subset ──
-          setAgentStatus({
-            phase: "calling_tools",
-            detail: `Selected ${toolSubset.length} tools from: ${categories.join(", ")}`,
-            tools: toolSubset.map((t: any) => t.function.name)
-          });
-
-          // Hermes tool mode forbids: custom system prompts, tool/tool_calls
-          // msgs from prior turns, consecutive same-role msgs. Sanitize history
-          // and embed domain context into the final user message.
-          const agentMessages: any[] = sanitizeHistoryForHermes(
-            currentChatContext,
-            { embedToolContext: true }
-          );
-          const MAX_ITERATIONS = 3;
-          let iteration = 0;
-          let loopCompleted = false;
-
-          // Helper to bypass WebLLM's internal bug: WebLLM sets content: null when returning
-          // parsed tool_calls, but throws ContentTypeError if passed back in history.
-          // This reconstructs the original JSON array string that Hermes natively outputted.
-          const serializeToolCallsForHermes = (msgs: any[]) => msgs.map(m => {
-            const copy = { ...m };
-            if (copy.role === "assistant" && typeof copy.content !== "string") {
-              if (copy.tool_calls && copy.tool_calls.length > 0) {
-                const rawToolCalls = copy.tool_calls.map((tc: any) => {
-                  try {
-                    return { name: tc.function.name, arguments: JSON.parse(tc.function.arguments || "{}") };
-                  } catch {
-                    return { name: tc.function.name, arguments: {} };
-                  }
-                });
-                copy.content = JSON.stringify(rawToolCalls);
-              } else {
-                copy.content = ""; // Fallback for empty/null content without tool_calls
-              }
-            }
-            return copy;
-          });
-
-          try {
-            while (iteration < MAX_ITERATIONS) {
-              iteration++;
-
-              // Build a fresh snapshot for each iteration. WebLLM's Hermes
-              // validation mutates request.messages (unshift), so we must
-              // never pass the live agentMessages reference.
-              const snapshot = serializeToolCallsForHermes(agentMessages);
-              const reply = await engineRef.current.chat.completions.create({
-                messages: snapshot,
-                tools: toolSubset,
-                tool_choice: "auto",
-                max_tokens: 2048,
-                temperature: 0.1
-              });
-
-              const choice = reply.choices[0];
-              const assistantMsg = choice.message;
-
-              // Push assistant message to agent context only. We do not push to
-              // currentChatContext to prevent empty chat bubbles rendering in the UI.
-              agentMessages.push(assistantMsg);
-
-              // If model produced a text response (no tool calls), we're done
-              if (choice.finish_reason !== "tool_calls" || !assistantMsg.tool_calls?.length) {
-                finalAiResponse = assistantMsg.content || "";
-                loopCompleted = true;
-                break;
-              }
-
-              // ── Execute ALL tool calls in parallel ──
-              // Local models sometimes hallucinate with OpenAI schemas, putting the real
-              // function call inside the arguments object and using the root name as a description.
-              const toolCalls = (assistantMsg.tool_calls || []).map((tc: any) => {
-                let parsedArgs: any = {};
-                try { parsedArgs = JSON.parse(tc.function.arguments || "{}"); } catch { }
-                
-                if (parsedArgs.function && typeof parsedArgs.function === "string") {
-                  return {
-                    ...tc,
-                    function: {
-                      name: parsedArgs.function,
-                      arguments: JSON.stringify(parsedArgs.arguments || {})
-                    }
-                  };
-                }
-                return tc;
-              });
-
-              const toolNames = toolCalls.map((tc: any) => tc.function.name);
-              setAgentStatus({
-                phase: "calling_tools",
-                detail: `Calling: ${toolNames.join(", ")} (iteration ${iteration})`,
-                tools: toolNames
-              });
-
-              const toolResults = await Promise.allSettled(
-                toolCalls.map(async (tc: any) => {
-                  let args: any = {};
-                  try {
-                    args = JSON.parse(tc.function.arguments || "{}");
-                  } catch {
-                    args = {};
-                  }
-                  const result = await executeFrontendTool(tc.function.name, args);
-                  return { toolCallId: tc.id, name: tc.function.name, result };
-                })
-              );
-
-              // Push all tool results back into both contexts
-              for (let i = 0; i < toolCalls.length; i++) {
-                const settled = toolResults[i];
-                let contentStr = "";
-                if (settled.status === "fulfilled") {
-                  contentStr = typeof settled.value.result === "string" 
-                    ? settled.value.result 
-                    : JSON.stringify(settled.value.result);
-                } else {
-                  contentStr = JSON.stringify({ error: "Tool execution failed", reason: (settled as PromiseRejectedResult).reason?.message || "Unknown" });
-                }
-                // Truncate result to avoid blowing up the 4096 context window (which also
-                // causes out-of-bounds memory corruption and grammar matcher errors)
-                const MAX_TOOL_OUTPUT_LENGTH = 1000;
-                if (contentStr.length > MAX_TOOL_OUTPUT_LENGTH) {
-                  contentStr = contentStr.substring(0, MAX_TOOL_OUTPUT_LENGTH) + '\n\n... [TRUNCATED DUE TO LENGTH]';
-                }
-
-                // Hermes-2-Pro expects tool results wrapped in specific XML tags with the name.
-                // WebLLM's internal formatter omits this, causing the model to lose context and fail.
-                const hermesFormattedResult = `<tool_response>\n${JSON.stringify({ name: toolCalls[i].function.name, content: contentStr })}\n</tool_response>`;
-
-                const toolMsg = {
-                  role: "tool" as const,
-                  tool_call_id: settled.status === "fulfilled" ? settled.value.toolCallId : toolCalls[i].id,
-                  content: hermesFormattedResult
-                };
-                agentMessages.push(toolMsg);
-              }
-
-              setAgentStatus({ phase: "analyzing", detail: `Processing results (step ${iteration}/${MAX_ITERATIONS})...` });
-            }
-
-            // If loop exhausted without a final text response, do one final completion.
-            // Guard: only call if the last message is user or tool (WebLLM requirement).
-            if (!loopCompleted || !finalAiResponse) {
-              const lastRole = agentMessages[agentMessages.length - 1]?.role;
-              if (lastRole === "user" || lastRole === "tool") {
-                setAgentStatus({ phase: "responding", detail: "Synthesizing final analysis..." });
-                const finalSnapshot = serializeToolCallsForHermes(agentMessages);
-                const finalReply = await engineRef.current.chat.completions.create({
-                  messages: finalSnapshot,
-                  max_tokens: 2048,
-                  temperature: 0.3
-                });
-                finalAiResponse = finalReply.choices[0].message.content || "I was unable to generate a complete response.";
-              } else {
-                // Last message is assistant — use its content directly
-                finalAiResponse = agentMessages[agentMessages.length - 1]?.content
-                  || "I was unable to generate a complete response.";
-              }
-            }
-          } catch (engineErr: any) {
-            console.warn("[Senzor Intelligence] Agentic loop error, attempting fallback:", engineErr);
-            setAgentStatus({ phase: "responding", detail: "Recovering from error..." });
-            try {
-              const fallback = await engineRef.current.chat.completions.create({
-                messages: [AGENT_SYSTEM_PROMPT, ...sanitizeHistoryForHermes(currentChatContext)],
-                max_tokens: 2048
-              });
-              finalAiResponse = fallback.choices[0].message.content || "I encountered an error processing that request.";
-            } catch {
-              finalAiResponse = "I encountered an internal error. Please try clearing the chat and asking again.";
-            }
-          }
+          next = prev.slice();
+          next[assistantIndex] = { role: "assistant", content: finalAnswer };
         }
-
-      } else {
-        // ── BYOK: Cloud API execution (OpenAI) ──
-        // Cloud models handle all 37 tools without issues
-        setAgentStatus({ phase: "calling_tools", detail: "Sending to cloud API..." });
-
-        let replyRes = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${byokKey}` },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
-            tools: AI_TOOLS
-          })
-        });
-        let reply = await replyRes.json();
-        if (reply.error) throw new Error(reply.error.message);
-
-        let byokIteration = 0;
-        while (reply.choices[0].message.tool_calls?.length && byokIteration < 10) {
-          byokIteration++;
-          const assistantMsg = reply.choices[0].message;
-          currentChatContext.push(assistantMsg);
-
-          // Execute all tool calls in parallel for BYOK too
-          const toolCalls = assistantMsg.tool_calls;
-          setAgentStatus({
-            phase: "calling_tools",
-            detail: `Calling: ${toolCalls.map((tc: any) => tc.function.name).join(", ")}`,
-            tools: toolCalls.map((tc: any) => tc.function.name)
-          });
-
-          const toolResults = await Promise.allSettled(
-            toolCalls.map(async (tc: any) => {
-              const args = JSON.parse(tc.function.arguments || "{}");
-              const result = await executeFrontendTool(tc.function.name, args);
-              return { toolCallId: tc.id, name: tc.function.name, result };
-            })
-          );
-
-          for (let i = 0; i < toolCalls.length; i++) {
-            const settled = toolResults[i];
-            currentChatContext.push({
-              role: "tool",
-              tool_call_id: settled.status === "fulfilled" ? settled.value.toolCallId : toolCalls[i].id,
-              name: toolCalls[i].function.name,
-              content: settled.status === "fulfilled"
-                ? settled.value.result
-                : JSON.stringify({ error: "Tool execution failed" })
-            });
-          }
-
-          setAgentStatus({ phase: "analyzing", detail: `Processing results (step ${byokIteration})...` });
-
-          replyRes = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${byokKey}` },
-            body: JSON.stringify({
-              model: "gpt-4o",
-              messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
-              tools: AI_TOOLS
-            })
-          });
-          reply = await replyRes.json();
-          if (reply.error) throw new Error(reply.error.message);
-        }
-        finalAiResponse = reply.choices[0].message.content || "No response generated.";
-      }
-
-      setAgentStatus({ phase: "idle" });
-      const newAiMsg = { role: "assistant", content: finalAiResponse };
-      const finalChat = [...currentChatContext, newAiMsg];
-
-      setMessages(finalChat);
-      await saveChat(chatId, finalChat);
-
+        // Persist clean state asynchronously.
+        saveChat(chatId, next).catch(err =>
+          console.warn("[Senzor Intelligence] saveChat failed:", err)
+        );
+        return next;
+      });
     } catch (err: any) {
-      toast.error("Generation failed: " + err.message);
+      if (err?.name === "AbortError") {
+        toast.info("Generation cancelled");
+      } else {
+        console.error("[Senzor Intelligence] runAgent error:", err);
+        toast.error("Generation failed: " + (err?.message || "Unknown error"));
+        // Don't leave a dangling empty assistant bubble in the chat.
+        setMessages(prev => {
+          if (assistantIndex === null) return prev;
+          const copy = prev.slice();
+          if (copy[assistantIndex] && !copy[assistantIndex].content) {
+            copy.splice(assistantIndex, 1);
+          }
+          return copy;
+        });
+      }
     } finally {
       setIsGenerating(false);
       setAgentStatus(null);
+      abortRef.current = null;
     }
   };
 
@@ -856,8 +1230,11 @@ export default function AiAssistantPage() {
       try {
         const imported = JSON.parse(e.target?.result as string);
         if (Array.isArray(imported)) {
-          setMessages(imported);
-          await saveChat(chatId, imported);
+          const cleaned: ChatMessage[] = imported.filter((m: any) =>
+            m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string"
+          );
+          setMessages(cleaned);
+          await saveChat(chatId, cleaned);
           toast.success("Chat imported successfully.");
         }
       } catch (err) {
@@ -868,6 +1245,7 @@ export default function AiAssistantPage() {
   };
 
   const handleDelete = async () => {
+    abortRef.current?.abort();
     await clearChat(chatId);
     setMessages([]);
     setContextLogs([]);
@@ -880,7 +1258,7 @@ export default function AiAssistantPage() {
   // ============================================================================
   // UI RENDERERS
   // ============================================================================
-  
+
   if (engineMode === "setup") {
     return (
       <DashboardLayout>
@@ -1173,14 +1551,18 @@ export default function AiAssistantPage() {
                 ) : (
                   contextLogs.map((log, i) => (
                     <div key={i} className="bg-[#0d1117] border border-border/60 rounded-lg overflow-hidden shadow-sm">
-                      <div className={cn("px-3 py-2 text-xs font-bold font-mono border-b flex items-center justify-between", log.type === "tool_call" ? "bg-blue-500/10 text-[#79c0ff] border-blue-500/20" : log.type === "tool_error" ? "bg-destructive/10 text-[#ff7b72] border-destructive/20" : "bg-emerald-500/10 text-[#3fb950] border-emerald-500/20")}>
-                        <span className="whitespace-nowrap truncate mr-2">{log.type === "tool_call" ? `> CALL ${log.name}` : `< RESULT ${log.name}`}</span>
+                      <div className={cn("px-3 py-2 text-xs font-bold font-mono border-b flex items-center justify-between", log.type === "tool_call" ? "bg-blue-500/10 text-[#79c0ff] border-blue-500/20" : log.type === "tool_error" ? "bg-destructive/10 text-[#ff7b72] border-destructive/20" : log.type === "thinking" ? "bg-violet-500/10 text-[#c4a8ff] border-violet-500/20" : "bg-emerald-500/10 text-[#3fb950] border-emerald-500/20")}>
+                        <span className="whitespace-nowrap truncate mr-2">{log.type === "tool_call" ? `> CALL ${log.name}` : log.type === "thinking" ? `~ THOUGHT ${log.name}` : `< RESULT ${log.name}`}</span>
                         <span className="text-[9px] opacity-70 text-gray-400 whitespace-nowrap">{log.time.toLocaleTimeString()}</span>
                       </div>
                       <div className="p-3 overflow-x-auto max-h-48 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                        <pre className="text-[10px] font-mono text-[#e6edf3]">
-                          {JSON.stringify(log.args || log.data || log.error, null, 2)}
-                        </pre>
+                        {log.type === "thinking" ? (
+                          <pre className="text-[10px] font-mono text-[#e6edf3] whitespace-pre-wrap">{log.content}</pre>
+                        ) : (
+                          <pre className="text-[10px] font-mono text-[#e6edf3]">
+                            {JSON.stringify(log.type === "tool_call" ? log.args : log.type === "tool_error" ? log.error : log.data, null, 2)}
+                          </pre>
+                        )}
                       </div>
                     </div>
                   ))
