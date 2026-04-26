@@ -524,7 +524,7 @@ export default function AiAssistantPage() {
         case "billing_get_transaction_receipt": data = await api.get(`/billing/transactions/${args.transactionId}/receipt`).then(res => res.data); break;
         case "billing_get_active_plans": data = await api.get('/billing/plans').then(res => res.data); break;
 
-        default: data = { error: "Endpoint not mapped." };
+        default: data = { error: `Endpoint not mapped: ${toolName}` };
       }
 
       setContextLogs(prev => [...prev, { time: new Date(), type: "tool_result", name: toolName, data }]);
@@ -594,7 +594,7 @@ export default function AiAssistantPage() {
             currentChatContext,
             { embedToolContext: true }
           );
-          const MAX_ITERATIONS = 5;
+          const MAX_ITERATIONS = 3;
           let iteration = 0;
           let loopCompleted = false;
 
@@ -684,6 +684,12 @@ export default function AiAssistantPage() {
                     : JSON.stringify(settled.value.result);
                 } else {
                   contentStr = JSON.stringify({ error: "Tool execution failed", reason: (settled as PromiseRejectedResult).reason?.message || "Unknown" });
+                }
+                // Truncate result to avoid blowing up the 4096 context window (which also
+                // causes out-of-bounds memory corruption and grammar matcher errors)
+                const MAX_TOOL_OUTPUT_LENGTH = 1000;
+                if (contentStr.length > MAX_TOOL_OUTPUT_LENGTH) {
+                  contentStr = contentStr.substring(0, MAX_TOOL_OUTPUT_LENGTH) + '\n\n... [TRUNCATED DUE TO LENGTH]';
                 }
 
                 const toolMsg = {
