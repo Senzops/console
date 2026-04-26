@@ -653,7 +653,24 @@ export default function AiAssistantPage() {
               }
 
               // ── Execute ALL tool calls in parallel ──
-              const toolCalls = assistantMsg.tool_calls;
+              // Local models sometimes hallucinate with OpenAI schemas, putting the real
+              // function call inside the arguments object and using the root name as a description.
+              const toolCalls = (assistantMsg.tool_calls || []).map((tc: any) => {
+                let parsedArgs: any = {};
+                try { parsedArgs = JSON.parse(tc.function.arguments || "{}"); } catch { }
+                
+                if (parsedArgs.function && typeof parsedArgs.function === "string") {
+                  return {
+                    ...tc,
+                    function: {
+                      name: parsedArgs.function,
+                      arguments: JSON.stringify(parsedArgs.arguments || {})
+                    }
+                  };
+                }
+                return tc;
+              });
+
               const toolNames = toolCalls.map((tc: any) => tc.function.name);
               setAgentStatus({
                 phase: "calling_tools",
