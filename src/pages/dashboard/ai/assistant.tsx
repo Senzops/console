@@ -226,15 +226,61 @@ Instructions:
 - Be thorough but concise`
 };
 
+/** Domain context string injected into the user message for tool-calling turns
+ * (Hermes forbids custom system prompts when tools are active) */
+const WEBLLM_TOOL_CONTEXT = `[CONTEXT] You are Senzor Operational Intelligence, an enterprise SRE assistant. Use the provided tools to fetch real telemetry data before answering. Summarize data into concise, actionable insights. Never fabricate metrics. Correlate signals across APM, logs, errors, and infrastructure when relevant. [/CONTEXT]`;
+
 /**
- * WebLLM Hermes models inject their own system prompt for tool-calling format
- * adherence and throw CustomSystemPromptError if a custom system message is
- * provided alongside tools. This user-role preamble is the standard workaround:
- * it provides domain context without conflicting with the internal system prompt.
+ * Sanitize persisted chat history for WebLLM Hermes compatibility.
+ *
+ * Hermes validates the ENTIRE message array:
+ *  - No `system` role messages (Hermes injects its own for tool calling)
+ *  - No `tool` role messages from prior turns
+ *  - No `assistant` messages with `tool_calls` property from prior turns
+ *  - Last message must be `user` or `tool` role
+ *  - No consecutive same-role messages
+ *
+ * This strips tool-calling artifacts from history, keeping only clean
+ * user/assistant text pairs. Tool messages from the CURRENT agentic loop
+ * iteration are added separately after sanitization.
  */
-const WEBLLM_TOOL_CONTEXT = {
-  role: "user" as const,
-  content: `[CONTEXT] You are Senzor Operational Intelligence, an enterprise SRE assistant. When tools are available, use them to fetch real telemetry data before answering. Summarize data into concise, actionable insights. Never fabricate metrics. If data appears anomalous, explain potential root causes. Correlate signals across APM, logs, errors, and infrastructure when relevant. [/CONTEXT]`
+const sanitizeHistoryForHermes = (
+  messages: any[],
+  opts?: { embedToolContext?: boolean }
+): any[] => {
+  const clean: any[] = [];
+  for (const msg of messages) {
+    // Drop tool results and system prompts from history
+    if (msg.role === "tool" || msg.role === "system") continue;
+    // Strip tool_calls from assistant messages, keep only text content
+    if (msg.role === "assistant") {
+      if (!msg.content) continue; // Skip empty assistant msgs (tool-call-only)
+      clean.push({ role: "assistant", content: msg.content });
+      continue;
+    }
+    clean.push(msg);
+  }
+
+  // Collapse consecutive same-role messages (can happen after stripping)
+  const collapsed: any[] = [];
+  for (const msg of clean) {
+    const prev = collapsed[collapsed.length - 1];
+    if (prev && prev.role === msg.role) {
+      prev.content = prev.content + "\n" + msg.content;
+    } else {
+      collapsed.push({ ...msg });
+    }
+  }
+
+  // Embed tool context into the last user message if requested
+  if (opts?.embedToolContext && collapsed.length > 0) {
+    const last = collapsed[collapsed.length - 1];
+    if (last.role === "user") {
+      last.content = `${WEBLLM_TOOL_CONTEXT}\n\n${last.content}`;
+    }
+  }
+
+  return collapsed;
 };
 
 /** Keyword-based intent classifier — instant, deterministic, no model call needed */
@@ -509,8 +555,9 @@ export default function AiAssistantPage() {
           // ── No tools needed — direct conversational completion ──
           setAgentStatus({ phase: "responding", detail: "Generating response..." });
           try {
+            // Spread-copy: WebLLM may mutate the messages array internally
             const reply = await engineRef.current.chat.completions.create({
-              messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
+              messages: [...[AGENT_SYSTEM_PROMPT], ...sanitizeHistoryForHermes(currentChatContext)],
               max_tokens: 2048,
               temperature: 0.4
             });
@@ -527,19 +574,33 @@ export default function AiAssistantPage() {
             tools: toolSubset.map((t: any) => t.function.name)
           });
 
-          // Hermes models forbid custom system prompts when tools are active;
-          // inject domain context as a user-role preamble instead
-          const agentMessages: any[] = [WEBLLM_TOOL_CONTEXT, ...currentChatContext];
+          // Hermes tool mode forbids: custom system prompts, tool/tool_calls
+          // msgs from prior turns, consecutive same-role msgs. Sanitize history
+          // and embed domain context into the final user message.
+          const agentMessages: any[] = sanitizeHistoryForHermes(
+            currentChatContext,
+            { embedToolContext: true }
+          );
           const MAX_ITERATIONS = 5;
           let iteration = 0;
           let loopCompleted = false;
+
+          // Reset engine's internal conversation state before starting tool
+          // mode. Prior non-tool calls leave stale KV cache with a different
+          // system prompt which causes MessageOrderError on the next call.
+          try { await engineRef.current.resetChat(); } catch { /* noop */ }
 
           try {
             while (iteration < MAX_ITERATIONS) {
               iteration++;
 
+              // CRITICAL: Spread-copy messages. WebLLM's Hermes validation
+              // mutates request.messages via unshift() to prepend its system
+              // prompt. Without a copy, the 2nd iteration sees the injected
+              // system message in agentMessages and throws
+              // CustomSystemPromptError.
               const reply = await engineRef.current.chat.completions.create({
-                messages: agentMessages,
+                messages: [...agentMessages],
                 tools: toolSubset,
                 tool_choice: "auto",
                 max_tokens: 2048,
@@ -605,7 +666,7 @@ export default function AiAssistantPage() {
             if (!loopCompleted || !finalAiResponse) {
               setAgentStatus({ phase: "responding", detail: "Synthesizing final analysis..." });
               const finalReply = await engineRef.current.chat.completions.create({
-                messages: agentMessages,
+                messages: [...agentMessages],
                 max_tokens: 2048,
                 temperature: 0.3
               });
@@ -615,8 +676,11 @@ export default function AiAssistantPage() {
             console.warn("[Senzor Intelligence] Agentic loop error, attempting fallback:", engineErr);
             setAgentStatus({ phase: "responding", detail: "Recovering from error..." });
             try {
+              // Fallback without tools — reset engine state first to clear
+              // any partial tool-calling state from the failed loop.
+              try { await engineRef.current.resetChat(); } catch { /* noop */ }
               const fallback = await engineRef.current.chat.completions.create({
-                messages: [AGENT_SYSTEM_PROMPT, ...currentChatContext],
+                messages: [AGENT_SYSTEM_PROMPT, ...sanitizeHistoryForHermes(currentChatContext)],
                 max_tokens: 2048
               });
               finalAiResponse = fallback.choices[0].message.content || "I encountered an error processing that request.";
