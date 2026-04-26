@@ -280,6 +280,19 @@ const sanitizeHistoryForHermes = (
     }
   }
 
+  // Final safety: ensure last message is user or tool (WebLLM requirement)
+  if (collapsed.length > 0) {
+    const last = collapsed[collapsed.length - 1];
+    if (last.role !== "user" && last.role !== "tool") {
+      // Strip trailing non-user/non-tool messages
+      while (collapsed.length > 0) {
+        const tail = collapsed[collapsed.length - 1];
+        if (tail.role === "user" || tail.role === "tool") break;
+        collapsed.pop();
+      }
+    }
+  }
+
   return collapsed;
 };
 
@@ -585,22 +598,16 @@ export default function AiAssistantPage() {
           let iteration = 0;
           let loopCompleted = false;
 
-          // Reset engine's internal conversation state before starting tool
-          // mode. Prior non-tool calls leave stale KV cache with a different
-          // system prompt which causes MessageOrderError on the next call.
-          try { await engineRef.current.resetChat(); } catch { /* noop */ }
-
           try {
             while (iteration < MAX_ITERATIONS) {
               iteration++;
 
-              // CRITICAL: Spread-copy messages. WebLLM's Hermes validation
-              // mutates request.messages via unshift() to prepend its system
-              // prompt. Without a copy, the 2nd iteration sees the injected
-              // system message in agentMessages and throws
-              // CustomSystemPromptError.
+              // Build a fresh snapshot for each iteration. WebLLM's Hermes
+              // validation mutates request.messages (unshift), so we must
+              // never pass the live agentMessages reference.
+              const snapshot = agentMessages.map((m: any) => ({ ...m }));
               const reply = await engineRef.current.chat.completions.create({
-                messages: [...agentMessages],
+                messages: snapshot,
                 tools: toolSubset,
                 tool_choice: "auto",
                 max_tokens: 2048,
@@ -662,23 +669,29 @@ export default function AiAssistantPage() {
               setAgentStatus({ phase: "analyzing", detail: `Processing results (step ${iteration}/${MAX_ITERATIONS})...` });
             }
 
-            // If loop exhausted without a final text response, do one final completion
+            // If loop exhausted without a final text response, do one final completion.
+            // Guard: only call if the last message is user or tool (WebLLM requirement).
             if (!loopCompleted || !finalAiResponse) {
-              setAgentStatus({ phase: "responding", detail: "Synthesizing final analysis..." });
-              const finalReply = await engineRef.current.chat.completions.create({
-                messages: [...agentMessages],
-                max_tokens: 2048,
-                temperature: 0.3
-              });
-              finalAiResponse = finalReply.choices[0].message.content || "I was unable to generate a complete response.";
+              const lastRole = agentMessages[agentMessages.length - 1]?.role;
+              if (lastRole === "user" || lastRole === "tool") {
+                setAgentStatus({ phase: "responding", detail: "Synthesizing final analysis..." });
+                const finalSnapshot = agentMessages.map((m: any) => ({ ...m }));
+                const finalReply = await engineRef.current.chat.completions.create({
+                  messages: finalSnapshot,
+                  max_tokens: 2048,
+                  temperature: 0.3
+                });
+                finalAiResponse = finalReply.choices[0].message.content || "I was unable to generate a complete response.";
+              } else {
+                // Last message is assistant — use its content directly
+                finalAiResponse = agentMessages[agentMessages.length - 1]?.content
+                  || "I was unable to generate a complete response.";
+              }
             }
           } catch (engineErr: any) {
             console.warn("[Senzor Intelligence] Agentic loop error, attempting fallback:", engineErr);
             setAgentStatus({ phase: "responding", detail: "Recovering from error..." });
             try {
-              // Fallback without tools — reset engine state first to clear
-              // any partial tool-calling state from the failed loop.
-              try { await engineRef.current.resetChat(); } catch { /* noop */ }
               const fallback = await engineRef.current.chat.completions.create({
                 messages: [AGENT_SYSTEM_PROMPT, ...sanitizeHistoryForHermes(currentChatContext)],
                 max_tokens: 2048
