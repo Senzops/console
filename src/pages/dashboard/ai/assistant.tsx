@@ -598,6 +598,28 @@ export default function AiAssistantPage() {
           let iteration = 0;
           let loopCompleted = false;
 
+          // Helper to bypass WebLLM's internal bug: WebLLM sets content: null when returning
+          // parsed tool_calls, but throws ContentTypeError if passed back in history.
+          // This reconstructs the original JSON array string that Hermes natively outputted.
+          const serializeToolCallsForHermes = (msgs: any[]) => msgs.map(m => {
+            const copy = { ...m };
+            if (copy.role === "assistant" && typeof copy.content !== "string") {
+              if (copy.tool_calls && copy.tool_calls.length > 0) {
+                const rawToolCalls = copy.tool_calls.map((tc: any) => {
+                  try {
+                    return { name: tc.function.name, arguments: JSON.parse(tc.function.arguments || "{}") };
+                  } catch {
+                    return { name: tc.function.name, arguments: {} };
+                  }
+                });
+                copy.content = JSON.stringify(rawToolCalls);
+              } else {
+                copy.content = ""; // Fallback for empty/null content without tool_calls
+              }
+            }
+            return copy;
+          });
+
           try {
             while (iteration < MAX_ITERATIONS) {
               iteration++;
@@ -605,7 +627,7 @@ export default function AiAssistantPage() {
               // Build a fresh snapshot for each iteration. WebLLM's Hermes
               // validation mutates request.messages (unshift), so we must
               // never pass the live agentMessages reference.
-              const snapshot = agentMessages.map((m: any) => ({ ...m }));
+              const snapshot = serializeToolCallsForHermes(agentMessages);
               const reply = await engineRef.current.chat.completions.create({
                 messages: snapshot,
                 tools: toolSubset,
@@ -655,12 +677,19 @@ export default function AiAssistantPage() {
               // Push all tool results back into both contexts
               for (let i = 0; i < toolCalls.length; i++) {
                 const settled = toolResults[i];
+                let contentStr = "";
+                if (settled.status === "fulfilled") {
+                  contentStr = typeof settled.value.result === "string" 
+                    ? settled.value.result 
+                    : JSON.stringify(settled.value.result);
+                } else {
+                  contentStr = JSON.stringify({ error: "Tool execution failed", reason: (settled as PromiseRejectedResult).reason?.message || "Unknown" });
+                }
+
                 const toolMsg = {
                   role: "tool" as const,
                   tool_call_id: settled.status === "fulfilled" ? settled.value.toolCallId : toolCalls[i].id,
-                  content: settled.status === "fulfilled"
-                    ? settled.value.result
-                    : JSON.stringify({ error: "Tool execution failed", reason: (settled as PromiseRejectedResult).reason?.message || "Unknown" })
+                  content: contentStr
                 };
                 agentMessages.push(toolMsg);
                 currentChatContext.push(toolMsg);
@@ -675,7 +704,7 @@ export default function AiAssistantPage() {
               const lastRole = agentMessages[agentMessages.length - 1]?.role;
               if (lastRole === "user" || lastRole === "tool") {
                 setAgentStatus({ phase: "responding", detail: "Synthesizing final analysis..." });
-                const finalSnapshot = agentMessages.map((m: any) => ({ ...m }));
+                const finalSnapshot = serializeToolCallsForHermes(agentMessages);
                 const finalReply = await engineRef.current.chat.completions.create({
                   messages: finalSnapshot,
                   max_tokens: 2048,
