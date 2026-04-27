@@ -3122,10 +3122,21 @@ export default function AiAssistantPage() {
   if (engineMode === "setup") {
     return (
       <DashboardLayout>
-        <div className="flex-1 flex items-center justify-center p-4 bg-muted/10 h-full">
-          <Card className="max-w-2xl w-full border-border/60 shadow-xl bg-card rounded-xl overflow-hidden">
+        <div className="flex-1 flex items-center justify-center p-4 bg-muted/10 h-full min-h-0">
+          {/*
+            Card is constrained to the viewport via `max-h-[calc(100%-1rem)]`
+            (computed from the parent's height minus our outer padding). The
+            outer wrapper is a flex column so items-center alignment plays
+            nicely with the Card's max-height: when content fits, the Card
+            sits centered at its natural height; when content is taller
+            than the viewport, the Card fills the available space and the
+            middle scroll region absorbs the overflow. Header and footer
+            stay pinned. This is the canonical pattern for chrome around a
+            scrollable body and matches our app shell elsewhere.
+          */}
+          <Card className="max-w-2xl w-full max-h-[calc(100%-1rem)] flex flex-col border-border/60 shadow-xl bg-card rounded-xl overflow-hidden">
             
-            <div className="p-6 border-b border-border/40">
+            <div className="p-6 border-b border-border/40 shrink-0">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <Sparkles className="h-4 w-4 text-primary" />
@@ -3137,7 +3148,7 @@ export default function AiAssistantPage() {
               </p>
             </div>
 
-            <div className="p-6 bg-muted/5 flex flex-col gap-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-muted/5 flex flex-col gap-4">
               
               <div 
                 className={cn("p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col", provider === "webllm" ? "bg-background border-primary shadow-sm ring-1 ring-primary/20" : "bg-card border-border hover:border-primary/50")} 
@@ -3237,7 +3248,7 @@ export default function AiAssistantPage() {
               </div>
             </div>
 
-            <div className="p-4 md:p-6 border-t border-border/40 bg-card flex justify-end gap-3 items-center">
+            <div className="p-4 md:p-6 border-t border-border/40 bg-card flex justify-end gap-3 items-center shrink-0">
               <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1.5 mr-auto">
                 <Lock className="h-3 w-3 text-emerald-500" /> End-to-End Encrypted
               </span>
