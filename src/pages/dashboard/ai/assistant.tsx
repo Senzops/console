@@ -510,6 +510,92 @@ function stripTrailingPartialCloseTag(body: string, closeTag: string): string {
 }
 
 /**
+ * Find the first balanced JSON array in `text` and return its substring.
+ * String-aware (skips brackets inside JSON string literals; respects backslash
+ * escapes). Returns null if no balanced array exists.
+ *
+ * Why we need this instead of plain `JSON.parse(body)`: small models routinely
+ * produce malformed wrapper output that nonetheless contains ONE valid array.
+ * Real failure modes captured in production logs:
+ *   - Two adjacent arrays: `[arr1][arr2]` (model emits parallel groups)
+ *   - Trailing scaffolding: `[arr1]\n[System then supplies:] ...`
+ *   - Garbage epilogue: `[arr1]\n</>\n[Continue with...]`
+ *   - Unclosed second array: `[arr1]\n[partial...`
+ * In every case the first balanced `[...]` is exactly what we want.
+ *
+ * Time complexity: O(n) over the string. No regex backtracking — safe on
+ * pathological inputs.
+ */
+function extractFirstJsonArray(text: string): string | null {
+  const start = text.indexOf("[");
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "[") depth++;
+    else if (ch === "]") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Salvage tool calls that the model accidentally emitted inside markdown
+ * fenced code blocks (\`\`\`json [{...}] \`\`\`) instead of the protocol's
+ * <tool_calls> tag. Some smaller / instruction-tuned models default to
+ * markdown when describing JSON, even after we tell them to use the
+ * protocol — preventing this from killing the whole turn yields a far more
+ * professional UX (the user gets data instead of a redirect).
+ *
+ * Returns null if no parseable tool-call array is found in any code fence.
+ */
+function extractMarkdownToolCalls(text: string): ParsedToolCall[] | null {
+  if (!text) return null;
+  // Match each ```...``` (with optional language tag like `json`).
+  const fenceRe = /```(?:\s*[a-zA-Z0-9_-]+)?\s*\n?([\s\S]*?)\s*```/g;
+  const acc: ParsedToolCall[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = fenceRe.exec(text)) !== null) {
+    const inner = m[1];
+    const arrText = extractFirstJsonArray(inner);
+    if (!arrText) continue;
+    let parsed: any;
+    try { parsed = JSON.parse(arrText); }
+    catch { continue; }
+    if (!Array.isArray(parsed)) continue;
+    for (const c of parsed) {
+      if (
+        c &&
+        typeof c === "object" &&
+        typeof c.name === "string" &&
+        // Tool names are snake_case identifiers — guards against picking up
+        // unrelated arrays like `["error", "warning"]`.
+        /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.name)
+      ) {
+        acc.push({
+          name: String(c.name),
+          arguments: (c.arguments && typeof c.arguments === "object") ? c.arguments : {},
+        });
+      }
+    }
+  }
+  return acc.length > 0 ? acc : null;
+}
+
+/**
  * Streaming, single-pass parser that emits structured events as token chunks
  * arrive. Holds back partial-tag tails to avoid emitting half a closing tag
  * as visible content. Tolerant: free-form text outside tags is silently
@@ -596,8 +682,17 @@ class ProtocolParser {
           // re-fed. See stripTrailingPartialCloseTag for details.
           let raw = this.buffer.slice(0, closeIdx).trim();
           raw = stripTrailingPartialCloseTag(raw, PROTOCOL_TAGS.TOOL_CALLS_CLOSE);
+
+          // Salvage: extract the first balanced JSON array. Models commonly
+          // emit two adjacent arrays or trailing scaffolding text (`[arr1]
+          // \n[System supplies:] ...`). Strict `JSON.parse` rejects all of
+          // these; the salvager returns the one valid array. Falls back to
+          // the original raw on miss so any "real" parse error message still
+          // surfaces in `tool_calls_error`.
+          const salvaged = extractFirstJsonArray(raw) ?? raw;
+
           try {
-            const parsed = JSON.parse(raw);
+            const parsed = JSON.parse(salvaged);
             const arr = Array.isArray(parsed) ? parsed : [parsed];
             const calls: ParsedToolCall[] = arr
               .filter((c: any) => c && typeof c === "object" && typeof c.name === "string")
@@ -806,6 +901,13 @@ function sanitizeFinalAnswerText(s: string): string {
   out = out.replace(/<observations>[\s\S]*$/gi, ""); // unclosed tail
   out = out.replace(/<\/?answer>/gi, "");
   out = out.replace(/(^|\n)(?:User|Assistant):[ \t]*/g, "$1");
+  // Strip leaked example-block scaffolding labels — small models echo these
+  // verbatim from few-shot prompts. Match a whole line so we don't accidentally
+  // remove user-typed bracket prose.
+  out = out.replace(/(^|\n)\s*\[(?:Your\s+turn[^\]\n]*|System[^\]\n]*?(?:supplies|provides|then)[^\]\n]*|Continue[^\]\n]*|Example[^\]\n]*|Turn\s+\d+[^\]\n]*)\][^\n]*/gi, "$1");
+  // Strip stray sentinel tokens leaked by some MLC tokenizers.
+  out = out.replace(/<unk>/gi, "");
+  out = out.replace(/<\/?s>/g, "");
   // Collapse runs of blank lines created by the strips above.
   out = out.replace(/\n{3,}/g, "\n\n");
   return out.trim();
@@ -872,30 +974,21 @@ Your GitHub-Flavored Markdown response. Cite real values from the observations.
 10. <answer> must be clean GitHub-Flavored Markdown — headings, bullet lists, tables, fenced code blocks where useful. Be concise. SREs are busy.
 11. Once you have called a tool, the next turn must be <answer> unless the data clearly requires a follow-up call with DIFFERENT arguments. NEVER call the same tool with the same arguments twice in a row — that is a fatal protocol violation; finalize with <answer> instead.
 
-# Worked Example
+# Examples of well-formed outputs
 
-The block below shows a complete agent run for ONE example user query. Inside <example>...</example>, you can see what YOU would emit on each turn and what the SYSTEM supplies between your turns. Outside of <example>, never repeat any of these literal values; they are illustrative only.
+Each block below is a single complete turn — the EXACT bytes you should emit. Nothing else. The system handles everything between turns. NEVER echo bracketed scaffolding like "[Your turn]", "[System then supplies]", "[Example]", or "[Turn 1]" — those are not part of the protocol and are not shown here.
 
-<example>
-[Example user query: "Is my main API healthy?"]
-
-[Your turn 1:]
+Example 1 — fetching data with one tool (Pattern A):
 <thinking>
-Need APM service list to find the main API, then its recent stats and unresolved errors.
+Need to list VPS servers to check their resource usage.
 </thinking>
 <tool_calls>
-[{"name": "apm_list_services", "arguments": {}}]
+[{"name": "vps_list", "arguments": {}}]
 </tool_calls>
 
-[System then supplies, as the next user message:]
-<observations>
-[1] apm_list_services (ok)
-{"services":[{"id":"svc_42","name":"main-api"}]}
-</observations>
-
-[Your turn 2:]
+Example 2 — parallel fetches in a single turn (Pattern A):
 <thinking>
-Found main-api (svc_42). Pulling 24h stats and unresolved errors in parallel.
+Pulling APM stats and unresolved errors for svc_42 in parallel.
 </thinking>
 <tool_calls>
 [
@@ -904,17 +997,9 @@ Found main-api (svc_42). Pulling 24h stats and unresolved errors in parallel.
 ]
 </tool_calls>
 
-[System then supplies:]
-<observations>
-[1] apm_get_stats (ok)
-{"p50":110,"p95":420,"p99":880,"rps":18,"errorRate":0.4}
-[2] error_get_global (ok)
-{"errors":[]}
-</observations>
-
-[Your turn 3 — final:]
+Example 3 — final answer with markdown (Pattern B), emitted AFTER an <observations> block was supplied to you:
 <thinking>
-p95 of 420ms is healthy, 18 RPS sustained, error rate 0.4%, no unresolved error groups. Service is healthy.
+p95 of 420ms is healthy, 18 RPS sustained, 0.4% error rate, no unresolved errors. Service is healthy.
 </thinking>
 <answer>
 ## main-api — Healthy
@@ -923,16 +1008,20 @@ p95 of 420ms is healthy, 18 RPS sustained, error rate 0.4%, no unresolved error 
 |---|---|
 | p50 latency | 110ms |
 | p95 latency | 420ms |
-| p99 latency | 880ms |
 | Throughput | 18 RPS |
 | Error rate | 0.4% |
 | Unresolved errors | 0 |
 
-No action needed. The service is operating within normal parameters.
+No action needed. Operating within normal parameters.
 </answer>
-</example>
 
-End of example. Now respond to the real user query that follows. Remember: ONE pattern per turn, STOP after </tool_calls> or </answer>, never invent values, never simulate the user.`;
+End of examples. Respond to the real user query that follows.
+
+Final reminders before you respond:
+- Emit EXACTLY ONE pattern. Either <thinking>...</thinking><tool_calls>[...]</tool_calls> OR <thinking>...</thinking><answer>...</answer>.
+- The body inside <tool_calls> must be a SINGLE valid JSON array. Do not emit two arrays. Do not put your tool calls inside markdown code fences (\`\`\`json ... \`\`\`) — that is forbidden, use the <tool_calls> tag.
+- STOP IMMEDIATELY after </tool_calls> or </answer>. Generate no further text in that turn.
+- Never write "[Your turn]", "[System ...]", "User:", "Assistant:", "Turn N:", or any similar role/scaffolding labels.`;
 };
 
 // ============================================================================
@@ -1829,16 +1918,141 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     //       (contains <thinking>, <tool_calls>, "User:", etc.) → escalate
     //       toward the synthesizer; never accept noisy output as final.
     const fallback = assistantOutput.trim();
+    // Wider leak detection — small models routinely echo bracketed
+    // scaffolding from the system prompt's example block ("[Your turn]",
+    // "[System then supplies]", etc.) and emit tool calls inside markdown
+    // code fences instead of <tool_calls>. Treat all of these as bad turns
+    // so we never accept them as a final answer.
     const looksLikeProtocolLeak =
-      /<thinking>|<tool_calls>|<answer>|<observations>|^User:|\nUser:|^Assistant:|\nAssistant:/i.test(fallback);
+      /<thinking>|<tool_calls>|<\/?answer>|<\/?observations>|(?:^|\n)\s*User:|(?:^|\n)\s*Assistant:|\[Your\s+turn|\[System\s+(?:then|supplies|will|provides)|\[Continue\b|\[Example(?:\s+user)?\b|\[Turn\s+\d|\[The\s+system\s+supplies|```\s*json\s*[\r\n]+\s*\[[\s\S]*?"name"\s*:/i.test(fallback);
+
+    // Salvage: maybe the model emitted tool calls inside ```json fences
+    // instead of using the <tool_calls> tag. Extract them and treat as a
+    // valid CASE 3 — better UX than rejecting the turn entirely.
+    const salvagedMarkdownCalls = extractMarkdownToolCalls(fallback);
 
     agentLogGroup(`run ${runId} · iter ${iteration} · no protocol output`, () => {
       agentLogField("fallback length", fallback.length);
       agentLogField("looksLikeProtocolLeak", looksLikeProtocolLeak);
+      agentLogField("salvaged markdown tool calls", salvagedMarkdownCalls);
       agentLogField("fallback preview", fallback, 1500);
       agentLogField("consecutiveBadTurns (before incr)", consecutiveBadTurns);
       agentLogField("gatheredObservations so far", gatheredObservations.length);
     });
+
+    if (salvagedMarkdownCalls && salvagedMarkdownCalls.length > 0) {
+      // Splice the salvaged calls into the same code path as a normal
+      // tool_calls turn. We do this by setting the turn state and
+      // continuing — handled cleanly by the existing CASE 3 logic on the
+      // next loop iteration via a synthetic re-entry. Simpler: execute
+      // inline here and feed observations back, mirroring CASE 3.
+      const validCalls: ParsedToolCall[] = [];
+      const invalidCalls: ParsedToolCall[] = [];
+      for (const c of salvagedMarkdownCalls) {
+        if (knownToolNames.has(c.name)) validCalls.push(c);
+        else invalidCalls.push(c);
+      }
+
+      if (validCalls.length === 0) {
+        // All hallucinated — feed corrective and let next iteration retry.
+        const knownArr = Array.from(knownToolNames);
+        const lines = invalidCalls.map((c) => {
+          const closest = closestToolName(c.name, knownArr);
+          opts.callbacks.onToolError(c, `Unknown tool "${c.name}".`);
+          return closest
+            ? `- "${c.name}" is not a real tool. Did you mean "${closest}"?`
+            : `- "${c.name}" is not a real tool.`;
+        });
+        conversation.push({
+          role: "user",
+          content: `<observations>\n[1] system (fail)\nYou wrote tool calls inside a markdown \`\`\`json code block AND used names that don't exist:\n${lines.join("\n")}\n\nUse <tool_calls>[...]</tool_calls> with names from the Available Tools list.\n</observations>`,
+        });
+        consecutiveBadTurns++;
+        agentLogGroup(`run ${runId} · iter ${iteration} · markdown salvage · all invalid`, () => {
+          agentLogField("invalid", invalidCalls.map(c => c.name));
+        });
+        if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) {
+          exitReason = "markdown salvage failed (all invalid); bailing to synth";
+          agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
+          break;
+        }
+        continue;
+      }
+
+      // Stuck-loop guard: don't re-execute the same calls we just ran.
+      if (lastCallSignature && sameToolCalls(lastCallSignature, validCalls)) {
+        opts.callbacks.onPhase("analyzing", "Tool data already gathered. Synthesizing final answer…");
+        exitReason = "markdown salvage hit stuck-loop guard";
+        agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
+        break;
+      }
+      lastCallSignature = validCalls;
+
+      opts.callbacks.onPhase(
+        "calling_tools",
+        `Executing ${validCalls.length} tool${validCalls.length > 1 ? "s" : ""}…`,
+        validCalls.map(c => c.name),
+      );
+      opts.callbacks.onToolCallsStart(validCalls);
+
+      agentLogGroup(`run ${runId} · iter ${iteration} · markdown salvage · executing`, () => {
+        agentLogField("calls", validCalls.map(c => ({ name: c.name, arguments: c.arguments })));
+      });
+
+      const callsStartedAt = Date.now();
+      const realResults: ToolExecutionResult[] = await Promise.all(
+        validCalls.map(async (call) => {
+          opts.callbacks.onToolStart(call);
+          const tStart = Date.now();
+          try {
+            const data = await opts.callTool(call.name, call.arguments || {});
+            opts.callbacks.onToolResult(call, data);
+            agentLogGroup(`run ${runId} · iter ${iteration} · tool ok · ${call.name}`, () => {
+              agentLogField("duration", `${Date.now() - tStart}ms`);
+              agentLogField("arguments", call.arguments || {});
+              agentLogField("result", data, 6000);
+            });
+            return { tool: call.name, args: call.arguments || {}, ok: true, data };
+          } catch (e: any) {
+            const message = e?.message || String(e);
+            opts.callbacks.onToolError(call, message);
+            agentLogGroup(`run ${runId} · iter ${iteration} · tool fail · ${call.name}`, () => {
+              agentLogField("duration", `${Date.now() - tStart}ms`);
+              agentLogField("arguments", call.arguments || {});
+              agentLogField("error", message);
+            });
+            return { tool: call.name, args: call.arguments || {}, ok: false, error: message };
+          }
+        }),
+      );
+
+      gatheredObservations.push(...realResults);
+
+      const knownArr = Array.from(knownToolNames);
+      const invalidResults: ToolExecutionResult[] = invalidCalls.map((c) => {
+        const closest = closestToolName(c.name, knownArr);
+        const hint = closest ? ` Did you mean "${closest}"?` : "";
+        const message = `Unknown tool "${c.name}".${hint}`;
+        opts.callbacks.onToolError(c, message);
+        return { tool: c.name, args: c.arguments || {}, ok: false, error: message };
+      });
+
+      const results = [...realResults, ...invalidResults];
+      // Add a soft nudge to use the proper protocol next turn — but DON'T
+      // count this as a bad turn since we successfully extracted real data.
+      conversation.push({
+        role: "user",
+        content: `${formatObservations(results)}\n\n(Note: your previous tool calls were inside a markdown \`\`\`json fence. Next turn, use the <tool_calls> tag instead — markdown fences are not part of the protocol.)`,
+      });
+      consecutiveBadTurns = 0;
+      opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`);
+      agentLogGroup(`run ${runId} · iter ${iteration} · markdown salvage · done`, () => {
+        agentLogField("total duration", `${Date.now() - callsStartedAt}ms`);
+        agentLogField("ok count", realResults.filter(r => r.ok).length);
+        agentLogField("fail count", realResults.filter(r => !r.ok).length);
+      });
+      continue;
+    }
 
     if (iteration === 1 && fallback && !looksLikeProtocolLeak && gatheredObservations.length === 0) {
       const cleaned = sanitizeFinalAnswerText(fallback);
