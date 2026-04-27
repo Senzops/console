@@ -512,6 +512,173 @@ class ProtocolParser {
   }
 }
 
+/**
+ * Streaming tag stripper for the synthesis pass. Small models occasionally
+ * leak protocol noise into what is supposed to be a plain markdown reply —
+ * `<thinking>`, `<tool_calls>`, `<observations>`, role markers like `User:`.
+ * This class strips that noise on the fly so the user sees clean markdown
+ * during streaming AND in the final stored message.
+ *
+ * Behavior:
+ *   - Tags whose content is internal-only (`<thinking>`, `<tool_calls>`,
+ *     `<observations>`) are dropped entirely along with their content.
+ *   - Bare markers we don't want shown (`<answer>`, `</answer>`, `User:`,
+ *     `Assistant:`) are stripped but surrounding content is preserved.
+ *   - Hold-back logic prevents partial tags from being emitted mid-stream.
+ *     Worst-case latency = longest suppressed tag (14 chars).
+ */
+class TagStripper {
+  private static readonly SUPPRESSED_TAGS: Array<{ open: string; close: string }> = [
+    { open: "<thinking>", close: "</thinking>" },
+    { open: "<tool_calls>", close: "</tool_calls>" },
+    { open: "<observations>", close: "</observations>" },
+  ];
+  private static readonly STRIPPED_MARKERS = ["<answer>", "</answer>"];
+  /** Every prefix that could grow into a suppressed open-tag or a stripped
+   * marker. Used by `partialTailLength` to decide how many trailing chars
+   * to hold back across chunks — we only ever delay emission for chars
+   * that *could* still be part of a tag, so plain prose streams immediately. */
+  private static readonly TAG_PREFIXES: string[] = (() => {
+    const all = new Set<string>();
+    const add = (full: string) => {
+      for (let i = 1; i < full.length; i++) all.add(full.slice(0, i));
+    };
+    for (const t of TagStripper.SUPPRESSED_TAGS) add(t.open);
+    for (const m of TagStripper.STRIPPED_MARKERS) add(m);
+    return Array.from(all);
+  })();
+
+  private buffer = "";
+  private suppressing = false;
+  private suppressUntil = "";
+  private emitted = "";
+
+  feed(chunk: string): string {
+    this.buffer += chunk;
+    let output = "";
+
+    // We may need several passes if the buffer contains alternating
+    // suppressed regions and visible content.
+    let progress = true;
+    while (progress) {
+      progress = false;
+
+      if (this.suppressing) {
+        const idx = this.buffer.indexOf(this.suppressUntil);
+        if (idx >= 0) {
+          this.buffer = this.buffer.slice(idx + this.suppressUntil.length);
+          this.suppressing = false;
+          this.suppressUntil = "";
+          progress = true;
+        } else {
+          // Hold back enough chars to detect the closing tag if it
+          // arrives split across chunks.
+          const hold = this.suppressUntil.length;
+          if (this.buffer.length > hold) this.buffer = this.buffer.slice(-hold);
+          break;
+        }
+      } else {
+        let earliestIdx = -1;
+        let earliest: { open: string; close: string } | null = null;
+        for (const tag of TagStripper.SUPPRESSED_TAGS) {
+          const idx = this.buffer.indexOf(tag.open);
+          if (idx >= 0 && (earliestIdx === -1 || idx < earliestIdx)) {
+            earliestIdx = idx;
+            earliest = tag;
+          }
+        }
+        if (earliestIdx >= 0 && earliest) {
+          output += this.buffer.slice(0, earliestIdx);
+          this.buffer = this.buffer.slice(earliestIdx + earliest.open.length);
+          this.suppressing = true;
+          this.suppressUntil = earliest.close;
+          progress = true;
+        } else {
+          // No suppressed tag found in full. Hold back only the trailing
+          // chars that could still grow into a suppressed tag — usually 0.
+          // This keeps plain markdown streaming live without delay.
+          const holdback = this.partialTailLength();
+          const safeLen = this.buffer.length - holdback;
+          if (safeLen > 0) {
+            output += this.buffer.slice(0, safeLen);
+            this.buffer = this.buffer.slice(safeLen);
+            progress = true;
+          }
+        }
+      }
+    }
+
+    output = TagStripper.stripMarkers(output);
+    this.emitted += output;
+    return output;
+  }
+
+  /** Length of the longest buffer suffix that is a strict prefix of any
+   * suppressed open-tag or stripped marker. We must hold back exactly that
+   * many chars so we don't accidentally emit "<th" before realizing it
+   * grows into "<thinking>". Returns 0 in the common (no partial-tag) case. */
+  private partialTailLength(): number {
+    if (this.buffer.length === 0) return 0;
+    let max = 0;
+    // Walk from the longest possible prefix down to 1 — first hit wins.
+    const limit = Math.min(this.buffer.length, 14);
+    for (let i = limit; i > 0; i--) {
+      const tail = this.buffer.slice(-i);
+      if (TagStripper.TAG_PREFIXES.includes(tail)) { max = i; break; }
+    }
+    return max;
+  }
+
+  flush(): string {
+    let tail = "";
+    if (!this.suppressing) {
+      tail = this.buffer;
+    }
+    this.buffer = "";
+    this.suppressing = false;
+    this.suppressUntil = "";
+    tail = TagStripper.stripMarkers(tail);
+    this.emitted += tail;
+    return tail;
+  }
+
+  /** Total clean content emitted so far. */
+  getEmitted(): string {
+    return this.emitted;
+  }
+
+  private static stripMarkers(s: string): string {
+    let out = s;
+    for (const m of TagStripper.STRIPPED_MARKERS) {
+      if (out.includes(m)) out = out.split(m).join("");
+    }
+    // Strip `User:` / `Assistant:` role markers when they appear at line start.
+    out = out.replace(/(^|\n)(?:User|Assistant):[ \t]*/g, "$1");
+    return out;
+  }
+}
+
+/**
+ * One-shot sanitizer for an already-finalized answer string. Same rules as
+ * `TagStripper` but for non-streaming consumers (cleaning a stored message
+ * before persisting, sanitizing the conversational fallback, etc.).
+ */
+function sanitizeFinalAnswerText(s: string): string {
+  if (!s) return "";
+  let out = s;
+  out = out.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
+  out = out.replace(/<thinking>[\s\S]*$/gi, ""); // unclosed tail
+  out = out.replace(/<tool_calls>[\s\S]*?<\/tool_calls>/gi, "");
+  out = out.replace(/<tool_calls>[\s\S]*$/gi, ""); // unclosed tail
+  out = out.replace(/<observations>[\s\S]*?<\/observations>/gi, "");
+  out = out.replace(/<observations>[\s\S]*$/gi, ""); // unclosed tail
+  out = out.replace(/<\/?answer>/gi, "");
+  out = out.replace(/(^|\n)(?:User|Assistant):[ \t]*/g, "$1");
+  // Collapse runs of blank lines created by the strips above.
+  out = out.replace(/\n{3,}/g, "\n\n");
+  return out.trim();
+}
+
 // ============================================================================
 // 5. SYSTEM PROMPT BUILDER
 // ============================================================================
@@ -569,8 +736,9 @@ Your GitHub-Flavored Markdown response. Cite real values from the observations.
 6. The body inside <tool_calls> MUST be a valid JSON array. Independent fetches go in the same array (executed in parallel). Use only tool names from the Available Tools list above.
 7. NEVER invent metrics, IDs, timestamps, or values. Only cite data that actually appeared in an <observations> block earlier in this conversation.
 8. If a tool returns ok:false or empty data, acknowledge it in the next <thinking> and adapt: try a different tool, broaden the time range, or finalize with <answer>.
-9. For purely conversational input (greeting, capability question, clarification), skip <tool_calls> and answer directly with <answer>.
+9. For PURELY conversational input (only "hi", "hello", "what can you do", "thanks", and similar — no data words), skip <tool_calls> and answer directly with <answer>. Anything that mentions logs, errors, services, traces, metrics, monitors, VPS, RUM, APM, billing, alerts, infrastructure, or any specific entity IS a data query and you MUST call a tool — never ask the user for filters or time ranges. Pick sensible defaults (e.g. range:"24h", limit:20).
 10. <answer> must be clean GitHub-Flavored Markdown — headings, bullet lists, tables, fenced code blocks where useful. Be concise. SREs are busy.
+11. Once you have called a tool, the next turn must be <answer> unless the data clearly requires a follow-up call with DIFFERENT arguments. NEVER call the same tool with the same arguments twice in a row — that is a fatal protocol violation; finalize with <answer> instead.
 
 # Worked Example
 
@@ -870,6 +1038,242 @@ const stripTrailing = (s: string, suffix: string): string =>
   s.endsWith(suffix) ? s.slice(0, -suffix.length) : s;
 
 /**
+ * Build the system prompt used by the SYNTHESIS pass — a separate, much
+ * simpler instruction that does NOT mention the agent protocol at all. We
+ * use this whenever the agent loop ends (success, stuck, or capped) and we
+ * need to convert gathered telemetry into a clean markdown reply.
+ *
+ * Why a separate prompt?
+ *   Small models (1.5B-3B) often fail to emit `<answer>...</answer>` even
+ *   when explicitly asked. By dropping the protocol entirely for synthesis,
+ *   we maximize the chance the model just writes plain markdown — which is
+ *   all we need at this stage. Any protocol noise that does leak through is
+ *   stripped client-side by `TagStripper`.
+ */
+const SYNTHESIS_SYSTEM_PROMPT = `You are Senzor Operational Intelligence — an enterprise SRE assistant for infrastructure observability across APM, RUM, logs, errors, infrastructure, and billing.
+
+The agent has finished gathering live telemetry from the user's monitoring backend. Your sole task now: write a clear, professional GitHub-Flavored Markdown reply that directly answers the user's question using the data provided below.
+
+# Output Rules — STRICT
+
+1. Output ONLY GitHub-Flavored Markdown. Use headings, bullet lists, tables, and fenced code blocks where useful.
+2. NEVER write XML or HTML tags — no <thinking>, <tool_calls>, <answer>, <observations>, or anything similar. Tags will be stripped.
+3. NEVER write the literal strings "User:" or "Assistant:" — those are role markers, not content.
+4. NEVER fabricate values. Only cite numbers, IDs, timestamps, and statuses that actually appear in the telemetry data below.
+5. If the data is empty, missing, or inconclusive, say so honestly and recommend a concrete next step.
+6. Do NOT include preamble like "Sure", "Of course", "Let me", "I will", "Here is". Begin immediately with a meaningful headline or summary line.
+7. Be concise. SREs are busy — prefer bulleted facts over paragraphs.
+8. Format the response so it can stand alone — the user will not see your raw data, only your reply.`;
+
+interface SynthesizeOpts {
+  provider: "webllm" | "byok";
+  engine: any;
+  apiKey?: string;
+  byokModel?: string;
+  userQuery: string;
+  observations: ToolExecutionResult[];
+  signal: AbortSignal;
+  onAnswerStart: () => void;
+  onAnswerDelta: (text: string) => void;
+  onAnswerEnd: (full: string) => void;
+}
+
+/**
+ * Format gathered tool results as plain-text data for the synthesizer's
+ * input. Unlike `formatObservations`, this does NOT wrap in <observations>
+ * tags (the synthesizer prompt forbids tags) and uses a friendlier, more
+ * markdown-compatible layout.
+ *
+ * Budget: keep total under ~10k chars to leave room in the context window
+ * for the system prompt + the user query + the model's own response.
+ */
+const formatDataForSynthesis = (results: ToolExecutionResult[]): string => {
+  if (results.length === 0) return "";
+  const PER_TOOL_LIMIT = 3000;
+  const TOTAL_LIMIT = 10000;
+
+  const safeStringify = (val: any): string => {
+    try { return JSON.stringify(val, null, 2); } catch { return String(val); }
+  };
+
+  const blocks: string[] = [];
+  let total = 0;
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    let body: string;
+    if (r.ok) {
+      let payload = safeStringify(r.data);
+      if (payload.length > PER_TOOL_LIMIT) {
+        payload = payload.slice(0, PER_TOOL_LIMIT) + ` …[truncated ${payload.length - PER_TOOL_LIMIT} chars]`;
+      }
+      body = payload;
+    } else {
+      body = `ERROR: ${r.error || "Unknown error"}`;
+    }
+    const argSummary = Object.keys(r.args || {}).length === 0
+      ? ""
+      : ` ${safeStringify(r.args)}`;
+    const block = `### ${i + 1}. ${r.tool}${argSummary} (${r.ok ? "ok" : "fail"})\n\n${body}`;
+    if (total + block.length > TOTAL_LIMIT) {
+      blocks.push(`*[${results.length - i} additional results omitted to fit context budget]*`);
+      break;
+    }
+    blocks.push(block);
+    total += block.length;
+  }
+  return blocks.join("\n\n");
+};
+
+/**
+ * Stream a clean final-answer to the user, free of agent protocol. Used
+ * whenever the agent loop ends — including the stuck-loop, bad-turn, and
+ * iteration-cap exits. Streams sanitized markdown via the supplied
+ * callbacks and returns the final cleaned string.
+ */
+async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
+  const dataBlock = formatDataForSynthesis(opts.observations);
+  const userMessage = dataBlock.length > 0
+    ? `User question:\n\n${opts.userQuery}\n\n---\n\nLive telemetry data fetched in response (DO NOT echo this section verbatim — analyze it and reply to the user):\n\n${dataBlock}`
+    : `User question:\n\n${opts.userQuery}\n\n---\n\nThe agent attempted to gather telemetry but could not retrieve any data — most likely because no matching tool was invoked successfully. In your reply:\n  1. Acknowledge briefly and honestly that you couldn't fetch the requested data this time.\n  2. Suggest one or two concrete next steps the user can take (e.g., rephrase the question with a specific service or VPS name, narrow the time range, or check that monitoring is enabled).\n  3. Do NOT fabricate values, IDs, or status indicators.\nKeep it short — a few lines is ideal.`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: SYNTHESIS_SYSTEM_PROMPT },
+    { role: "user", content: userMessage },
+  ];
+
+  const stripper = new TagStripper();
+  let started = false;
+  let raw = "";
+  let aborted = false;
+
+  try {
+    for await (const delta of streamCompletion({
+      provider: opts.provider,
+      engine: opts.engine,
+      apiKey: opts.apiKey,
+      byokModel: opts.byokModel,
+      messages,
+      // Slightly higher temp for natural prose; still well below default.
+      temperature: 0.3,
+      maxTokens: 2048,
+      signal: opts.signal,
+      // Intentionally NO stop sequences — we want the model to fully
+      // complete the markdown reply. Sanitization handles any noise.
+    })) {
+      raw += delta;
+      const clean = stripper.feed(delta);
+      if (clean.length > 0) {
+        if (!started) { opts.onAnswerStart(); started = true; }
+        opts.onAnswerDelta(clean);
+      }
+    }
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      aborted = true;
+      throw err;
+    }
+    // Network / engine errors — fall through and use whatever we have.
+    console.warn("[Senzor Intelligence] synthesis stream failed:", err);
+  }
+
+  if (!aborted) {
+    const tail = stripper.flush();
+    if (tail.length > 0) {
+      if (!started) { opts.onAnswerStart(); started = true; }
+      opts.onAnswerDelta(tail);
+    }
+  }
+
+  // Final clean is the streamer's accumulated output, but if the model
+  // somehow produced nothing (e.g. all output was suppressed tags), fall
+  // back to a sanitized version of the raw text, then to a generic message.
+  let cleaned = stripper.getEmitted().trim();
+  if (!cleaned) cleaned = sanitizeFinalAnswerText(raw);
+  if (!cleaned) {
+    cleaned = opts.observations.length > 0
+      ? "I gathered some data but couldn't formulate a complete response. Try rephrasing your question or narrowing the time range."
+      : "I couldn't gather the data needed to answer that. Please rephrase your question or check that the relevant monitoring is active.";
+    if (!started) opts.onAnswerStart();
+    opts.onAnswerDelta(cleaned);
+  }
+
+  opts.onAnswerEnd(cleaned);
+  return cleaned;
+}
+
+/**
+ * Standard Levenshtein edit distance. Used for fuzzy-matching hallucinated
+ * tool names back to the real registry so we can give the model a
+ * "did you mean X?" hint instead of a generic rejection.
+ */
+const levenshtein = (a: string, b: string): number => {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const dp = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) dp[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1]
+        ? prev
+        : 1 + Math.min(prev, dp[j - 1], dp[j]);
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+};
+
+/**
+ * Find the most likely real tool the model meant when it emitted
+ * `needle`. Strategy (in priority order):
+ *   1. Case-insensitive exact match.
+ *   2. Substring match in either direction (handles things like
+ *      "list_vps_servers" → "vps_list", or "vps_stats" → "vps_get_stats").
+ *   3. Levenshtein within a length-proportional threshold.
+ * Returns null if no plausible match exists — better silence than a
+ * misleading suggestion.
+ */
+const closestToolName = (needle: string, knownNames: string[]): string | null => {
+  if (!needle || knownNames.length === 0) return null;
+  const lower = needle.toLowerCase();
+
+  for (const name of knownNames) {
+    if (name.toLowerCase() === lower) return name;
+  }
+
+  // Token-aware substring: strip non-alphanumerics and check both directions.
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "_");
+  const nLower = normalize(lower);
+  let bestSubstr: { name: string; overlap: number } | null = null;
+  for (const name of knownNames) {
+    const nName = normalize(name);
+    if (nName.includes(nLower) || nLower.includes(nName)) {
+      const overlap = Math.min(nName.length, nLower.length);
+      if (!bestSubstr || overlap > bestSubstr.overlap) {
+        bestSubstr = { name, overlap };
+      }
+    }
+  }
+  if (bestSubstr) return bestSubstr.name;
+
+  let best: { name: string; dist: number } | null = null;
+  for (const name of knownNames) {
+    const d = levenshtein(lower, name.toLowerCase());
+    if (best === null || d < best.dist) best = { name, dist: d };
+  }
+  // Threshold: allow up to 1/3 of the longer name's length, capped at 5.
+  if (best) {
+    const longer = Math.max(needle.length, best.name.length);
+    const threshold = Math.min(5, Math.max(2, Math.floor(longer / 3)));
+    if (best.dist <= threshold) return best.name;
+  }
+  return null;
+};
+
+/**
  * Compare two arrays of tool calls for structural equality. Used to detect
  * the "model is stuck repeating the same call" failure mode.
  */
@@ -901,6 +1305,13 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
   let iteration = 0;
   let lastCallSignature: ParsedToolCall[] | null = null;
   let consecutiveBadTurns = 0;
+  /**
+   * Real (not synthetic) tool results gathered across iterations. Powers
+   * the synthesis pass at the end of the run. Synthetic system observations
+   * (unknown-tool errors, stuck-loop nudges, etc.) are intentionally NOT
+   * included — we want the synthesizer to reason from real data only.
+   */
+  const gatheredObservations: ToolExecutionResult[] = [];
 
   while (iteration < maxIter) {
     iteration++;
@@ -920,6 +1331,11 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       answerComplete: boolean;
       answerBuffer: string;
       thinkingBuffer: string;
+      /** Per-turn streaming sanitizer for whatever ends up in <answer>. Small
+       * models occasionally nest <thinking> or other protocol noise inside
+       * <answer>; running every answer chunk through the stripper guarantees
+       * the user only ever sees clean markdown — never leaked tags. */
+      answerStripper: TagStripper;
     } = {
       pendingToolCalls: null,
       toolCallsError: null,
@@ -927,6 +1343,18 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       answerComplete: false,
       answerBuffer: "",
       thinkingBuffer: "",
+      answerStripper: new TagStripper(),
+    };
+
+    const emitAnswerChunk = (chunk: string) => {
+      if (!chunk) return;
+      if (!turn.answerStarted) {
+        turn.answerStarted = true;
+        opts.callbacks.onAnswerStart();
+        opts.callbacks.onPhase("responding", "Streaming response…");
+      }
+      turn.answerBuffer += chunk;
+      opts.callbacks.onAnswerDelta(chunk);
     };
 
     const handleEvents = (events: ParseEvent[]) => {
@@ -942,16 +1370,13 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         } else if (ev.kind === "tool_calls_error") {
           turn.toolCallsError = { raw: ev.raw, error: ev.error };
         } else if (ev.kind === "answer_delta") {
-          if (!turn.answerStarted) {
-            turn.answerStarted = true;
-            opts.callbacks.onAnswerStart();
-            opts.callbacks.onPhase("responding", "Streaming response…");
-          }
-          turn.answerBuffer += ev.text;
-          opts.callbacks.onAnswerDelta(ev.text);
+          emitAnswerChunk(turn.answerStripper.feed(ev.text));
         } else if (ev.kind === "answer_end") {
+          emitAnswerChunk(turn.answerStripper.flush());
           turn.answerComplete = true;
-          opts.callbacks.onAnswerEnd(turn.answerBuffer.trim());
+          if (turn.answerStarted) {
+            opts.callbacks.onAnswerEnd(turn.answerBuffer.trim());
+          }
         }
       }
     };
@@ -1016,8 +1441,14 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
 
     conversation.push({ role: "assistant", content: canonical });
 
-    if (turn.answerComplete && turn.answerBuffer.trim()) {
-      finalAnswer = turn.answerBuffer.trim();
+    if (turn.answerComplete) {
+      // answerBuffer is already sanitized via TagStripper during streaming.
+      // If non-empty, accept; otherwise the model only emitted protocol
+      // noise inside <answer> — fall through to synthesizer.
+      const cleaned = turn.answerBuffer.trim();
+      if (cleaned) {
+        finalAnswer = cleaned;
+      }
       break;
     }
 
@@ -1032,21 +1463,69 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         else invalidCalls.push(c);
       }
 
-      // Stuck-loop guard: same calls as the previous iteration → force
-      // synthesis instead of repeating.
+      // ---------------------------------------------------------------
+      // CASE 1 — every requested tool name is hallucinated.
+      // ---------------------------------------------------------------
+      // Without a special branch this path was the silent killer: the
+      // model emits <tool_calls>[{name:"list_vps_servers"...}]</tool_calls>,
+      // we generate an invalid-tool error observation, results.length is
+      // 1 (the synthetic error), the OLD `else` branch resets
+      // consecutiveBadTurns to 0, and the loop runs all 6 iterations
+      // without ever capturing a real result. We now treat
+      // "no valid tools at all" as a bad turn and offer the model a
+      // typed-fix hint via closestToolName so it can self-correct.
+      if (validCalls.length === 0 && invalidCalls.length > 0) {
+        const knownArr = Array.from(knownToolNames);
+        const lines = invalidCalls.map((c) => {
+          const closest = closestToolName(c.name, knownArr);
+          opts.callbacks.onToolError(c, `Unknown tool "${c.name}".`);
+          return closest
+            ? `- "${c.name}" is not a real tool. Did you mean "${closest}"?`
+            : `- "${c.name}" is not a real tool and no close match was found.`;
+        });
+        conversation.push({
+          role: "user",
+          content: `<observations>\n[1] system (fail)\nNone of the tool names you requested exist:\n${lines.join("\n")}\n\nUse ONLY tool names from the Available Tools list (look at the # Available Tools section of the system prompt). If unsure, finalize with <answer> instead of guessing.\n</observations>`,
+        });
+        consecutiveBadTurns++;
+        // Two strikes-and-out — if the model can't pick a real tool name
+        // after one correction, it likely never will. Synthesize from
+        // whatever (if any) prior data we have.
+        if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) {
+          opts.callbacks.onPhase("analyzing", "Synthesizing final answer from available context…");
+          break;
+        }
+        opts.callbacks.onPhase("analyzing", "Suggesting valid tool names…");
+        continue;
+      }
+
+      // ---------------------------------------------------------------
+      // CASE 2 — model emitted <tool_calls>[]</tool_calls>. Useless turn.
+      // ---------------------------------------------------------------
+      if (validCalls.length === 0 && invalidCalls.length === 0) {
+        conversation.push({
+          role: "user",
+          content: `<observations>\n[1] system (warn)\nYour <tool_calls> array was empty. Either choose a valid tool from the list or finalize with <answer>.\n</observations>`,
+        });
+        consecutiveBadTurns++;
+        if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) break;
+        continue;
+      }
+
+      // ---------------------------------------------------------------
+      // CASE 3 — at least one valid tool call. Normal execution path.
+      // ---------------------------------------------------------------
+      // Stuck-loop guard: same calls as the previous iteration. Hard-break
+      // instead of looping; small models won't change behavior with a
+      // corrective nudge, they just re-emit the same call again.
       if (
-        validCalls.length > 0 &&
         lastCallSignature &&
         sameToolCalls(lastCallSignature, validCalls)
       ) {
-        conversation.push({
-          role: "user",
-          content: `<observations>\n[1] system (info)\nYou requested the same tool calls as your previous turn. The data has not changed. Provide your final <answer> now using the observations already gathered. Do NOT call any more tools.\n</observations>`,
-        });
-        opts.callbacks.onPhase("analyzing", "Synthesizing final answer…");
-        continue;
+        opts.callbacks.onPhase("analyzing", "Tool data already gathered. Synthesizing final answer…");
+        break;
       }
-      lastCallSignature = validCalls.length > 0 ? validCalls : null;
+      lastCallSignature = validCalls;
 
       const calls: ParsedToolCall[] = validCalls;
       opts.callbacks.onPhase(
@@ -1071,30 +1550,36 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         }),
       );
 
+      // Build "did you mean" hints for any invalid tools that came along
+      // with the valid ones (partial-batch case — much less common).
+      const knownArr = Array.from(knownToolNames);
       const invalidResults: ToolExecutionResult[] = invalidCalls.map((c) => {
-        const message = `Unknown tool "${c.name}". Choose only from the Available Tools list.`;
+        const closest = closestToolName(c.name, knownArr);
+        const hint = closest ? ` Did you mean "${closest}"?` : "";
+        const message = `Unknown tool "${c.name}".${hint} Choose only from the Available Tools list.`;
         opts.callbacks.onToolError(c, message);
         return { tool: c.name, args: c.arguments || {}, ok: false, error: message };
       });
 
+      // Persist real results (not invalid synthetic ones) for the synthesizer.
+      // Successful AND failed real calls both carry useful signal.
+      gatheredObservations.push(...realResults);
+
       const results = [...realResults, ...invalidResults];
-      if (results.length === 0) {
-        // Model emitted <tool_calls>[]</tool_calls> — useless. Push it back.
-        conversation.push({
-          role: "user",
-          content: `<observations>\n[1] system (warn)\nYour <tool_calls> array was empty or contained only unknown tools. Either choose a valid tool from the list or finalize with <answer>.\n</observations>`,
-        });
-        consecutiveBadTurns++;
-      } else {
-        conversation.push({ role: "user", content: formatObservations(results) });
-        consecutiveBadTurns = 0;
-      }
+      conversation.push({ role: "user", content: formatObservations(results) });
+      consecutiveBadTurns = 0;
       opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`);
       continue;
     }
 
     if (turn.toolCallsError) {
-      // Tell the model its JSON was bad — it will retry.
+      // Tell the model its JSON was bad — it will retry. But if we already
+      // have real data, prefer to synthesize rather than risk another bad
+      // turn from a small model that can't recover.
+      if (gatheredObservations.length > 0) {
+        opts.callbacks.onPhase("analyzing", "Recovering from a malformed tool call. Synthesizing final answer…");
+        break;
+      }
       conversation.push({
         role: "user",
         content: `<observations>\n[1] system (fail)\nCould not parse your <tool_calls> JSON: ${turn.toolCallsError.error}. Retry with a valid JSON array, or skip tools and provide an <answer>.\n</observations>`,
@@ -1106,26 +1591,31 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     // Model produced text but neither tool_calls nor answer parsed cleanly.
     // Two sub-cases:
     //   (a) iteration 1 with no tools used yet AND no protocol noise → treat
-    //       as conversational reply (greeting, capability question).
+    //       as conversational reply (greeting, capability question). Sanitize
+    //       defensively in case there's a leaked tag we missed.
     //   (b) any later iteration, OR output that looks like a protocol leak
-    //       (contains <thinking>, <tool_calls>, "User:", etc.) → push the
-    //       model back on rails with a corrective observation.
+    //       (contains <thinking>, <tool_calls>, "User:", etc.) → escalate
+    //       toward the synthesizer; never accept noisy output as final.
     const fallback = assistantOutput.trim();
     const looksLikeProtocolLeak =
       /<thinking>|<tool_calls>|<answer>|<observations>|^User:|\nUser:|^Assistant:|\nAssistant:/i.test(fallback);
-    const hasGatheredData = conversation.some(
-      (m, i) => i > 0 && m.role === "user" && m.content.includes("<observations>"),
-    );
 
-    if (iteration === 1 && fallback && !looksLikeProtocolLeak && !hasGatheredData) {
-      finalAnswer = fallback;
-      break;
+    if (iteration === 1 && fallback && !looksLikeProtocolLeak && gatheredObservations.length === 0) {
+      const cleaned = sanitizeFinalAnswerText(fallback);
+      if (cleaned) {
+        finalAnswer = cleaned;
+        break;
+      }
     }
 
     consecutiveBadTurns++;
-    if (consecutiveBadTurns >= 2) {
-      // Hard fail — break out so the post-loop synthesizer can salvage
-      // whatever observations we already have.
+    // Two-strikes-and-out for clean runs, but ONE strike if we already
+    // have real data — at that point another bad turn would just waste
+    // tokens; the synthesizer can do the rest.
+    if (
+      consecutiveBadTurns >= 2 ||
+      (gatheredObservations.length > 0 && consecutiveBadTurns >= 1)
+    ) {
       break;
     }
 
@@ -1135,68 +1625,29 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     });
   }
 
-  // Hit iteration cap without a final <answer> — force synthesis
+  // Loop ended without a usable <answer> tag. Run a clean, protocol-free
+  // synthesis pass using the real observations we gathered. This pass
+  //   - uses a separate, simpler system prompt that forbids XML tags;
+  //   - does NOT use stop sequences (so the model can complete its reply);
+  //   - streams through TagStripper so any leaked tags are scrubbed in
+  //     real time before the user sees them;
+  //   - always returns a non-empty string (with a graceful fallback if the
+  //     model produced nothing usable).
   if (!finalAnswer) {
     if (opts.signal.aborted) throw new DOMException("Aborted", "AbortError");
     opts.callbacks.onPhase("responding", "Synthesizing final answer…");
-    conversation.push({
-      role: "user",
-      content: `<observations>\n[1] system (info)\nYou have used the maximum number of tool iterations. Provide your <answer> now using only the data already gathered. Do NOT call any more tools.\n</observations>`,
+    finalAnswer = await synthesizeFinalAnswer({
+      provider: opts.provider,
+      engine: opts.engine,
+      apiKey: opts.apiKey,
+      byokModel: opts.byokModel,
+      userQuery: opts.userInput,
+      observations: gatheredObservations,
+      signal: opts.signal,
+      onAnswerStart: opts.callbacks.onAnswerStart,
+      onAnswerDelta: opts.callbacks.onAnswerDelta,
+      onAnswerEnd: opts.callbacks.onAnswerEnd,
     });
-
-    const parser = new ProtocolParser();
-    let buf = "";
-    let answered = false;
-    let raw = "";
-    try {
-      for await (const delta of streamCompletion({
-        provider: opts.provider,
-        engine: opts.engine,
-        apiKey: opts.apiKey,
-        byokModel: opts.byokModel,
-        messages: conversation,
-        temperature: 0.2,
-        maxTokens: 2048,
-        signal: opts.signal,
-        stop: AGENT_STOP_SEQUENCES,
-      })) {
-        raw += delta;
-        for (const ev of parser.feed(delta)) {
-          if (ev.kind === "answer_delta") {
-            if (!answered) { answered = true; opts.callbacks.onAnswerStart(); }
-            buf += ev.text;
-            opts.callbacks.onAnswerDelta(ev.text);
-          } else if (ev.kind === "answer_end") {
-            opts.callbacks.onAnswerEnd(buf.trim());
-          }
-        }
-      }
-      // Synthesize closer if engine ate it via stop sequence
-      if (parser.getState() === "answer") {
-        for (const ev of parser.feed("</answer>")) {
-          if (ev.kind === "answer_delta") {
-            if (!answered) { answered = true; opts.callbacks.onAnswerStart(); }
-            buf += ev.text;
-            opts.callbacks.onAnswerDelta(ev.text);
-          } else if (ev.kind === "answer_end") {
-            opts.callbacks.onAnswerEnd(buf.trim());
-          }
-        }
-      }
-      for (const ev of parser.flush()) {
-        if (ev.kind === "answer_delta") {
-          if (!answered) { answered = true; opts.callbacks.onAnswerStart(); }
-          buf += ev.text;
-          opts.callbacks.onAnswerDelta(ev.text);
-        } else if (ev.kind === "answer_end") {
-          opts.callbacks.onAnswerEnd(buf.trim());
-        }
-      }
-    } catch (err: any) {
-      if (err?.name === "AbortError") throw err;
-      // fall through with whatever we have
-    }
-    finalAnswer = buf.trim() || raw.trim() || "I gathered some data but could not finalize a response. Please try rephrasing your question.";
   }
 
   return finalAnswer;
