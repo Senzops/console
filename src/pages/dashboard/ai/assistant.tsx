@@ -347,6 +347,100 @@ const AI_TOOLS: ToolSchema[] = [
 ];
 
 // ============================================================================
+// 3.5. DEBUG LOGGING — toggleable, structured agent traces in the dev console
+// ============================================================================
+//
+// Purpose: when something goes wrong (loop runs forever, tool call hallucinates,
+// synthesizer says "no data"), we need a paper trail of EXACTLY what the model
+// emitted, what the parser captured, what routing decision the orchestrator
+// made, and how the synthesizer recovered. Otherwise debugging becomes guessing.
+//
+// All output goes to the browser DevTools console under collapsible groups
+// labeled `[AI Agent · ...]`. Enabled by default; opt out by running:
+//   localStorage.AI_AGENT_DEBUG = "0"
+// in the browser console (or set to "1" / unset to re-enable). Has zero cost
+// when disabled — every helper short-circuits on the cached flag.
+
+const AGENT_DEBUG_ENABLED: boolean = (() => {
+  if (typeof window === "undefined") return false;
+  try {
+    const v = window.localStorage.getItem("AI_AGENT_DEBUG");
+    return v === null ? true : v !== "0";
+  } catch {
+    return true;
+  }
+})();
+
+/** Truncate any value to a printable string of bounded length. Objects are
+ * JSON-stringified; everything else is coerced via `String()`. Truncation is
+ * advertised inline so the reader knows data was elided. */
+const debugTruncate = (value: any, maxChars = 4000): string => {
+  let s: string;
+  if (value === null || value === undefined) {
+    s = String(value);
+  } else if (typeof value === "string") {
+    s = value;
+  } else {
+    try {
+      s = JSON.stringify(value);
+    } catch {
+      s = String(value);
+    }
+  }
+  if (s.length <= maxChars) return s;
+  return s.slice(0, maxChars) + ` …[+${s.length - maxChars} chars]`;
+};
+
+const AGENT_LOG_STYLE = "color:#6366f1;font-weight:600";
+const AGENT_LOG_DIM_STYLE = "color:#94a3b8";
+
+/** Single-line log entry. Use for short status updates. */
+const agentLog = (label: string, ...payload: any[]): void => {
+  if (!AGENT_DEBUG_ENABLED) return;
+  // eslint-disable-next-line no-console
+  console.log(`%c[AI Agent · ${label}]`, AGENT_LOG_STYLE, ...payload);
+};
+
+/** Run a body inside a collapsed console group. Always closes the group, even
+ * if the body throws. Use for grouping multi-field iteration traces. */
+const agentLogGroup = (title: string, body: () => void): void => {
+  if (!AGENT_DEBUG_ENABLED) return;
+  let opened = false;
+  try {
+    // eslint-disable-next-line no-console
+    console.groupCollapsed(`%c[AI Agent · ${title}]`, AGENT_LOG_STYLE);
+    opened = true;
+    body();
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[AI Agent] log group threw:", err);
+  } finally {
+    if (opened) {
+      try {
+        // eslint-disable-next-line no-console
+        console.groupEnd();
+      } catch {
+        /* best effort */
+      }
+    }
+  }
+};
+
+/** Log a key/value field inside a group. Multi-line strings get a leading
+ * newline so they line-up neatly under the label. */
+const agentLogField = (label: string, value: any, max = 4000): void => {
+  if (!AGENT_DEBUG_ENABLED) return;
+  const str = debugTruncate(value, max);
+  if (str.length > 80 || str.includes("\n")) {
+    // eslint-disable-next-line no-console
+    console.log(`%c${label}:%c\n${str}`, AGENT_LOG_DIM_STYLE, "");
+  } else {
+    // eslint-disable-next-line no-console
+    console.log(`%c${label}:%c ${str}`, AGENT_LOG_DIM_STYLE, "");
+  }
+};
+
+// ============================================================================
 // 4. AGENT PROTOCOL — ReAct-style XML tags, parsed incrementally from a stream
 // ============================================================================
 //
@@ -389,6 +483,31 @@ type ParseEvent =
   | { kind: "tool_calls_error"; raw: string; error: string }
   | { kind: "answer_delta"; text: string }
   | { kind: "answer_end" };
+
+/**
+ * Strip a non-empty proper prefix of `closeTag` from the end of `body` if
+ * present. Defensive cleanup for stop-sequence-truncated streams.
+ *
+ * Concrete failure mode this guards against: WebLLM (and some OpenAI clients
+ * with `stop`) cuts the stream mid-token when a stop sequence boundary is
+ * crossed. For our `</tool_calls>` stop, that means a stream can end with
+ * `</tool_calls` (no `>`). The orchestrator then re-feeds `</tool_calls>` so
+ * the parser can finalize, but the parser's body slice now contains the
+ * partial close tag *before* the real one — corrupting JSON parsing with a
+ * cryptic "Unexpected non-whitespace character" error. By peeling the
+ * trailing partial-tag suffix here we avoid surfacing engine-side artifacts.
+ */
+function stripTrailingPartialCloseTag(body: string, closeTag: string): string {
+  // Walk from the longest possible proper prefix down to length 1 — first
+  // match wins so we never strip more than intended.
+  for (let i = closeTag.length - 1; i >= 1; i--) {
+    const partial = closeTag.slice(0, i);
+    if (body.endsWith(partial)) {
+      return body.slice(0, body.length - partial.length).trimEnd();
+    }
+  }
+  return body;
+}
 
 /**
  * Streaming, single-pass parser that emits structured events as token chunks
@@ -472,7 +591,11 @@ class ProtocolParser {
       } else if (this.state === "tool_calls") {
         const closeIdx = this.buffer.indexOf(PROTOCOL_TAGS.TOOL_CALLS_CLOSE);
         if (closeIdx >= 0) {
-          const raw = this.buffer.slice(0, closeIdx).trim();
+          // Belt-and-braces: peel any partial close-tag artifact left over by
+          // a stop-sequence-truncated stream that the orchestrator then
+          // re-fed. See stripTrailingPartialCloseTag for details.
+          let raw = this.buffer.slice(0, closeIdx).trim();
+          raw = stripTrailingPartialCloseTag(raw, PROTOCOL_TAGS.TOOL_CALLS_CLOSE);
           try {
             const parsed = JSON.parse(raw);
             const arr = Array.isArray(parsed) ? parsed : [parsed];
@@ -493,7 +616,16 @@ class ProtocolParser {
       } else if (this.state === "answer") {
         const closeIdx = this.buffer.indexOf(PROTOCOL_TAGS.ANSWER_CLOSE);
         if (closeIdx >= 0) {
-          if (closeIdx > 0) events.push({ kind: "answer_delta", text: this.buffer.slice(0, closeIdx) });
+          if (closeIdx > 0) {
+            // Same partial-close-tag defense as tool_calls. Without this a
+            // stream ending in `</answer` followed by an orchestrator-injected
+            // `</answer>` would leak `</answer` into the rendered markdown.
+            const visible = stripTrailingPartialCloseTag(
+              this.buffer.slice(0, closeIdx),
+              PROTOCOL_TAGS.ANSWER_CLOSE,
+            );
+            if (visible.length > 0) events.push({ kind: "answer_delta", text: visible });
+          }
           events.push({ kind: "answer_end" });
           this.buffer = this.buffer.slice(closeIdx + PROTOCOL_TAGS.ANSWER_CLOSE.length);
           this.state = "idle";
@@ -1141,10 +1273,17 @@ async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
     { role: "user", content: userMessage },
   ];
 
+  agentLogGroup("synthesizer · prompt", () => {
+    agentLogField("data block length", dataBlock.length);
+    agentLogField("data block preview", dataBlock, 4000);
+    agentLogField("user message", userMessage, 4000);
+  });
+
   const stripper = new TagStripper();
   let started = false;
   let raw = "";
   let aborted = false;
+  const synthStartedAt = Date.now();
 
   try {
     for await (const delta of streamCompletion({
@@ -1170,9 +1309,11 @@ async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
   } catch (err: any) {
     if (err?.name === "AbortError") {
       aborted = true;
+      agentLog("synthesizer · aborted", err?.message || String(err));
       throw err;
     }
     // Network / engine errors — fall through and use whatever we have.
+    agentLog("synthesizer · stream error", err?.message || String(err));
     console.warn("[Senzor Intelligence] synthesis stream failed:", err);
   }
 
@@ -1188,14 +1329,24 @@ async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
   // somehow produced nothing (e.g. all output was suppressed tags), fall
   // back to a sanitized version of the raw text, then to a generic message.
   let cleaned = stripper.getEmitted().trim();
-  if (!cleaned) cleaned = sanitizeFinalAnswerText(raw);
+  let fallbackPath: string = "stripped stream";
+  if (!cleaned) { cleaned = sanitizeFinalAnswerText(raw); fallbackPath = "sanitized raw"; }
   if (!cleaned) {
     cleaned = opts.observations.length > 0
       ? "I gathered some data but couldn't formulate a complete response. Try rephrasing your question or narrowing the time range."
       : "I couldn't gather the data needed to answer that. Please rephrase your question or check that the relevant monitoring is active.";
+    fallbackPath = "generic fallback";
     if (!started) opts.onAnswerStart();
     opts.onAnswerDelta(cleaned);
   }
+
+  agentLogGroup("synthesizer · finished", () => {
+    agentLogField("duration", `${Date.now() - synthStartedAt}ms`);
+    agentLogField("aborted", aborted);
+    agentLogField("raw model output", raw, 8000);
+    agentLogField("emit path", fallbackPath);
+    agentLogField("final answer", cleaned, 4000);
+  });
 
   opts.onAnswerEnd(cleaned);
   return cleaned;
@@ -1292,6 +1443,8 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
   const maxIter = opts.maxIterations ?? 6;
   const systemPrompt = buildAgentSystemPrompt(opts.tools);
   const knownToolNames = new Set(opts.tools.map(t => t.function.name));
+  const runStartedAt = Date.now();
+  const runId = Math.random().toString(36).slice(2, 8);
 
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -1300,6 +1453,15 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       .map(m => ({ role: m.role, content: m.content })),
     { role: "user", content: opts.userInput },
   ];
+
+  agentLogGroup(`run ${runId} · start`, () => {
+    agentLogField("provider", opts.provider);
+    agentLogField("byokModel", opts.byokModel ?? "(local)");
+    agentLogField("user query", opts.userInput);
+    agentLogField("history messages", opts.history.length);
+    agentLogField("tools registered", opts.tools.length);
+    agentLogField("max iterations", maxIter);
+  });
 
   let finalAnswer = "";
   let iteration = 0;
@@ -1312,6 +1474,8 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
    * included — we want the synthesizer to reason from real data only.
    */
   const gatheredObservations: ToolExecutionResult[] = [];
+  /** Reason the loop terminated. Logged at the end of the run. */
+  let exitReason = "iteration cap";
 
   while (iteration < maxIter) {
     iteration++;
@@ -1319,6 +1483,8 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
 
     opts.callbacks.onIterationStart(iteration);
     opts.callbacks.onPhase("thinking", `Reasoning (step ${iteration})…`);
+    const iterStartedAt = Date.now();
+    agentLog(`run ${runId} · iter ${iteration}`, "started");
 
     const parser = new ProtocolParser();
     let assistantOutput = "";
@@ -1441,6 +1607,17 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
 
     conversation.push({ role: "assistant", content: canonical });
 
+    agentLogGroup(`run ${runId} · iter ${iteration} · model output`, () => {
+      agentLogField("duration", `${Date.now() - iterStartedAt}ms`);
+      agentLogField("raw assistantOutput", assistantOutput, 8000);
+      agentLogField("parser final state", parser.getState());
+      agentLogField("captured pendingToolCalls", turn.pendingToolCalls);
+      agentLogField("captured toolCallsError", turn.toolCallsError);
+      agentLogField("answerComplete", turn.answerComplete);
+      agentLogField("answer (sanitized)", turn.answerBuffer);
+      agentLogField("conversation length so far", conversation.length);
+    });
+
     if (turn.answerComplete) {
       // answerBuffer is already sanitized via TagStripper during streaming.
       // If non-empty, accept; otherwise the model only emitted protocol
@@ -1448,7 +1625,11 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       const cleaned = turn.answerBuffer.trim();
       if (cleaned) {
         finalAnswer = cleaned;
+        exitReason = "model emitted clean <answer>";
+      } else {
+        exitReason = "<answer> sanitized to empty → fall through to synth";
       }
+      agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
       break;
     }
 
@@ -1488,11 +1669,19 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           content: `<observations>\n[1] system (fail)\nNone of the tool names you requested exist:\n${lines.join("\n")}\n\nUse ONLY tool names from the Available Tools list (look at the # Available Tools section of the system prompt). If unsure, finalize with <answer> instead of guessing.\n</observations>`,
         });
         consecutiveBadTurns++;
+        agentLogGroup(`run ${runId} · iter ${iteration} · CASE 1 all-hallucinated`, () => {
+          agentLogField("invalid tool names", invalidCalls.map(c => c.name));
+          agentLogField("did-you-mean lines", lines);
+          agentLogField("consecutiveBadTurns", consecutiveBadTurns);
+          agentLogField("gatheredObservations so far", gatheredObservations.length);
+        });
         // Two strikes-and-out — if the model can't pick a real tool name
         // after one correction, it likely never will. Synthesize from
         // whatever (if any) prior data we have.
         if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) {
           opts.callbacks.onPhase("analyzing", "Synthesizing final answer from available context…");
+          exitReason = "all-hallucinated tool names; bailing to synth";
+          agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
           break;
         }
         opts.callbacks.onPhase("analyzing", "Suggesting valid tool names…");
@@ -1508,7 +1697,15 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           content: `<observations>\n[1] system (warn)\nYour <tool_calls> array was empty. Either choose a valid tool from the list or finalize with <answer>.\n</observations>`,
         });
         consecutiveBadTurns++;
-        if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) break;
+        agentLogGroup(`run ${runId} · iter ${iteration} · CASE 2 empty tool_calls`, () => {
+          agentLogField("consecutiveBadTurns", consecutiveBadTurns);
+          agentLogField("gatheredObservations so far", gatheredObservations.length);
+        });
+        if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) {
+          exitReason = "empty <tool_calls>; bailing to synth";
+          agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
+          break;
+        }
         continue;
       }
 
@@ -1523,6 +1720,11 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         sameToolCalls(lastCallSignature, validCalls)
       ) {
         opts.callbacks.onPhase("analyzing", "Tool data already gathered. Synthesizing final answer…");
+        exitReason = "stuck-loop guard fired (same tool calls as previous turn)";
+        agentLogGroup(`run ${runId} · iter ${iteration} · CASE 3 stuck-loop`, () => {
+          agentLogField("repeated calls", validCalls);
+          agentLogField("gatheredObservations so far", gatheredObservations.length);
+        });
         break;
       }
       lastCallSignature = validCalls;
@@ -1535,16 +1737,33 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       );
       opts.callbacks.onToolCallsStart(calls);
 
+      agentLogGroup(`run ${runId} · iter ${iteration} · CASE 3 executing tools`, () => {
+        agentLogField("calls", calls.map(c => ({ name: c.name, arguments: c.arguments })));
+        agentLogField("invalid (sibling) calls", invalidCalls.map(c => c.name));
+      });
+
+      const callsStartedAt = Date.now();
       const realResults: ToolExecutionResult[] = await Promise.all(
         calls.map(async (call) => {
           opts.callbacks.onToolStart(call);
+          const tStart = Date.now();
           try {
             const data = await opts.callTool(call.name, call.arguments || {});
             opts.callbacks.onToolResult(call, data);
+            agentLogGroup(`run ${runId} · iter ${iteration} · tool ok · ${call.name}`, () => {
+              agentLogField("duration", `${Date.now() - tStart}ms`);
+              agentLogField("arguments", call.arguments || {});
+              agentLogField("result", data, 6000);
+            });
             return { tool: call.name, args: call.arguments || {}, ok: true, data };
           } catch (e: any) {
             const message = e?.message || String(e);
             opts.callbacks.onToolError(call, message);
+            agentLogGroup(`run ${runId} · iter ${iteration} · tool fail · ${call.name}`, () => {
+              agentLogField("duration", `${Date.now() - tStart}ms`);
+              agentLogField("arguments", call.arguments || {});
+              agentLogField("error", message);
+            });
             return { tool: call.name, args: call.arguments || {}, ok: false, error: message };
           }
         }),
@@ -1569,15 +1788,28 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       conversation.push({ role: "user", content: formatObservations(results) });
       consecutiveBadTurns = 0;
       opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`);
+      agentLogGroup(`run ${runId} · iter ${iteration} · CASE 3 done`, () => {
+        agentLogField("total duration", `${Date.now() - callsStartedAt}ms`);
+        agentLogField("ok count", realResults.filter(r => r.ok).length);
+        agentLogField("fail count", realResults.filter(r => !r.ok).length);
+        agentLogField("gatheredObservations cumulative", gatheredObservations.length);
+      });
       continue;
     }
 
     if (turn.toolCallsError) {
+      agentLogGroup(`run ${runId} · iter ${iteration} · tool_calls JSON error`, () => {
+        agentLogField("parse error", turn.toolCallsError?.error);
+        agentLogField("raw block", turn.toolCallsError?.raw);
+        agentLogField("gatheredObservations so far", gatheredObservations.length);
+      });
       // Tell the model its JSON was bad — it will retry. But if we already
       // have real data, prefer to synthesize rather than risk another bad
       // turn from a small model that can't recover.
       if (gatheredObservations.length > 0) {
         opts.callbacks.onPhase("analyzing", "Recovering from a malformed tool call. Synthesizing final answer…");
+        exitReason = "tool_calls JSON parse error with prior data → synth";
+        agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
         break;
       }
       conversation.push({
@@ -1600,10 +1832,20 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     const looksLikeProtocolLeak =
       /<thinking>|<tool_calls>|<answer>|<observations>|^User:|\nUser:|^Assistant:|\nAssistant:/i.test(fallback);
 
+    agentLogGroup(`run ${runId} · iter ${iteration} · no protocol output`, () => {
+      agentLogField("fallback length", fallback.length);
+      agentLogField("looksLikeProtocolLeak", looksLikeProtocolLeak);
+      agentLogField("fallback preview", fallback, 1500);
+      agentLogField("consecutiveBadTurns (before incr)", consecutiveBadTurns);
+      agentLogField("gatheredObservations so far", gatheredObservations.length);
+    });
+
     if (iteration === 1 && fallback && !looksLikeProtocolLeak && gatheredObservations.length === 0) {
       const cleaned = sanitizeFinalAnswerText(fallback);
       if (cleaned) {
         finalAnswer = cleaned;
+        exitReason = "iter 1 conversational reply accepted as final";
+        agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
         break;
       }
     }
@@ -1616,6 +1858,8 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       consecutiveBadTurns >= 2 ||
       (gatheredObservations.length > 0 && consecutiveBadTurns >= 1)
     ) {
+      exitReason = `bad-turn threshold reached (${consecutiveBadTurns} consecutive)`;
+      agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
       break;
     }
 
@@ -1636,6 +1880,14 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
   if (!finalAnswer) {
     if (opts.signal.aborted) throw new DOMException("Aborted", "AbortError");
     opts.callbacks.onPhase("responding", "Synthesizing final answer…");
+    agentLogGroup(`run ${runId} · synthesizer · start`, () => {
+      agentLogField("exit reason", exitReason);
+      agentLogField("iterations used", iteration);
+      agentLogField("observations to synthesize", gatheredObservations.length);
+      agentLogField("ok observations", gatheredObservations.filter(o => o.ok).length);
+      agentLogField("fail observations", gatheredObservations.filter(o => !o.ok).length);
+      agentLogField("observations summary", gatheredObservations.map(o => ({ tool: o.tool, ok: o.ok })));
+    });
     finalAnswer = await synthesizeFinalAnswer({
       provider: opts.provider,
       engine: opts.engine,
@@ -1649,6 +1901,14 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       onAnswerEnd: opts.callbacks.onAnswerEnd,
     });
   }
+
+  agentLogGroup(`run ${runId} · finished`, () => {
+    agentLogField("total duration", `${Date.now() - runStartedAt}ms`);
+    agentLogField("iterations used", iteration);
+    agentLogField("exit reason", exitReason);
+    agentLogField("real tool calls captured", gatheredObservations.length);
+    agentLogField("final answer", finalAnswer, 4000);
+  });
 
   return finalAnswer;
 }
