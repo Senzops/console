@@ -90,11 +90,180 @@ const clearChat = async (id: string) => {
 // ============================================================================
 // 2. MODELS
 // ============================================================================
-const LOCAL_MODELS = [
-  { id: "Hermes-3-Llama-3.1-8B-q4f32_1-MLC", name: "Hermes 3 (8B) - High Quality", vramReq: 8 },
-  { id: "Hermes-3-Llama-3.1-8B-q4f16_1-MLC", name: "Hermes 3 (8B) - Balanced", vramReq: 6 },
-  { id: "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC", name: "Hermes 2 Pro (7B) - Fast Spec", vramReq: 4 },
+//
+// Local-execution lineup. We intentionally do NOT use MLC's native function
+// calling (only Hermes-2-Pro supports it) — we drive a tool-use protocol from
+// our own prompt, which means any well-aligned instruction model works. That
+// lets us pick whatever gives the best quality / footprint tradeoff per tier.
+//
+// Selection criteria (production):
+//   1. Strong instruction following + JSON/XML output (tool calls are XML).
+//   2. Available in @mlc-ai/web-llm prebuilt config (no custom model_lib).
+//   3. Footprint covers the full hardware spectrum, from <1GB (mobile / iGPU)
+//      to ~6GB (workstation GPUs). Sorted descending by `vramReq`.
+//   4. At least one well-known model per family (Hermes, Llama, Qwen, Phi)
+//      so users can fall back across architectures if a wasm fails to load.
+//
+// `vramRequiredMB` is the figure WebLLM ships in `prebuiltAppConfig`, used
+// purely as informational metadata. `vramReq` is the rounded GB we surface
+// in the UI as the recommended floor.
+//
+type LocalModelTier = "premium" | "balanced" | "light" | "ultralight";
+
+interface LocalModelOption {
+  id: string;
+  name: string;
+  family: string;
+  params: number;          // billions of parameters
+  vramReq: number;         // recommended VRAM (GB)
+  vramRequiredMB: number;  // exact MB required by the WebLLM bundle
+  tier: LocalModelTier;
+  description: string;
+  tags: string[];
+}
+
+const LOCAL_MODELS: LocalModelOption[] = [
+  // --- Premium tier (6-8 GB VRAM, large parameter count, top quality) ---
+  {
+    id: "Hermes-3-Llama-3.1-8B-q4f32_1-MLC",
+    name: "Hermes 3 (8B) - High Quality",
+    family: "Hermes 3",
+    params: 8,
+    vramReq: 8,
+    vramRequiredMB: 5779,
+    tier: "premium",
+    description: "Highest reasoning quality. Best for complex multi-tool workflows.",
+    tags: ["Tool-Tuned", "Reasoning"],
+  },
+  {
+    id: "Hermes-3-Llama-3.1-8B-q4f16_1-MLC",
+    name: "Hermes 3 (8B) - Balanced",
+    family: "Hermes 3",
+    params: 8,
+    vramReq: 6,
+    vramRequiredMB: 4876,
+    tier: "premium",
+    description: "Same model, lower precision. Default for most discrete GPUs.",
+    tags: ["Tool-Tuned", "Recommended"],
+  },
+  {
+    id: "Qwen2.5-7B-Instruct-q4f16_1-MLC",
+    name: "Qwen 2.5 (7B) - Strong Tool-Use",
+    family: "Qwen 2.5",
+    params: 7,
+    vramReq: 6,
+    vramRequiredMB: 5107,
+    tier: "premium",
+    description: "Best-in-class instruction following and structured output.",
+    tags: ["Recommended", "Fast"],
+  },
+  {
+    id: "Llama-3.1-8B-Instruct-q4f16_1-MLC",
+    name: "Llama 3.1 (8B) - Standard",
+    family: "Llama 3.1",
+    params: 8,
+    vramReq: 6,
+    vramRequiredMB: 4598,
+    tier: "premium",
+    description: "Meta's flagship 8B. Reliable general-purpose reasoning.",
+    tags: [],
+  },
+
+  // --- Balanced tier (4-5 GB VRAM, mid-size, strong quality) ---
+  {
+    id: "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC",
+    name: "Hermes 2 Pro (7B) - Tool Specialist",
+    family: "Hermes 2 Pro",
+    params: 7,
+    vramReq: 5,
+    vramRequiredMB: 4033,
+    tier: "balanced",
+    description: "Mistral base, fine-tuned on function-calling data. Classic.",
+    tags: ["Tool-Tuned"],
+  },
+  {
+    id: "Phi-3.5-mini-instruct-q4f16_1-MLC",
+    name: "Phi 3.5 Mini (3.8B) - Reasoning",
+    family: "Phi 3.5",
+    params: 3.8,
+    vramReq: 4,
+    vramRequiredMB: 3672,
+    tier: "balanced",
+    description: "Microsoft's efficient reasoner. Great logic-per-parameter.",
+    tags: ["Reasoning"],
+  },
+
+  // --- Light tier (3 GB VRAM, small but capable) ---
+  {
+    id: "Qwen2.5-3B-Instruct-q4f16_1-MLC",
+    name: "Qwen 2.5 (3B) - Lightweight Pro",
+    family: "Qwen 2.5",
+    params: 3,
+    vramReq: 3,
+    vramRequiredMB: 2505,
+    tier: "light",
+    description: "Best small-model tool use. Recommended for laptops.",
+    tags: ["Recommended", "Fast"],
+  },
+  {
+    id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
+    name: "Llama 3.2 (3B) - Edge",
+    family: "Llama 3.2",
+    params: 3,
+    vramReq: 3,
+    vramRequiredMB: 2264,
+    tier: "light",
+    description: "Edge-optimized by Meta. Solid quality at 3B parameters.",
+    tags: ["Edge"],
+  },
+
+  // --- Ultralight tier (1-2 GB VRAM, integrated graphics / mobile) ---
+  {
+    id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+    name: "Qwen 2.5 (1.5B) - Ultra Light",
+    family: "Qwen 2.5",
+    params: 1.5,
+    vramReq: 2,
+    vramRequiredMB: 1630,
+    tier: "ultralight",
+    description: "Runs on integrated GPUs. Surprisingly capable for tool calls.",
+    tags: ["Edge", "Fast"],
+  },
+  {
+    id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+    name: "Llama 3.2 (1B) - Minimal",
+    family: "Llama 3.2",
+    params: 1,
+    vramReq: 1,
+    vramRequiredMB: 879,
+    tier: "ultralight",
+    description: "Smallest viable model. For very constrained devices.",
+    tags: ["Edge"],
+  },
 ];
+
+const TIER_ORDER: LocalModelTier[] = ["premium", "balanced", "light", "ultralight"];
+
+const TIER_LABELS: Record<LocalModelTier, string> = {
+  premium: "Premium — discrete GPU (6 GB+ VRAM)",
+  balanced: "Balanced — mid-range GPU (4–5 GB VRAM)",
+  light: "Light — laptops / older GPUs (3 GB VRAM)",
+  ultralight: "Ultra-light — integrated graphics (1–2 GB VRAM)",
+};
+
+/** Default initial selection before the WebGPU profiler runs. */
+const DEFAULT_LOCAL_MODEL_ID = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC";
+
+/**
+ * Pick the highest-quality model whose recommended VRAM fits the detected
+ * budget. LOCAL_MODELS is sorted descending by `vramReq`, so the first match
+ * is also the highest-quality option that fits. Falls back to the smallest
+ * model if nothing fits (avoids returning undefined).
+ */
+function pickModelForVram(gb: number): string {
+  const fit = LOCAL_MODELS.find(m => m.vramReq <= gb);
+  return (fit ?? LOCAL_MODELS[LOCAL_MODELS.length - 1]).id;
+}
 
 // ============================================================================
 // 3. TOOL DEFINITIONS (used to build the agent system prompt)
@@ -1570,7 +1739,7 @@ export default function AiAssistantPage() {
   const [engineMode, setEngineMode] = useState<"setup" | "loading" | "ready">("setup");
   const [provider, setProvider] = useState<"webllm" | "byok">("webllm");
   const [hardwareProfile, setHardwareProfile] = useState<any>(null);
-  const [selectedModel, setSelectedModel] = useState(LOCAL_MODELS[1].id);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_LOCAL_MODEL_ID);
   const [byokKey, setByokKey] = useState("");
 
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
@@ -1633,9 +1802,21 @@ export default function AiAssistantPage() {
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) throw new Error("No adapter found");
 
-        let vramEstimate = 4;
-        if (adapter.limits.maxStorageBufferBindingSize > 2 * 1024 * 1024 * 1024) vramEstimate = 8;
-        else if (adapter.limits.maxStorageBufferBindingSize < 1024 * 1024 * 1024) vramEstimate = 2;
+        // WebGPU does not expose total VRAM directly. We estimate from
+        // `maxStorageBufferBindingSize`, which scales with device memory:
+        //   discrete GPUs (>=8 GB VRAM)   ~ 4+ GB max buffer
+        //   mid-range / mobile dGPUs       ~ 2-4 GB
+        //   thin-and-light dGPUs           ~ 1-2 GB
+        //   integrated graphics            ~ 256 MB-1 GB
+        // These thresholds map onto our model tiers without false positives.
+        const maxBuf = adapter.limits.maxStorageBufferBindingSize;
+        const GB = 1024 * 1024 * 1024;
+        let vramEstimate: number;
+        if (maxBuf >= 4 * GB) vramEstimate = 8;
+        else if (maxBuf >= 2 * GB) vramEstimate = 6;
+        else if (maxBuf >= 1 * GB) vramEstimate = 4;
+        else if (maxBuf >= 0.5 * GB) vramEstimate = 2;
+        else vramEstimate = 1;
 
         setHardwareProfile({
           supported: true,
@@ -1643,9 +1824,7 @@ export default function AiAssistantPage() {
           name: adapter.info?.isFallbackAdapter ? "Software Renderer" : "Hardware GPU"
         });
 
-        if (vramEstimate >= 8) setSelectedModel(LOCAL_MODELS[0].id);
-        else if (vramEstimate >= 4) setSelectedModel(LOCAL_MODELS[1].id);
-        else setSelectedModel(LOCAL_MODELS[2].id);
+        setSelectedModel(pickModelForVram(vramEstimate));
 
       } catch (err) {
         setHardwareProfile({ supported: false, reason: "Failed to access GPU adapter." });
@@ -2059,10 +2238,39 @@ export default function AiAssistantPage() {
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Model Weights</label>
                             <Select value={selectedModel} onChange={e => setSelectedModel(e.target.value)} className="h-8 text-xs bg-background shadow-sm">
-                              {LOCAL_MODELS.map(m => (
-                                <option key={m.id} value={m.id}>{m.name} (Requires {m.vramReq}GB VRAM)</option>
-                              ))}
+                              {TIER_ORDER.map(tier => {
+                                const tierModels = LOCAL_MODELS.filter(m => m.tier === tier);
+                                if (tierModels.length === 0) return null;
+                                return (
+                                  <optgroup key={tier} label={TIER_LABELS[tier]}>
+                                    {tierModels.map(m => (
+                                      <option key={m.id} value={m.id}>
+                                        {m.name} · {m.vramReq}GB VRAM
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                );
+                              })}
                             </Select>
+                            {selectedModelData && (
+                              <div className="flex flex-col gap-1.5 mt-1">
+                                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                  {selectedModelData.description}
+                                </p>
+                                {selectedModelData.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {selectedModelData.tags.map(tag => (
+                                      <span
+                                        key={tag}
+                                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-border/60 bg-muted/40 text-muted-foreground"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             {showVramWarning && (
                               <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 p-3 rounded-lg mt-4 animate-in fade-in">
                                 <AlertTriangle className="h-5 w-5 shrink-0" />
