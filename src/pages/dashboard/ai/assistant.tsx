@@ -253,6 +253,10 @@ class ProtocolParser {
     return events;
   }
 
+  /** Current parser state. Used by the orchestrator to decide whether to
+   * synthesize a closing tag after a stream-side stop sequence fires. */
+  getState(): "idle" | "thinking" | "tool_calls" | "answer" { return this.state; }
+
   /** Whatever is currently buffered but not yet emitted. */
   remainder(): string { return this.buffer; }
 
@@ -358,68 +362,71 @@ const buildToolListForPrompt = (tools: ToolSchema[]): string => {
 
 const buildAgentSystemPrompt = (tools: ToolSchema[]): string => {
   const toolList = buildToolListForPrompt(tools);
-  return `You are Senzor Operational Intelligence — an enterprise SRE assistant for infrastructure monitoring and observability. You analyze APM, RUM, logs, errors, and infrastructure metrics to help the user diagnose issues, understand system behavior, and make data-driven decisions.
+  return `You are Senzor Operational Intelligence — an enterprise SRE assistant for infrastructure monitoring and observability across APM, RUM, logs, errors, infrastructure, and billing.
 
-You operate as an autonomous agent with access to live telemetry tools. Reason step-by-step, fetch real data with tools, then synthesize a clear answer.
+You operate as an autonomous agent with access to live telemetry tools. Reason briefly, fetch real data with tools, then synthesize a clear answer for the user.
 
-# Tools
+# Available Tools
 
 ${toolList}
 
-# Protocol
+# Output Protocol — STRICT
 
-You MUST communicate using XML-style tags. Each turn must follow ONE of these patterns exactly. Never mix patterns in a single turn. Never emit text outside the tags.
+You communicate ONLY through XML-tagged blocks. Every response is EXACTLY ONE of these two patterns. Never mix them. Never write any text outside the tags.
 
-## Pattern A — gather data with tools
-
+## Pattern A — fetch data with tools
 <thinking>
-One short paragraph: what data do you need and which tools will get it? Be specific.
+One short paragraph (1-3 sentences) of plain prose: what data is needed and which tool(s) will get it.
 </thinking>
 <tool_calls>
-[
-  {"name": "tool_name", "arguments": { "key": "value" }}
-]
+[{"name": "tool_name", "arguments": {"key": "value"}}]
 </tool_calls>
 
-## Pattern B — provide the final answer
-
+## Pattern B — final answer to the user
 <thinking>
-One short paragraph: what does the gathered data show?
+One short paragraph (1-3 sentences) summarizing what the gathered data shows.
 </thinking>
 <answer>
-Your markdown response to the user. Cite real values from the observations.
+Your GitHub-Flavored Markdown response. Cite real values from the observations.
 </answer>
 
-# Rules
+# Hard Rules — DO NOT VIOLATE
 
-1. ALWAYS open with a <thinking> block. Keep it 1-3 sentences.
-2. Each turn outputs EXACTLY ONE pattern — either <tool_calls> OR <answer>, never both, never neither.
-3. The <tool_calls> body MUST be a valid JSON array. Multiple tools execute in parallel, so include independent fetches together.
-4. NEVER invent metrics, IDs, or values. Only cite data that appeared in an <observations> block in the conversation.
-5. If a tool returns ok:false or empty data, acknowledge it in your next <thinking> and adapt (try a different tool, or answer with what you have).
-6. If the user's request is conversational (greeting, capability question, clarification), skip <tool_calls> and answer directly with <answer>.
-7. If you cannot make further progress, write a clear <answer> explaining what you found and what is missing.
-8. Format <answer> in clean markdown: headings, bullet lists, tables, fenced code blocks where useful. Keep it scannable.
-9. Be concise. SREs are busy.
+1. STOP IMMEDIATELY after </tool_calls> or </answer>. Generate nothing more in that turn.
+2. NEVER write the literal strings "User:" or "Assistant:" — those are role markers, not content.
+3. NEVER write your own <observations> block. The system supplies <observations> for you as the next user message after each <tool_calls>.
+4. NEVER simulate a follow-up question from the user. Wait for the real user's next message.
+5. Each turn = exactly ONE pattern. Either <tool_calls> OR <answer>, never both, never neither.
+6. The body inside <tool_calls> MUST be a valid JSON array. Independent fetches go in the same array (executed in parallel). Use only tool names from the Available Tools list above.
+7. NEVER invent metrics, IDs, timestamps, or values. Only cite data that actually appeared in an <observations> block earlier in this conversation.
+8. If a tool returns ok:false or empty data, acknowledge it in the next <thinking> and adapt: try a different tool, broaden the time range, or finalize with <answer>.
+9. For purely conversational input (greeting, capability question, clarification), skip <tool_calls> and answer directly with <answer>.
+10. <answer> must be clean GitHub-Flavored Markdown — headings, bullet lists, tables, fenced code blocks where useful. Be concise. SREs are busy.
 
-# Example
+# Worked Example
 
-User: "Is my main API healthy?"
+The block below shows a complete agent run for ONE example user query. Inside <example>...</example>, you can see what YOU would emit on each turn and what the SYSTEM supplies between your turns. Outside of <example>, never repeat any of these literal values; they are illustrative only.
 
+<example>
+[Example user query: "Is my main API healthy?"]
+
+[Your turn 1:]
 <thinking>
-I need the user's APM services and the main one's recent latency plus unresolved errors.
+Need APM service list to find the main API, then its recent stats and unresolved errors.
 </thinking>
 <tool_calls>
 [{"name": "apm_list_services", "arguments": {}}]
 </tool_calls>
 
+[System then supplies, as the next user message:]
 <observations>
 [1] apm_list_services (ok)
 {"services":[{"id":"svc_42","name":"main-api"}]}
 </observations>
 
+[Your turn 2:]
 <thinking>
-Found "main-api" (svc_42). Fetching stats and unresolved errors in parallel.
+Found main-api (svc_42). Pulling 24h stats and unresolved errors in parallel.
 </thinking>
 <tool_calls>
 [
@@ -428,6 +435,7 @@ Found "main-api" (svc_42). Fetching stats and unresolved errors in parallel.
 ]
 </tool_calls>
 
+[System then supplies:]
 <observations>
 [1] apm_get_stats (ok)
 {"p50":110,"p95":420,"p99":880,"rps":18,"errorRate":0.4}
@@ -435,14 +443,15 @@ Found "main-api" (svc_42). Fetching stats and unresolved errors in parallel.
 {"errors":[]}
 </observations>
 
+[Your turn 3 — final:]
 <thinking>
-Latency healthy (p95 420ms), 18 RPS sustained, error rate < 1%, no unresolved exception groups. The service is healthy.
+p95 of 420ms is healthy, 18 RPS sustained, error rate 0.4%, no unresolved error groups. Service is healthy.
 </thinking>
 <answer>
 ## main-api — Healthy
 
 | Metric | Value |
-|--------|-------|
+|---|---|
 | p50 latency | 110ms |
 | p95 latency | 420ms |
 | p99 latency | 880ms |
@@ -451,7 +460,10 @@ Latency healthy (p95 420ms), 18 RPS sustained, error rate < 1%, no unresolved ex
 | Unresolved errors | 0 |
 
 No action needed. The service is operating within normal parameters.
-</answer>`;
+</answer>
+</example>
+
+End of example. Now respond to the real user query that follows. Remember: ONE pattern per turn, STOP after </tool_calls> or </answer>, never invent values, never simulate the user.`;
 };
 
 // ============================================================================
@@ -540,9 +552,18 @@ interface StreamOpts {
   temperature?: number;
   maxTokens?: number;
   signal: AbortSignal;
+  /**
+   * Hard stop sequences. Both providers natively support these. We also keep
+   * a software-side guard in the consumer (the orchestrator) in case the
+   * provider doesn't honor them in streaming mode (some local backends don't).
+   */
+  stop?: string[];
 }
 
 async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void, void> {
+  // OpenAI's REST API caps `stop` at 4 entries. WebLLM mirrors that contract.
+  const stop = opts.stop && opts.stop.length > 0 ? opts.stop.slice(0, 4) : undefined;
+
   if (opts.provider === "webllm") {
     if (!opts.engine) throw new Error("WebLLM engine is not initialized.");
     const stream = (await opts.engine.chat.completions.create({
@@ -550,6 +571,7 @@ async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void,
       stream: true,
       temperature: opts.temperature ?? 0.3,
       max_tokens: opts.maxTokens ?? 2048,
+      ...(stop ? { stop } : {}),
     })) as AsyncIterable<any>;
 
     for await (const chunk of stream) {
@@ -577,6 +599,7 @@ async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void,
       stream: true,
       temperature: opts.temperature ?? 0.3,
       max_tokens: opts.maxTokens ?? 2048,
+      ...(stop ? { stop } : {}),
     }),
   });
 
@@ -657,9 +680,45 @@ interface RunAgentOpts {
   maxIterations?: number;
 }
 
+/**
+ * Stop sequences sent to the model on every iteration. Two purposes:
+ *   1. Natural turn-boundary stops (</tool_calls>, </answer>) — the model is
+ *      contractually supposed to stop there anyway, but giving the engine an
+ *      explicit stop saves compute and prevents runaway hallucination.
+ *   2. Hallucination guards (<observations>, "User:") — the model should
+ *      NEVER emit these. If a small model hallucinates them, we kill the
+ *      stream before the bogus content pollutes our protocol.
+ *
+ * OpenAI's API caps `stop` at 4. WebLLM mirrors that contract.
+ */
+const AGENT_STOP_SEQUENCES = ["</tool_calls>", "</answer>", "<observations>", "User:"];
+
+/**
+ * Strip a string from the end if present. Used to canonicalize raw model
+ * output after a stop sequence fired (the engine excludes the stop string).
+ */
+const stripTrailing = (s: string, suffix: string): string =>
+  s.endsWith(suffix) ? s.slice(0, -suffix.length) : s;
+
+/**
+ * Compare two arrays of tool calls for structural equality. Used to detect
+ * the "model is stuck repeating the same call" failure mode.
+ */
+const sameToolCalls = (a: ParsedToolCall[], b: ParsedToolCall[]): boolean => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].name !== b[i].name) return false;
+    try {
+      if (JSON.stringify(a[i].arguments) !== JSON.stringify(b[i].arguments)) return false;
+    } catch { return false; }
+  }
+  return true;
+};
+
 async function runAgent(opts: RunAgentOpts): Promise<string> {
-  const maxIter = opts.maxIterations ?? 8;
+  const maxIter = opts.maxIterations ?? 6;
   const systemPrompt = buildAgentSystemPrompt(opts.tools);
+  const knownToolNames = new Set(opts.tools.map(t => t.function.name));
 
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -671,6 +730,8 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
 
   let finalAnswer = "";
   let iteration = 0;
+  let lastCallSignature: ParsedToolCall[] | null = null;
+  let consecutiveBadTurns = 0;
 
   while (iteration < maxIter) {
     iteration++;
@@ -733,9 +794,13 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         apiKey: opts.apiKey,
         byokModel: opts.byokModel,
         messages: conversation,
-        temperature: 0.3,
-        maxTokens: 2048,
+        // Low temperature for deterministic protocol & tool selection. Higher
+        // temperatures cause small models like Hermes-3-8B to hallucinate
+        // tool names and protocol violations.
+        temperature: 0.1,
+        maxTokens: 1536,
         signal: opts.signal,
+        stop: AGENT_STOP_SEQUENCES,
       })) {
         assistantOutput += delta;
         handleEvents(parser.feed(delta));
@@ -750,6 +815,18 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           break;
         }
       }
+
+      // Stream ended. If a stop sequence fired and we were mid-block, the
+      // engine swallowed the closing tag (e.g. "</tool_calls>"). Re-feed the
+      // appropriate closer so the parser can finalize cleanly.
+      const parserState = parser.getState();
+      if (!turn.pendingToolCalls && !turn.toolCallsError && !turn.answerComplete) {
+        if (parserState === "tool_calls") {
+          handleEvents(parser.feed("</tool_calls>"));
+        } else if (parserState === "answer") {
+          handleEvents(parser.feed("</answer>"));
+        }
+      }
       handleEvents(parser.flush());
     } catch (err: any) {
       if (err?.name === "AbortError") throw err;
@@ -757,8 +834,18 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       throw err;
     }
 
-    // Persist this turn into the agent's working memory (system + assistant raw)
-    conversation.push({ role: "assistant", content: assistantOutput });
+    // Canonicalize the raw output for conversation memory: drop any trailing
+    // stop sequence the engine may or may not have included.
+    let canonical = assistantOutput;
+    for (const seq of AGENT_STOP_SEQUENCES) {
+      canonical = stripTrailing(canonical, seq);
+    }
+    canonical = canonical.trimEnd();
+    // If we had to synthesize a closer, append it for memory consistency.
+    if (turn.pendingToolCalls && !canonical.endsWith("</tool_calls>")) canonical += "\n</tool_calls>";
+    if (turn.answerComplete && !canonical.endsWith("</answer>")) canonical += "\n</answer>";
+
+    conversation.push({ role: "assistant", content: canonical });
 
     if (turn.answerComplete && turn.answerBuffer.trim()) {
       finalAnswer = turn.answerBuffer.trim();
@@ -766,7 +853,33 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     }
 
     if (turn.pendingToolCalls && turn.pendingToolCalls.length > 0) {
-      const calls: ParsedToolCall[] = turn.pendingToolCalls;
+      // Validate every requested call against the registered tool list.
+      // Unknown tools become synthetic ok:false observations so the model
+      // can self-correct on the next iteration.
+      const validCalls: ParsedToolCall[] = [];
+      const invalidCalls: ParsedToolCall[] = [];
+      for (const c of turn.pendingToolCalls) {
+        if (knownToolNames.has(c.name)) validCalls.push(c);
+        else invalidCalls.push(c);
+      }
+
+      // Stuck-loop guard: same calls as the previous iteration → force
+      // synthesis instead of repeating.
+      if (
+        validCalls.length > 0 &&
+        lastCallSignature &&
+        sameToolCalls(lastCallSignature, validCalls)
+      ) {
+        conversation.push({
+          role: "user",
+          content: `<observations>\n[1] system (info)\nYou requested the same tool calls as your previous turn. The data has not changed. Provide your final <answer> now using the observations already gathered. Do NOT call any more tools.\n</observations>`,
+        });
+        opts.callbacks.onPhase("analyzing", "Synthesizing final answer…");
+        continue;
+      }
+      lastCallSignature = validCalls.length > 0 ? validCalls : null;
+
+      const calls: ParsedToolCall[] = validCalls;
       opts.callbacks.onPhase(
         "calling_tools",
         `Executing ${calls.length} tool${calls.length > 1 ? "s" : ""}…`,
@@ -774,7 +887,7 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       );
       opts.callbacks.onToolCallsStart(calls);
 
-      const results: ToolExecutionResult[] = await Promise.all(
+      const realResults: ToolExecutionResult[] = await Promise.all(
         calls.map(async (call) => {
           opts.callbacks.onToolStart(call);
           try {
@@ -789,8 +902,25 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         }),
       );
 
-      conversation.push({ role: "user", content: formatObservations(results) });
-      opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length > 1 ? "s" : ""}…`);
+      const invalidResults: ToolExecutionResult[] = invalidCalls.map((c) => {
+        const message = `Unknown tool "${c.name}". Choose only from the Available Tools list.`;
+        opts.callbacks.onToolError(c, message);
+        return { tool: c.name, args: c.arguments || {}, ok: false, error: message };
+      });
+
+      const results = [...realResults, ...invalidResults];
+      if (results.length === 0) {
+        // Model emitted <tool_calls>[]</tool_calls> — useless. Push it back.
+        conversation.push({
+          role: "user",
+          content: `<observations>\n[1] system (warn)\nYour <tool_calls> array was empty or contained only unknown tools. Either choose a valid tool from the list or finalize with <answer>.\n</observations>`,
+        });
+        consecutiveBadTurns++;
+      } else {
+        conversation.push({ role: "user", content: formatObservations(results) });
+        consecutiveBadTurns = 0;
+      }
+      opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`);
       continue;
     }
 
@@ -798,22 +928,42 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       // Tell the model its JSON was bad — it will retry.
       conversation.push({
         role: "user",
-        content: `<observations>\n[1] system (fail)\nERROR: Could not parse your <tool_calls> JSON (${turn.toolCallsError.error}). Retry with a valid JSON array, or skip tools and provide an <answer>.\n</observations>`,
+        content: `<observations>\n[1] system (fail)\nCould not parse your <tool_calls> JSON: ${turn.toolCallsError.error}. Retry with a valid JSON array, or skip tools and provide an <answer>.\n</observations>`,
       });
+      consecutiveBadTurns++;
       continue;
     }
 
-    // Model produced text but neither pattern parsed — graceful fallback:
-    // treat the whole raw output as the answer if it looks like prose.
+    // Model produced text but neither tool_calls nor answer parsed cleanly.
+    // Two sub-cases:
+    //   (a) iteration 1 with no tools used yet AND no protocol noise → treat
+    //       as conversational reply (greeting, capability question).
+    //   (b) any later iteration, OR output that looks like a protocol leak
+    //       (contains <thinking>, <tool_calls>, "User:", etc.) → push the
+    //       model back on rails with a corrective observation.
     const fallback = assistantOutput.trim();
-    if (fallback) {
+    const looksLikeProtocolLeak =
+      /<thinking>|<tool_calls>|<answer>|<observations>|^User:|\nUser:|^Assistant:|\nAssistant:/i.test(fallback);
+    const hasGatheredData = conversation.some(
+      (m, i) => i > 0 && m.role === "user" && m.content.includes("<observations>"),
+    );
+
+    if (iteration === 1 && fallback && !looksLikeProtocolLeak && !hasGatheredData) {
       finalAnswer = fallback;
       break;
     }
 
-    // Empty output — bail to avoid infinite loop.
-    finalAnswer = "I was unable to generate a response. Please try rephrasing.";
-    break;
+    consecutiveBadTurns++;
+    if (consecutiveBadTurns >= 2) {
+      // Hard fail — break out so the post-loop synthesizer can salvage
+      // whatever observations we already have.
+      break;
+    }
+
+    conversation.push({
+      role: "user",
+      content: `<observations>\n[1] system (warn)\nYour previous response did not follow the protocol. Respond with EXACTLY one pattern: either <thinking>...</thinking><tool_calls>[...]</tool_calls> or <thinking>...</thinking><answer>...</answer>. Do not output anything else.\n</observations>`,
+    });
   }
 
   // Hit iteration cap without a final <answer> — force synthesis
@@ -836,12 +986,25 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         apiKey: opts.apiKey,
         byokModel: opts.byokModel,
         messages: conversation,
-        temperature: 0.4,
+        temperature: 0.2,
         maxTokens: 2048,
         signal: opts.signal,
+        stop: AGENT_STOP_SEQUENCES,
       })) {
         raw += delta;
         for (const ev of parser.feed(delta)) {
+          if (ev.kind === "answer_delta") {
+            if (!answered) { answered = true; opts.callbacks.onAnswerStart(); }
+            buf += ev.text;
+            opts.callbacks.onAnswerDelta(ev.text);
+          } else if (ev.kind === "answer_end") {
+            opts.callbacks.onAnswerEnd(buf.trim());
+          }
+        }
+      }
+      // Synthesize closer if engine ate it via stop sequence
+      if (parser.getState() === "answer") {
+        for (const ev of parser.feed("</answer>")) {
           if (ev.kind === "answer_delta") {
             if (!answered) { answered = true; opts.callbacks.onAnswerStart(); }
             buf += ev.text;
@@ -1705,7 +1868,7 @@ export default function AiAssistantPage() {
         callTool: (name, args) => callToolForAgent(name, args),
         signal: abort.signal,
         callbacks,
-        maxIterations: 8,
+        maxIterations: 6,
       });
 
       trace.endedAt = Date.now();
