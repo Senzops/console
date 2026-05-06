@@ -356,18 +356,18 @@ const AI_TOOLS: ToolSchema[] = [
 // made, and how the synthesizer recovered. Otherwise debugging becomes guessing.
 //
 // All output goes to the browser DevTools console under collapsible groups
-// labeled `[AI Agent · ...]`. Enabled by default; opt out by running:
-//   localStorage.AI_AGENT_DEBUG = "0"
-// in the browser console (or set to "1" / unset to re-enable). Has zero cost
+// labeled `[AI Agent · ...]`. Disabled by default; opt in by running:
+//   localStorage.AI_AGENT_DEBUG = "1"
+// in the browser console (or set to "0" / set to re-disable). Has zero cost
 // when disabled — every helper short-circuits on the cached flag.
 
 const AGENT_DEBUG_ENABLED: boolean = (() => {
   if (typeof window === "undefined") return false;
   try {
     const v = window.localStorage.getItem("AI_AGENT_DEBUG");
-    return v === null ? true : v !== "0";
+    return v === null ? false : v !== "0";
   } catch {
-    return true;
+    return false;
   }
 })();
 
