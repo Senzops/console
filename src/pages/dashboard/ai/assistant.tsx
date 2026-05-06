@@ -255,6 +255,21 @@ const TIER_LABELS: Record<LocalModelTier, string> = {
 const DEFAULT_LOCAL_MODEL_ID = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC";
 
 /**
+ * KV cache budget (tokens) we ask WebLLM to allocate per engine. The MLC
+ * prebuilt config defaults to 4096 for almost every model; with a 38-tool
+ * registry our system prompt alone is ~2K tokens, so 4096 is far too tight
+ * once observations and a few iteration turns accumulate. 8192 is the sweet
+ * spot — safely supported by every wasm lib we ship, costs only ~0.5–1 GB
+ * extra VRAM on 8B models, and gives ~6K usable tokens after the prompt
+ * baseline.
+ *
+ * If the wasm lib can't allocate this (rare; only happens on heavily
+ * memory-constrained devices), engine init falls back to FALLBACK below.
+ */
+const ENGINE_CONTEXT_TARGET = 8192;
+const ENGINE_CONTEXT_FALLBACK = 4096;
+
+/**
  * Pick the highest-quality model whose recommended VRAM fits the detected
  * budget. LOCAL_MODELS is sorted descending by `vramReq`, so the first match
  * is also the highest-quality option that fits. Falls back to the smallest
@@ -905,6 +920,11 @@ function sanitizeFinalAnswerText(s: string): string {
   // verbatim from few-shot prompts. Match a whole line so we don't accidentally
   // remove user-typed bracket prose.
   out = out.replace(/(^|\n)\s*\[(?:Your\s+turn[^\]\n]*|System[^\]\n]*?(?:supplies|provides|then)[^\]\n]*|Continue[^\]\n]*|Example[^\]\n]*|Turn\s+\d+[^\]\n]*)\][^\n]*/gi, "$1");
+  // Strip enumerated example labels — "Example 4 — fetching data...", etc.
+  out = out.replace(/(^|\n)\s*Example\s+\d+\s*[—–-][^\n]*/gi, "$1");
+  // Strip reference-card scaffolding lines from our prompt template.
+  out = out.replace(/(^|\n)\s*(?:Reference\s+card[^\n]*|Single-tool\s+call[^\n]*|Parallel\s+calls\s+in[^\n]*|Final\s+answer\s+in\s+markdown[^\n]*|Pattern\s+[ABab][^\n]*)/gi, "$1");
+  out = out.replace(/(^|\n)\s*---\s*(?:BEGIN|END)\s+REFERENCE\s*---[^\n]*/gi, "$1");
   // Strip stray sentinel tokens leaked by some MLC tokenizers.
   out = out.replace(/<unk>/gi, "");
   out = out.replace(/<\/?s>/g, "");
@@ -974,54 +994,54 @@ Your GitHub-Flavored Markdown response. Cite real values from the observations.
 10. <answer> must be clean GitHub-Flavored Markdown — headings, bullet lists, tables, fenced code blocks where useful. Be concise. SREs are busy.
 11. Once you have called a tool, the next turn must be <answer> unless the data clearly requires a follow-up call with DIFFERENT arguments. NEVER call the same tool with the same arguments twice in a row — that is a fatal protocol violation; finalize with <answer> instead.
 
-# Examples of well-formed outputs
+# Reference card — three correct outputs
 
-Each block below is a single complete turn — the EXACT bytes you should emit. Nothing else. The system handles everything between turns. NEVER echo bracketed scaffolding like "[Your turn]", "[System then supplies]", "[Example]", or "[Turn 1]" — those are not part of the protocol and are not shown here.
+Read the card below ONCE for shape. The card is closed reference material — never extend it, never enumerate beyond what you see, never echo any of its labels (e.g. "Single-tool call", "Pattern A", "Pattern B", "BEGIN REFERENCE", "END REFERENCE").
 
-Example 1 — fetching data with one tool (Pattern A):
+--- BEGIN REFERENCE ---
+
+Single-tool call (Pattern A):
 <thinking>
-Need to list VPS servers to check their resource usage.
+Need to list VPS servers to check resource usage.
 </thinking>
 <tool_calls>
 [{"name": "vps_list", "arguments": {}}]
 </tool_calls>
 
-Example 2 — parallel fetches in a single turn (Pattern A):
+Parallel calls in one turn (Pattern A):
 <thinking>
 Pulling APM stats and unresolved errors for svc_42 in parallel.
 </thinking>
 <tool_calls>
-[
-  {"name": "apm_get_stats", "arguments": {"id": "svc_42", "range": "24h"}},
-  {"name": "error_get_global", "arguments": {}}
-]
+[{"name": "apm_get_stats", "arguments": {"id": "svc_42", "range": "24h"}}, {"name": "error_get_global", "arguments": {}}]
 </tool_calls>
 
-Example 3 — final answer with markdown (Pattern B), emitted AFTER an <observations> block was supplied to you:
+Final answer in markdown (Pattern B), emitted AFTER an <observations> block was supplied:
 <thinking>
-p95 of 420ms is healthy, 18 RPS sustained, 0.4% error rate, no unresolved errors. Service is healthy.
+p95 420ms, 18 RPS, 0.4% errors, no unresolved groups. Healthy.
 </thinking>
 <answer>
 ## main-api — Healthy
 
 | Metric | Value |
 |---|---|
-| p50 latency | 110ms |
 | p95 latency | 420ms |
 | Throughput | 18 RPS |
 | Error rate | 0.4% |
 | Unresolved errors | 0 |
 
-No action needed. Operating within normal parameters.
+No action needed.
 </answer>
 
-End of examples. Respond to the real user query that follows.
+--- END REFERENCE ---
 
-Final reminders before you respond:
-- Emit EXACTLY ONE pattern. Either <thinking>...</thinking><tool_calls>[...]</tool_calls> OR <thinking>...</thinking><answer>...</answer>.
-- The body inside <tool_calls> must be a SINGLE valid JSON array. Do not emit two arrays. Do not put your tool calls inside markdown code fences (\`\`\`json ... \`\`\`) — that is forbidden, use the <tool_calls> tag.
-- STOP IMMEDIATELY after </tool_calls> or </answer>. Generate no further text in that turn.
-- Never write "[Your turn]", "[System ...]", "User:", "Assistant:", "Turn N:", or any similar role/scaffolding labels.`;
+Now respond to the real user query that follows.
+
+Final checklist:
+- Emit EXACTLY ONE pattern: <thinking>…</thinking><tool_calls>[…]</tool_calls> OR <thinking>…</thinking><answer>…</answer>.
+- The body of <tool_calls> is a SINGLE valid JSON array — never two arrays, never inside a \`\`\`json fence.
+- STOP IMMEDIATELY after </tool_calls> or </answer>. No trailing text.
+- Never write "Example N", "Reference N", "Single-tool call", "Pattern A", "Pattern B", "[Your turn]", "[System ...]", "User:", "Assistant:", "Turn N:", "--- BEGIN", "--- END", or any other scaffolding seen above. Those are reference labels, NOT protocol.`;
 };
 
 // ============================================================================
@@ -1037,7 +1057,11 @@ interface ToolExecutionResult {
 
 const formatObservations = (
   results: ToolExecutionResult[],
-  budget: { perTool: number; total: number } = { perTool: 3500, total: 14000 },
+  // Tightened from { 3500, 14000 } to fit the 8K context window. With our
+  // ~2K-token system prompt, this leaves ~3K tokens for accumulated history
+  // plus ~1.5K for the model's response — comfortable working budget.
+  // Per-tool 2400 chars ≈ 700 tokens; total 7200 chars ≈ 2050 tokens.
+  budget: { perTool: number; total: number } = { perTool: 2400, total: 7200 },
 ): string => {
   const safeStringify = (val: any): string => {
     try { return JSON.stringify(val); } catch { return String(val); }
@@ -1236,7 +1260,60 @@ interface RunAgentOpts {
   signal: AbortSignal;
   callbacks: AgentCallbacks;
   maxIterations?: number;
+  /**
+   * KV cache window the engine was initialized with. The agent uses this to
+   * budget how aggressively to trim history and observations. For BYOK
+   * (cloud), set to the model's actual context (defaults to 128000).
+   */
+  contextWindow?: number;
 }
+
+/**
+ * Cheap conservative token estimator. WebLLM doesn't expose the tokenizer
+ * synchronously and we don't want to ship one ourselves; for budgeting we
+ * only need an upper bound. Empirically, GPT/Llama tokenizers run ~3.6–4.2
+ * chars/token on English+JSON; we use 3.5 to stay on the safe side.
+ *
+ * Used exclusively for the in-loop trim heuristic — never for billing.
+ */
+const estimateTokens = (text: string): number => Math.ceil((text?.length ?? 0) / 3.5);
+
+/**
+ * Total estimated token cost of a conversation. Includes a small per-message
+ * overhead (~6 tokens) for chat-template framing (role tags, separators).
+ */
+const estimateConversationTokens = (msgs: ChatMessage[]): number => {
+  let total = 0;
+  for (const m of msgs) {
+    total += estimateTokens(typeof m.content === "string" ? m.content : "") + 6;
+  }
+  return total;
+};
+
+/**
+ * Drop the oldest user/assistant pairs from the middle of `conversation`
+ * until the estimated token cost fits inside `tokenBudget`. The system
+ * message (index 0) and the latest user/observation (last index) are always
+ * preserved — they carry the immediate context we cannot recover from.
+ *
+ * Returns the (possibly mutated) conversation array. Mutates in place for
+ * call-site clarity; orchestrator owns the array.
+ */
+const enforceContextBudget = (
+  conversation: ChatMessage[],
+  tokenBudget: number,
+): { trimmedCount: number; finalTokens: number } => {
+  let trimmedCount = 0;
+  let current = estimateConversationTokens(conversation);
+  while (current > tokenBudget && conversation.length > 3) {
+    // Remove the OLDEST trimmable message (index 1 — index 0 is system).
+    // Removing one at a time means we always keep the newest exchanges.
+    conversation.splice(1, 1);
+    trimmedCount++;
+    current = estimateConversationTokens(conversation);
+  }
+  return { trimmedCount, finalTokens: current };
+};
 
 /**
  * Stop sequences sent to the model on every iteration. Two purposes:
@@ -1543,6 +1620,19 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     { role: "user", content: opts.userInput },
   ];
 
+  // Reserve room for the model's own response (max_tokens) when budgeting.
+  // Anything below this we hand to the engine; anything above we trim. We
+  // keep a 256-token safety margin for chat-template framing tokens that
+  // our estimator can't see.
+  const contextWindow = opts.contextWindow ?? 8192;
+  const responseReserve = 1536;
+  const safetyMargin = 256;
+  const promptBudget = Math.max(1024, contextWindow - responseReserve - safetyMargin);
+
+  // Initial trim — covers the case where prior history alone is already
+  // too large (long previous conversations).
+  const initialTrim = enforceContextBudget(conversation, promptBudget);
+
   agentLogGroup(`run ${runId} · start`, () => {
     agentLogField("provider", opts.provider);
     agentLogField("byokModel", opts.byokModel ?? "(local)");
@@ -1550,6 +1640,12 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     agentLogField("history messages", opts.history.length);
     agentLogField("tools registered", opts.tools.length);
     agentLogField("max iterations", maxIter);
+    agentLogField("context window", contextWindow);
+    agentLogField("prompt budget (tokens)", promptBudget);
+    agentLogField("estimated prompt tokens (after initial trim)", initialTrim.finalTokens);
+    if (initialTrim.trimmedCount > 0) {
+      agentLogField("initial trim — dropped messages", initialTrim.trimmedCount);
+    }
   });
 
   let finalAnswer = "";
@@ -1574,6 +1670,20 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     opts.callbacks.onPhase("thinking", `Reasoning (step ${iteration})…`);
     const iterStartedAt = Date.now();
     agentLog(`run ${runId} · iter ${iteration}`, "started");
+
+    // Per-iteration context-budget enforcement. After every tool call we
+    // append a synthetic <observations> user message — these can be 3KB+ of
+    // JSON. Without trimming, three iterations of large-payload tools blow
+    // past the engine's KV cache and we hit ContextWindowSizeExceededError
+    // (the failure mode you saw in production). Trim here so the next
+    // streamCompletion call always fits.
+    const trim = enforceContextBudget(conversation, promptBudget);
+    if (trim.trimmedCount > 0) {
+      agentLog(
+        `run ${runId} · iter ${iteration} · context trim`,
+        `dropped ${trim.trimmedCount} oldest messages, now ~${trim.finalTokens} tokens`,
+      );
+    }
 
     const parser = new ProtocolParser();
     let assistantOutput = "";
@@ -1679,6 +1789,55 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       handleEvents(parser.flush());
     } catch (err: any) {
       if (err?.name === "AbortError") throw err;
+
+      // Context-overflow recovery. WebLLM throws ContextWindowSizeExceededError
+      // when prefill won't fit. Even with our budget enforcer this can still
+      // happen if our 3.5 chars/token estimate undershoots reality on a
+      // tokenizer-heavy payload (Asian text, deeply nested JSON, etc.).
+      // Strategy: aggressively shrink the conversation (drop ALL history
+      // except system + last user) and retry the iteration ONCE. If we
+      // still hit it, surface the error.
+      const isContextOverflow =
+        err?.name === "ContextWindowSizeExceededError" ||
+        /ContextWindow|Prompt tokens exceed|context window size/i.test(String(err?.message ?? ""));
+
+      if (isContextOverflow) {
+        agentLogGroup(`run ${runId} · iter ${iteration} · context overflow recovery`, () => {
+          agentLogField("error", err?.message ?? String(err));
+          agentLogField("conversation length before purge", conversation.length);
+          agentLogField("estimated tokens before purge", estimateConversationTokens(conversation));
+        });
+
+        if (conversation.length > 2) {
+          // Keep ONLY system message and the most-recent user/observation
+          // turn; drop everything in between. Brutal but always fits.
+          const systemMsg = conversation[0];
+          const lastMsg = conversation[conversation.length - 1];
+          conversation.length = 0;
+          conversation.push(systemMsg, lastMsg);
+
+          agentLog(
+            `run ${runId} · iter ${iteration} · context overflow recovery`,
+            `purged history; conversation now ${conversation.length} messages, ~${estimateConversationTokens(conversation)} tokens. Retrying same iteration.`,
+          );
+          // Retry the SAME iteration with the slimmed conversation. We
+          // decrement the iteration counter so the user-visible iteration
+          // numbering stays consistent.
+          iteration--;
+          continue;
+        }
+
+        // Already minimal — nothing more we can do, surface a clear error.
+        opts.callbacks.onPhase(
+          "responding",
+          "Context window exhausted. Falling back to a shorter answer…",
+        );
+        finalAnswer =
+          "I couldn't fit your full request into the model's context window. Try a shorter question, narrow the time range, or switch to a model with a larger context (the 8B variants have more headroom).";
+        exitReason = "context overflow with no further trim possible";
+        break;
+      }
+
       // Network/engine error during streaming — bubble up so caller can show toast
       throw err;
     }
@@ -1924,7 +2083,7 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     // code fences instead of <tool_calls>. Treat all of these as bad turns
     // so we never accept them as a final answer.
     const looksLikeProtocolLeak =
-      /<thinking>|<tool_calls>|<\/?answer>|<\/?observations>|(?:^|\n)\s*User:|(?:^|\n)\s*Assistant:|\[Your\s+turn|\[System\s+(?:then|supplies|will|provides)|\[Continue\b|\[Example(?:\s+user)?\b|\[Turn\s+\d|\[The\s+system\s+supplies|```\s*json\s*[\r\n]+\s*\[[\s\S]*?"name"\s*:/i.test(fallback);
+      /<thinking>|<tool_calls>|<\/?answer>|<\/?observations>|(?:^|\n)\s*User:|(?:^|\n)\s*Assistant:|\[Your\s+turn|\[System\s+(?:then|supplies|will|provides)|\[Continue\b|\[Example(?:\s+user)?\b|\[Turn\s+\d|\[The\s+system\s+supplies|(?:^|\n)\s*Example\s+\d+\b|(?:^|\n)\s*Reference\s+(?:card|\d+)|(?:^|\n)\s*(?:Pattern\s+[ABab]|Single-tool\s+call|Parallel\s+calls\s+in|Final\s+answer\s+in\s+markdown)\b|---\s*(?:BEGIN|END)\s+REFERENCE\s*---|```\s*json\s*[\r\n]+\s*\[[\s\S]*?"name"\s*:/i.test(fallback);
 
     // Salvage: maybe the model emitted tool calls inside ```json fences
     // instead of using the <tool_calls> tag. Extract them and treat as a
@@ -2678,6 +2837,9 @@ export default function AiAssistantPage() {
   const [liveTrace, setLiveTrace] = useState<AgentTrace | null>(null);
 
   const engineRef = useRef<any>(null);
+  /** Actual KV cache window the engine was initialized with. Drives prompt
+   * budgeting in runAgent so we never overshoot what the engine can hold. */
+  const engineContextWindowRef = useRef<number>(ENGINE_CONTEXT_TARGET);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -2772,33 +2934,66 @@ export default function AiAssistantPage() {
       try {
         const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
 
-        engineRef.current = await CreateMLCEngine(selectedModel, {
-          initProgressCallback: (report: any) => {
-            let cleanText = "Initializing Engine...";
-            let stats: any = null;
+        const initProgressCallback = (report: any) => {
+          let cleanText = "Initializing Engine...";
+          let stats: any = null;
 
-            if (report.text.includes("Fetching param cache")) {
-              cleanText = "Downloading Neural Network Weights";
-              const chunks = report.text.match(/\[(\d+\/\d+)\]/)?.[1] || "-";
-              const mb = report.text.match(/(\d+\s*MB)/i)?.[1] || "-";
-              const time = report.text.match(/(\d+\s*secs)/i)?.[1] || "-";
-              stats = { chunks, mb, time };
-            } else if (report.text.includes("Loading GPU") || report.text.includes("Loading model")) {
-              cleanText = "Allocating VRAM";
-              stats = { chunks: "100%", mb: "Done", time: "Finalizing" };
-            } else if (report.text.includes("Finish") || report.progress === 1) {
-              cleanText = "Compilation Complete";
-              stats = { chunks: "Ready", mb: "Ready", time: "Ready" };
-            } else {
-              cleanText = report.text.replace(/It can take a while.*/, '').trim();
-            }
-
-            setLoadProgress({ text: cleanText, stats, progress: Math.round(report.progress * 100) });
+          if (report.text.includes("Fetching param cache")) {
+            cleanText = "Downloading Neural Network Weights";
+            const chunks = report.text.match(/\[(\d+\/\d+)\]/)?.[1] || "-";
+            const mb = report.text.match(/(\d+\s*MB)/i)?.[1] || "-";
+            const time = report.text.match(/(\d+\s*secs)/i)?.[1] || "-";
+            stats = { chunks, mb, time };
+          } else if (report.text.includes("Loading GPU") || report.text.includes("Loading model")) {
+            cleanText = "Allocating VRAM";
+            stats = { chunks: "100%", mb: "Done", time: "Finalizing" };
+          } else if (report.text.includes("Finish") || report.progress === 1) {
+            cleanText = "Compilation Complete";
+            stats = { chunks: "Ready", mb: "Ready", time: "Ready" };
+          } else {
+            cleanText = report.text.replace(/It can take a while.*/, '').trim();
           }
-        });
+
+          setLoadProgress({ text: cleanText, stats, progress: Math.round(report.progress * 100) });
+        };
+
+        // Try the wider window first (8192). If a particular wasm lib can't
+        // allocate that much KV cache (rare, only on extremely VRAM-starved
+        // devices), gracefully retry with the original 4096 default. Either
+        // way we record the actual size in `engineContextWindowRef` so the
+        // agent loop can budget accordingly.
+        let actualWindow = ENGINE_CONTEXT_TARGET;
+        try {
+          engineRef.current = await CreateMLCEngine(
+            selectedModel,
+            { initProgressCallback },
+            { context_window_size: ENGINE_CONTEXT_TARGET },
+          );
+        } catch (primaryErr: any) {
+          console.warn(
+            `[Senzor Intelligence] context_window_size=${ENGINE_CONTEXT_TARGET} init failed; ` +
+            `retrying with ${ENGINE_CONTEXT_FALLBACK}.`,
+            primaryErr,
+          );
+          try {
+            engineRef.current = await CreateMLCEngine(
+              selectedModel,
+              { initProgressCallback },
+              { context_window_size: ENGINE_CONTEXT_FALLBACK },
+            );
+            actualWindow = ENGINE_CONTEXT_FALLBACK;
+          } catch (fallbackErr: any) {
+            // Both attempts failed — bubble out the original error so the
+            // outer catch reports the right thing.
+            throw primaryErr;
+          }
+        }
+        engineContextWindowRef.current = actualWindow;
+        agentLog("engine init", `context window = ${actualWindow} tokens`);
         toast.success("Local AI Engine Initialized");
         setEngineMode("ready");
       } catch (err: any) {
+        console.error("[Senzor Intelligence] engine init failed:", err);
         toast.error("Failed to load local model. Ensure your browser supports WebGPU.");
         setEngineMode("setup");
       }
@@ -2973,6 +3168,10 @@ export default function AiAssistantPage() {
         signal: abort.signal,
         callbacks,
         maxIterations: 6,
+        // Local engine: actual KV cache size we negotiated at init.
+        // BYOK (cloud): GPT-4o has 128K context; we use 32K as a safe
+        // operating budget that still leaves room for very long sessions.
+        contextWindow: provider === "webllm" ? engineContextWindowRef.current : 32768,
       });
 
       trace.endedAt = Date.now();
