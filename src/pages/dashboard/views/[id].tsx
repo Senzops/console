@@ -399,6 +399,23 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
       ? "hsl(var(--chart-mono))"
       : CHART_COLORS[index % CHART_COLORS.length];
 
+  /**
+   * Schema discovery
+   * Handles sparse/dynamic datasets safely.
+   * Single-pass, allocation-efficient implementation.
+   */
+  const keySet = new Set<string>();
+
+  for (const item of data) {
+    if (!item || typeof item !== "object") continue;
+
+    for (const key of Object.keys(item)) {
+      keySet.add(key);
+    }
+  }
+
+  const itemKeys = Array.from(keySet);
+
   // Enterprise Billboard Render Engine
   if (activeViz === "billboard") {
     const items = Array.isArray(data) ? data : [data];
@@ -439,14 +456,31 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
 
   if (activeViz === "pie") {
     // Dynamic Fallback Mapping
-    const firstItem = data[0] || {};
-    const itemKeys = Object.keys(firstItem);
     let nameK = "name";
     let valK = "value";
 
     if (!itemKeys.includes("name") && !itemKeys.includes("value")) {
-      nameK = itemKeys.find(k => typeof firstItem[k] === "string") || itemKeys[0];
-      valK = itemKeys.find(k => typeof firstItem[k] === "number" && k !== nameK) || itemKeys[1] || itemKeys[0];
+      for (const item of data) {
+        if (!item || typeof item !== "object") continue;
+
+        for (const k of Object.keys(item)) {
+          if (!nameK && typeof item[k] === "string") {
+            nameK = k;
+          }
+
+          if (!valK && typeof item[k] === "number" && k !== nameK) {
+            valK = k;
+          }
+        }
+      }
+
+      if (!nameK) {
+        nameK = itemKeys[0];
+      }
+
+      if (!valK) {
+        valK = itemKeys.find((k) => k !== nameK) || itemKeys[0];
+      }
     }
 
     return (
@@ -481,7 +515,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
         <table className="w-full text-sm text-left border-collapse whitespace-nowrap">
           <thead className="bg-muted/50 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
             <tr>
-              {Object.keys(data[0] || {}).map((k) => (
+              {itemKeys.map((k) => (
                 <th key={k} className="px-4 py-3 font-semibold">
                   {k}
                 </th>
@@ -491,14 +525,14 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
           <tbody className="divide-y divide-border/40">
             {data.map((row: any, i: number) => (
               <tr key={i} className="hover:bg-muted/30 transition-colors">
-                {Object.values(row).map((val: any, j: number) => (
+                {itemKeys.map((k, j) => (
                   <td
                     key={j}
                     className="px-4 py-2 font-mono text-xs truncate max-w-[300px]"
                   >
-                    {typeof val === "object"
-                      ? JSON.stringify(val)
-                      : String(val)}
+                    {typeof row[k] === "object"
+                      ? JSON.stringify(row[k])
+                      : String(row[k] ?? "")}
                   </td>
                 ))}
               </tr>
@@ -513,18 +547,35 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
   let timeKey = "time";
   let renderKeys: string[] = [];
 
-  const firstItem = data[0] || {};
-  const itemKeys = Object.keys(firstItem);
-  
   if (itemKeys.includes("time")) {
     timeKey = "time";
   } else {
-    // If the user forgot to project the time object perfectly, auto-map it
-    const possibleTime = itemKeys.find(k => k.toLowerCase().includes("time") || k.toLowerCase().includes("date") || k === "_id");
-    if (possibleTime) timeKey = possibleTime;
+    // Auto-map time/date fields safely across sparse datasets
+    const possibleTime = itemKeys.find(
+      (k) =>
+        k.toLowerCase().includes("time") ||
+        k.toLowerCase().includes("date") ||
+        k === "_id"
+    );
+
+    if (possibleTime) {
+      timeKey = possibleTime;
+    }
   }
-  
-  renderKeys = itemKeys.filter((k) => k !== timeKey && k !== "name" && k !== "_id");
+
+  renderKeys = itemKeys.filter((k) => {
+    if (k === timeKey || k === "name" || k === "_id") {
+      return false;
+    }
+
+    // Ignore fully empty series
+    return data.some(
+      (row: any) =>
+        row &&
+        row[k] !== undefined &&
+        row[k] !== null
+    );
+  });
 
   return (
     <ResponsiveContainer width="100%" height="100%">
