@@ -148,14 +148,14 @@ const DiagramViews = () => (
             viewBox="0 0 36 36"
             className="w-full h-full stroke-red-500 fill-transparent"
             strokeWidth="4"
-            strokeDasharray="30 100"
+            strokeDasharray="75 100"
             strokeLinecap="round"
           >
             <circle cx="18" cy="18" r="16" className="stroke-muted" />
             <circle cx="18" cy="18" r="16" />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-600 dark:text-red-400">
-            30%
+            75%
           </div>
         </div>
       </div>
