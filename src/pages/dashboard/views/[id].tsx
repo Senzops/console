@@ -55,9 +55,8 @@ import {
   AlertTriangle,
   Play,
   BookOpen,
-  CheckCircle,
-  Zap,
   ChevronRight,
+  Zap
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -104,7 +103,19 @@ const CHART_COLORS = [
   "#f97316",
 ];
 
-// Enterprise Aggregation Pipeline Defaults (Safe $match + limits)
+// Enterprise Consistent Color & Stacking Hashing
+const getStringHash = (str: string) => {
+  let hash = 0;
+  if (!str || str.length === 0) return hash;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+};
+
+// Enterprise Aggregation Pipeline Defaults
 const DEFAULT_QUERIES: Record<string, string> = {
   logs: '[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "service": "$serviceModel" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   apm: '[\n  { "$match": { "duration": { "$gt": 1000 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
@@ -115,7 +126,7 @@ const DEFAULT_QUERIES: Record<string, string> = {
   task: '[\n  { "$match": { "status": "failed" } },\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
-// Universal Pipeline Templates ($dateToString ensures < 5.0 compat fallback for $dateTrunc)
+// Universal Pipeline Templates
 const QUICK_TEMPLATES: Record<string, any[]> = {
   apm: [
     {
@@ -265,7 +276,7 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
     const root = { children: {} as Record<string, any> };
     schemaList.forEach((item: any) => {
       const parts = item.field.split(".");
-      let current: any = root; // Force typed to allow dynamic properties
+      let current: any = root; 
       parts.forEach((part: string, i: number) => {
         if (!current.children[part]) {
           current.children[part] = {
@@ -394,21 +405,21 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     );
   }
 
-  const getColor = (index: number) =>
-    isMono
-      ? "hsl(var(--chart-mono))"
-      : CHART_COLORS[index % CHART_COLORS.length];
+  // Consistent hashing mapping to lock color bindings across renders
+  const getColor = (keyStr: string, index: number) => {
+    if (isMono) return "hsl(var(--chart-mono))";
+    const hash = keyStr ? getStringHash(keyStr) : index;
+    return CHART_COLORS[hash % CHART_COLORS.length];
+  };
 
   /**
    * Schema discovery
    * Handles sparse/dynamic datasets safely.
-   * Single-pass, allocation-efficient implementation.
    */
   const keySet = new Set<string>();
 
   for (const item of data) {
     if (!item || typeof item !== "object") continue;
-
     for (const key of Object.keys(item)) {
       keySet.add(key);
     }
@@ -500,9 +511,10 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             className="focus:outline-none"
             style={{ outline: "none" }}
           >
-            {data.map((_: any, index: number) => (
-              <Cell key={`cell-${index}`} fill={getColor(index)} style={{ outline: "none" }} className="focus:outline-none" />
-            ))}
+            {data.map((entry: any, index: number) => {
+              const keyValue = String(entry[nameK] || index);
+              return <Cell key={`cell-${index}`} fill={getColor(keyValue, index)} style={{ outline: "none" }} className="focus:outline-none" />
+            })}
           </Pie>
         </PieChart>
       </ResponsiveContainer>
@@ -577,6 +589,11 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     );
   });
 
+  // Deterministic Stacking Order
+  // Sort the keys securely by their hashed value so stacked area/bar components
+  // never visually shift layers if backend JSON payload ordering differs.
+  renderKeys.sort((a, b) => getStringHash(a) - getStringHash(b));
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       {activeViz === "area" ? (
@@ -588,17 +605,22 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
             content={<CustomTooltip range={range} />}
           />
-          {renderKeys.map((k, i) => (
-            <React.Fragment key={k}>
-              <defs>
-                <linearGradient id={`color-${k}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={getColor(i)} stopOpacity={0.4} />
-                  <stop offset="95%" stopColor={getColor(i)} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area type="monotone" dataKey={k} stroke={getColor(i)} fill={`url(#color-${k})`} strokeWidth={2} />
-            </React.Fragment>
-          ))}
+          {renderKeys.map((k, i) => {
+            const color = getColor(k, i);
+            // Safe DOM IDs for SVG gradients prevent the black fill bug
+            const safeId = `color-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+            return (
+              <React.Fragment key={k}>
+                <defs>
+                  <linearGradient id={safeId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={color} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey={k} stackId="1" stroke={color} fill={`url(#${safeId})`} strokeWidth={2} />
+              </React.Fragment>
+            )
+          })}
         </AreaChart>
       ) : activeViz === "bar" ? (
         <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
@@ -611,7 +633,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
           />
           {renderKeys.map((k, i) => (
-            <Bar key={k} dataKey={k} fill={getColor(i)} radius={[2, 2, 0, 0]} />
+            <Bar key={k} dataKey={k} stackId="1" fill={getColor(k, i)} radius={[2, 2, 0, 0]} />
           ))}
         </BarChart>
       ) : (
@@ -624,7 +646,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             content={<CustomTooltip range={range} />}
           />
           {renderKeys.map((k, i) => (
-            <Line key={k} type="monotone" dataKey={k} stroke={getColor(i)} strokeWidth={2} dot={false} />
+            <Line key={k} type="monotone" dataKey={k} stroke={getColor(k, i)} strokeWidth={2} dot={false} />
           ))}
         </LineChart>
       )}
