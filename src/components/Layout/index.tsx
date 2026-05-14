@@ -62,11 +62,41 @@ const getGravatar = (email: string) =>
   )}?d=identicon`;
 
 // --- Public Navbar ---
-export const Navbar = () => {
+export const Navbar = ({
+  transparentOnTop = false,
+}: {
+  transparentOnTop?: boolean;
+}) => {
   const { user, logout, loading } = useAuth();
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Smooth scroll detection for dynamic glassmorphic effect
+  useEffect(() => {
+    if (!transparentOnTop) return;
+
+    const handleScroll = () => {
+      // 20px threshold to trigger the background transition
+      setIsScrolled(window.scrollY > 20);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // Initial check on mount
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [transparentOnTop]);
+
+  // Determine if we should show the transparent, borderless state
+  const isTransparent = transparentOnTop && !isScrolled;
 
   return (
-    <nav className="fixed top-0 w-full z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <nav
+      className={cn(
+        "fixed top-0 w-full z-50 transition-all duration-300 ease-in-out",
+        isTransparent
+          ? "bg-transparent border-transparent shadow-none"
+          : "border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/80",
+      )}
+    >
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Brand */}
         <Link

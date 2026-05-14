@@ -117,7 +117,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col selection:bg-primary/20 selection:text-primary">
-      <Navbar />
+      <Navbar transparentOnTop />
 
       <main className="flex-grow  overflow-x-hidden">
         {/* --- HERO SECTION --- */}
