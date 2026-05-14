@@ -5,6 +5,7 @@ import Editor from "@monaco-editor/react";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
 import { DashboardLayout } from "../../../components/Layout";
+import { WorldMap } from "../../../components/WorldMap";
 import {
   Card,
   CardContent,
@@ -34,6 +35,11 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
 } from "recharts";
 import {
   LayoutTemplate,
@@ -348,7 +354,6 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
   );
 };
 
-
 // --- Recharts Tooltip Formatting ---
 const formatAxisDate = (str: string, range: string) => {
   if (!str) return "";
@@ -427,7 +432,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
 
   const itemKeys = Array.from(keySet);
 
-  // Enterprise Billboard Render Engine
+  // 1. Enterprise Billboard Render Engine
   if (activeViz === "billboard") {
     const items = Array.isArray(data) ? data : [data];
     const blacklist = ["value", "null", "undefined", "time", "_id", "name"];
@@ -463,6 +468,110 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
         })}
       </div>
     );
+  }
+
+  // 2. Metric Gauge (Speedometer)
+  if (activeViz === "gauge") {
+    const items = Array.isArray(data) ? data : [data];
+    const blacklist = ["value", "null", "undefined", "time", "_id", "name"];
+
+    return (
+       <div className="h-full w-full flex flex-row flex-wrap items-center justify-center gap-8 overflow-auto p-4">
+         {items.map((item: any, idx: number) => {
+           const keys = Object.keys(item).filter((k) => !blacklist.includes(k.toLowerCase()));
+           const displayKey = keys.length > 0 ? keys[0] : null;
+
+           let val = 0;
+           if (displayKey) val = item[displayKey];
+           else if (item.value !== undefined) val = item.value;
+           else val = Object.values(item)[0] as number;
+
+           const numVal = Number(val) || 0;
+           
+           // Dynamic Max: Defaults to 100 for percentages, otherwise dynamically calculates headroom
+           let max = 100;
+           if (numVal > 100) {
+             max = Math.pow(10, Math.ceil(Math.log10(numVal)));
+             if (max - numVal < max * 0.1) max *= 2; 
+           }
+           
+           const percentage = Math.min(100, Math.max(0, (numVal / max) * 100));
+           const color = getColor(displayKey || "gauge", idx);
+
+           return (
+             <div key={idx} className="flex flex-col items-center justify-center relative w-full h-full max-w-[280px] max-h-[280px]">
+                <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
+                  <PieChart className="focus:outline-none" style={{ outline: "none" }}>
+                    <Pie
+                      data={[
+                        { value: percentage, fill: color },
+                        { value: 100 - percentage, fill: "hsl(var(--muted))" }
+                      ]}
+                      cx="50%"
+                      cy="75%"
+                      startAngle={180}
+                      endAngle={0}
+                      innerRadius="75%"
+                      outerRadius="100%"
+                      dataKey="value"
+                      stroke="none"
+                      isAnimationActive={true}
+                      activeShape={undefined}
+                      className="focus:outline-none"
+                      style={{ outline: "none" }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 flex flex-col items-center text-center w-full">
+                   <div className="text-3xl md:text-4xl font-extrabold tracking-tighter text-foreground">
+                     <SmartAnimatedValue value={numVal > 1000 ? formatNumber(numVal) : numVal.toFixed(1).replace(/\.0$/, '')} />
+                   </div>
+                   {displayKey && (
+                     <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1 opacity-70 truncate max-w-[80%]">
+                       {displayKey}
+                     </div>
+                   )}
+                </div>
+             </div>
+           );
+         })}
+       </div>
+    );
+  }
+
+  // 3. Raw JSON Payload
+  if (activeViz === "json") {
+     return (
+       <div className="w-full h-full overflow-auto bg-[#0d1117] p-4 rounded-lg border border-border/40 shadow-inner">
+         <pre className="text-[11px] font-mono leading-relaxed text-[#e6edf3]">
+           {JSON.stringify(data, null, 2)}
+         </pre>
+       </div>
+     );
+  }
+
+  // 4. Geospatial Map
+  if (activeViz === "map") {
+     // Format MQL Aggregation data into the exact schema expected by WorldMap
+     const mappedData = data.map((d: any) => {
+       let key = d.name || d._id || d.country || "";
+       let val = d.value || d.count || 0;
+       
+       if (!key || !val) {
+          const keys = Object.keys(d);
+          if (keys.length >= 2) {
+             key = key || d[keys[0]];
+             val = val || d[keys[1]];
+          }
+       }
+       return { _id: String(key), count: Number(val) };
+     });
+
+     return (
+       <div className="w-full h-full bg-card rounded-lg overflow-hidden relative">
+         <WorldMap data={mappedData} />
+       </div>
+     );
   }
 
   if (activeViz === "pie") {
@@ -517,6 +626,54 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             })}
           </Pie>
         </PieChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // 5. Insight Radar Chart
+  if (activeViz === "radar") {
+    let timeKey = "name";
+    if (!itemKeys.includes("name")) {
+       timeKey = itemKeys.find(k => k.toLowerCase().includes("time") || k.toLowerCase().includes("date") || k === "_id") || itemKeys[0];
+    }
+    const renderKeys = itemKeys.filter(k => k !== timeKey);
+    renderKeys.sort((a, b) => getStringHash(a) - getStringHash(b)); // Deterministic color lock
+
+    return (
+      <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
+        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data} className="focus:outline-none" style={{ outline: "none" }}>
+          <defs>
+            {renderKeys.map((k, i) => {
+              const color = getColor(k, i);
+              const safeId = `color-radar-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+              return (
+                <radialGradient key={safeId} id={safeId} cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.1} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.4} />
+                </radialGradient>
+              );
+            })}
+          </defs>
+          <PolarGrid stroke="hsl(var(--border))" />
+          <PolarAngleAxis dataKey={timeKey} tick={false} />
+          <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+          <RechartsTooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: '8px' }} />
+          {renderKeys.map((k, i) => {
+            const color = getColor(k, i);
+            const safeId = `color-radar-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+            return (
+              <Radar 
+                key={k} 
+                name={k} 
+                dataKey={k} 
+                stroke={color} 
+                fill={`url(#${safeId})`} 
+                fillOpacity={1}
+                strokeWidth={2} 
+              />
+            );
+          })}
+        </RadarChart>
       </ResponsiveContainer>
     );
   }
@@ -589,9 +746,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     );
   });
 
-  // Deterministic Stacking Order
-  // Sort the keys securely by their hashed value so stacked area/bar components
-  // never visually shift layers if backend JSON payload ordering differs.
+  // ENTERPRISE FIX: Deterministic Stacking Order
   renderKeys.sort((a, b) => getStringHash(a) - getStringHash(b));
 
   return (
@@ -607,7 +762,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
           />
           {renderKeys.map((k, i) => {
             const color = getColor(k, i);
-            // Safe DOM IDs for SVG gradients prevent the black fill bug
             const safeId = `color-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
             return (
               <React.Fragment key={k}>
@@ -980,6 +1134,8 @@ export default function CustomDashboardView() {
       const res = await postFetcher("/views/execute", {
         target: builderForm.target,
         query: parsedQuery,
+        visualization: builderForm.visualization,
+        config: builderForm.config,
         range,
       });
       setPreviewData(res);
@@ -1403,7 +1559,11 @@ export default function CustomDashboardView() {
                       <option value="bar">Bar Chart</option>
                       <option value="pie">Pie Chart</option>
                       <option value="billboard">Billboard Number</option>
+                      <option value="gauge">Metric Gauge</option>
+                      <option value="radar">Insight Radar</option>
+                      <option value="map">Geospatial Map</option>
                       <option value="table">Data Table</option>
+                      <option value="json">Raw JSON</option>
                     </Select>
                   </div>
                 </div>
