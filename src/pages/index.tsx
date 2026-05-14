@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Navbar, Footer } from "../components/Layout";
 import { Button, cn } from "../components/Core";
-import { AnimatedBackground } from "../components/AnimatedBackground";
+import { MeshBackground } from "../components/MeshBackground";
 import { FEATURES_DATA, renderDiagram } from "../static/featuresData";
 import { ArrowRight, Check, ChevronRight } from "lucide-react";
 import { useAuth } from "../lib/auth";
@@ -122,7 +122,14 @@ export default function Home() {
       <main className="flex-grow  overflow-x-hidden">
         {/* --- HERO SECTION --- */}
         <section className="relative px-4 pt-32 pb-24 w-full flex flex-col items-center justify-center h-screen border-b border-border/30 overflow-hidden">
-          <AnimatedBackground />
+          <MeshBackground className="absolute inset-0 z-0 opacity-80" />
+
+          {/* This creates a central focal point, blurring the mesh directly behind the text, and fading it out at the edges */}
+          <div className="absolute inset-0 z-10 bg-background/30 backdrop-blur-[2px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,transparent_30%,black_100%)] pointer-events-none" />
+
+          {/* Bottom fade out to transition smoothly into the next page section */}
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none" />
+
           <div className="relative z-10 text-center max-w-4xl mx-auto space-y-8 mt-12">
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.1]">
               Unified Visibility.
@@ -249,7 +256,7 @@ export default function Home() {
 
         {/* --- PROFESSIONAL OUTRO SECTION --- */}
         <section className="relative px-4 py-32 w-full flex flex-col items-center justify-center border-t border-border/30 overflow-hidden">
-          <AnimatedBackground />
+          <MeshBackground className="absolute inset-0 z-0 opacity-80" />
           <div className="absolute inset-0 bg-background/80 z-0"></div>
 
           <div className="relative z-10 text-center max-w-3xl mx-auto space-y-6">
