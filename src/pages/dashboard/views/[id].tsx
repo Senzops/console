@@ -435,6 +435,25 @@ const CustomTooltip = ({ active, payload, label, range }: any) => {
   return null;
 };
 
+// Smooth closed path using Catmull-Rom spline
+const smoothRadarPath = (points, tension = 0.3) => {
+  if (!points || points.length < 2) return '';
+  const n = points.length;
+  let d = `M ${points[0].x},${points[0].y}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = points[(i - 1 + n) % n];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const p3 = points[(i + 2) % n];
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+    d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }
+  return d + ' Z';
+};
+
 // --- Sub-Component: Chart Renderer ---
 const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
   const activeViz = visualization || config?.viz || "table";
@@ -719,6 +738,15 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
                 fill={`url(#${safeId})`} 
                 fillOpacity={1}
                 strokeWidth={2} 
+                shape={({ points }) => (
+                  <path
+                    d={smoothRadarPath(points)}
+                    stroke={color}
+                    strokeWidth={2}
+                    fill={`url(#${safeId})`}
+                    fillOpacity={1}
+                  />
+                )}
               />
             );
           })}
