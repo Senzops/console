@@ -657,7 +657,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
           <PolarGrid stroke="hsl(var(--border))" />
           <PolarAngleAxis dataKey={timeKey} tick={false} />
           <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-          <RechartsTooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: '8px' }} />
+          <RechartsTooltip content={<CustomTooltip range={range} />} />
           {renderKeys.map((k, i) => {
             const color = getColor(k, i);
             const safeId = `color-radar-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
