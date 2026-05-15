@@ -99,14 +99,54 @@ const getTargetIcon = (target: string) => {
 };
 
 const CHART_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-  "#ec4899",
-  "#f97316",
+  "#3b82f6", // blue-500
+  "#10b981", // emerald-500
+  "#f59e0b", // amber-500
+  "#ef4444", // red-500
+  "#8b5cf6", // violet-500
+  "#06b6d4", // cyan-500
+  "#ec4899", // pink-500
+  "#f97316", // orange-500
+  "#6366f1", // indigo-500
+  "#14b8a6", // teal-500
+  "#f43f5e", // rose-500
+  "#84cc16", // lime-500
+  "#a855f7", // fuchsia-500
+  "#0ea5e9", // sky-500
+  "#eab308", // yellow-500
+  "#22c55e", // green-500
+  "#2563eb", // blue-600
+  "#059669", // emerald-600
+  "#d97706", // amber-600
+  "#dc2626", // red-600
+  "#7c3aed", // violet-600
+  "#0891b2", // cyan-600
+  "#db2777", // pink-600
+  "#ea580c", // orange-600
+  "#4f46e5", // indigo-600
+  "#0d9488", // teal-600
+  "#e11d48", // rose-600
+  "#65a30d", // lime-600
+  "#c026d3", // fuchsia-600
+  "#0284c7", // sky-600
+  "#ca8a04", // yellow-600
+  "#16a34a", // green-600
+  "#60a5fa", // blue-400
+  "#34d399", // emerald-400
+  "#fbbf24", // amber-400
+  "#f87171", // red-400
+  "#a78bfa", // violet-400
+  "#22d3ee", // cyan-400
+  "#f472b6", // pink-400
+  "#fb923c", // orange-400
+  "#818cf8", // indigo-400
+  "#2dd4bf", // teal-400
+  "#fb7185", // rose-400
+  "#a3e635", // lime-400
+  "#e879f9", // fuchsia-400
+  "#38bdf8", // sky-400
+  "#facc15", // yellow-400
+  "#4ade80", // green-400
 ];
 
 // Enterprise Consistent Color & Stacking Hashing
@@ -430,21 +470,28 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     }
   }
 
-  const itemKeys = Array.from(keySet);
+  // Global Deterministic Key Sorting
+  // Enforces mathematical consistency for all visual column layouts, table structures, and categorical renders
+  const itemKeys = Array.from(keySet).sort((a, b) => getStringHash(a) - getStringHash(b));
 
   // 1. Enterprise Billboard Render Engine
   if (activeViz === "billboard") {
-    const items = Array.isArray(data) ? data : [data];
+    const items = Array.isArray(data) ? [...data] : [data];
     const blacklist = ["value", "null", "undefined", "time", "_id", "name"];
+
+    // Deterministic billboard sorting to prevent jumping
+    items.sort((a, b) => {
+      const keyA = Object.keys(a).filter(k => !blacklist.includes(k.toLowerCase()))[0] || "";
+      const keyB = Object.keys(b).filter(k => !blacklist.includes(k.toLowerCase()))[0] || "";
+      return getStringHash(keyA) - getStringHash(keyB);
+    });
 
     return (
       <div className="h-full w-full flex flex-row flex-wrap items-center justify-center gap-8 overflow-auto p-4">
         {items.map((item: any, idx: number) => {
-          // Exclude time and strict blacklisted system keys
           const keys = Object.keys(item).filter((k) => !blacklist.includes(k.toLowerCase()));
           const displayKey = keys.length > 0 ? keys[0] : null;
 
-          // Resolve value gracefully
           let val = 0;
           if (displayKey) val = item[displayKey];
           else if (item.value !== undefined) val = item.value;
@@ -472,8 +519,15 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
 
   // 2. Metric Gauge (Speedometer)
   if (activeViz === "gauge") {
-    const items = Array.isArray(data) ? data : [data];
+    const items = Array.isArray(data) ? [...data] : [data];
     const blacklist = ["value", "null", "undefined", "time", "_id", "name"];
+
+    // Deterministic gauge sorting to prevent jumping
+    items.sort((a, b) => {
+      const keyA = Object.keys(a).filter(k => !blacklist.includes(k.toLowerCase()))[0] || "";
+      const keyB = Object.keys(b).filter(k => !blacklist.includes(k.toLowerCase()))[0] || "";
+      return getStringHash(keyA) - getStringHash(keyB);
+    });
 
     return (
        <div className="h-full w-full flex flex-row flex-wrap items-center justify-center gap-8 overflow-auto p-4">
@@ -488,7 +542,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
 
            const numVal = Number(val) || 0;
            
-           // Dynamic Max: Defaults to 100 for percentages, otherwise dynamically calculates headroom
            let max = 100;
            if (numVal > 100) {
              max = Math.pow(10, Math.ceil(Math.log10(numVal)));
@@ -539,7 +592,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     );
   }
 
-  // 3. Raw JSON Payload
+  // 3. Raw JSON
   if (activeViz === "json") {
      return (
        <div className="w-full h-full overflow-auto bg-[#0d1117] p-4 rounded-lg border border-border/40 shadow-inner">
@@ -552,7 +605,6 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
 
   // 4. Geospatial Map
   if (activeViz === "map") {
-     // Format MQL Aggregation data into the exact schema expected by WorldMap
      const mappedData = data.map((d: any) => {
        let key = d.name || d._id || d.country || "";
        let val = d.value || d.count || 0;
@@ -567,6 +619,9 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
        return { _id: String(key), count: Number(val) };
      });
 
+     // Deterministic map sorting
+     mappedData.sort((a: any, b: any) => getStringHash(a._id) - getStringHash(b._id));
+
      return (
        <div className="w-full h-full bg-card rounded-lg overflow-hidden relative">
          <WorldMap data={mappedData} />
@@ -575,40 +630,34 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
   }
 
   if (activeViz === "pie") {
-    // Dynamic Fallback Mapping
     let nameK = "name";
     let valK = "value";
 
     if (!itemKeys.includes("name") && !itemKeys.includes("value")) {
       for (const item of data) {
         if (!item || typeof item !== "object") continue;
-
         for (const k of Object.keys(item)) {
-          if (!nameK && typeof item[k] === "string") {
-            nameK = k;
-          }
-
-          if (!valK && typeof item[k] === "number" && k !== nameK) {
-            valK = k;
-          }
+          if (!nameK && typeof item[k] === "string") nameK = k;
+          if (!valK && typeof item[k] === "number" && k !== nameK) valK = k;
         }
       }
-
-      if (!nameK) {
-        nameK = itemKeys[0];
-      }
-
-      if (!valK) {
-        valK = itemKeys.find((k) => k !== nameK) || itemKeys[0];
-      }
+      if (!nameK) nameK = itemKeys[0];
+      if (!valK) valK = itemKeys.find((k) => k !== nameK) || itemKeys[0];
     }
+
+    // Deterministic Pie Slicing Order
+    const sortedPieData = [...data].sort((a, b) => {
+      const keyA = String(a[nameK] || "");
+      const keyB = String(b[nameK] || "");
+      return getStringHash(keyA) - getStringHash(keyB);
+    });
 
     return (
       <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
         <PieChart className="focus:outline-none" style={{ outline: "none" }}>
           <RechartsTooltip content={<CustomTooltip range={range} />} />
           <Pie
-            data={data}
+            data={sortedPieData}
             dataKey={valK}
             nameKey={nameK}
             cx="50%"
@@ -620,7 +669,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
             className="focus:outline-none"
             style={{ outline: "none" }}
           >
-            {data.map((entry: any, index: number) => {
+            {sortedPieData.map((entry: any, index: number) => {
               const keyValue = String(entry[nameK] || index);
               return <Cell key={`cell-${index}`} fill={getColor(keyValue, index)} style={{ outline: "none" }} className="focus:outline-none" />
             })}
@@ -637,7 +686,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
        timeKey = itemKeys.find(k => k.toLowerCase().includes("time") || k.toLowerCase().includes("date") || k === "_id") || itemKeys[0];
     }
     const renderKeys = itemKeys.filter(k => k !== timeKey);
-    renderKeys.sort((a, b) => getStringHash(a) - getStringHash(b)); // Deterministic color lock
+    // Note: itemKeys are globally hashed above, so renderKeys inherits determinism automatically.
 
     return (
       <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
@@ -719,35 +768,21 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
   if (itemKeys.includes("time")) {
     timeKey = "time";
   } else {
-    // Auto-map time/date fields safely across sparse datasets
     const possibleTime = itemKeys.find(
       (k) =>
         k.toLowerCase().includes("time") ||
         k.toLowerCase().includes("date") ||
         k === "_id"
     );
-
     if (possibleTime) {
       timeKey = possibleTime;
     }
   }
 
   renderKeys = itemKeys.filter((k) => {
-    if (k === timeKey || k === "name" || k === "_id") {
-      return false;
-    }
-
-    // Ignore fully empty series
-    return data.some(
-      (row: any) =>
-        row &&
-        row[k] !== undefined &&
-        row[k] !== null
-    );
+    if (k === timeKey || k === "name" || k === "_id") return false;
+    return data.some((row: any) => row && row[k] !== undefined && row[k] !== null);
   });
-
-  // ENTERPRISE FIX: Deterministic Stacking Order
-  renderKeys.sort((a, b) => getStringHash(a) - getStringHash(b));
 
   return (
     <ResponsiveContainer width="100%" height="100%">
