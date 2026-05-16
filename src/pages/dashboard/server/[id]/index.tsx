@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
@@ -6,7 +6,7 @@ import { useTheme } from '../../../../lib/theme';
 import { DashboardLayout } from '../../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, cn, DataError } from '../../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
-import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal, Layers, CloudLightning, ArrowRight, Route } from 'lucide-react';
+import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal, Layers, CloudLightning, ArrowRight, Route, Thermometer, Zap } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue, useCounter } from '@/components/Tween';
 import { toast } from 'sonner';
@@ -14,6 +14,24 @@ import { extractErrorMessage } from '@/utils/axiosError';
 import Link from 'next/link';
 
 export const fetcher = (url: string) => api.get(url).then(res => res.data);
+
+// --- Dynamic Color Utilities for New Charts ---
+const CHART_COLORS = [
+  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4",
+  "#ec4899", "#f97316", "#6366f1", "#14b8a6", "#f43f5e", "#84cc16",
+  "#a855f7", "#0ea5e9", "#eab308", "#22c55e", "#2563eb", "#059669",
+  "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#db2777", "#ea580c"
+];
+
+const getStringHash = (str: string) => {
+  let hash = 0;
+  if (!str || str.length === 0) return hash;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+};
 
 // --- Formatter for Uptime ---
 const formatUptime = (seconds: number) => {
@@ -48,6 +66,39 @@ export const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
             <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
           </div>
         ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// --- Disk Tooltip ---
+export const DiskTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50 min-w-[200px]">
+        <p className="font-semibold text-foreground mb-2">{label}</p>
+        {payload.map((entry: any, idx: number) => {
+          const diskName = entry.name;
+          const usedVal = data[`diskUsedVal_${diskName}`] || data.diskUsedVal; 
+          const totalVal = data[`diskTotalVal_${diskName}`] || data.diskTotalVal;
+          
+          return (
+            <div key={idx} className="mb-2.5 last:mb-0">
+              <div className="flex items-center gap-2" style={{ color: entry.color || entry.stroke || entry.fill }}>
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.stroke || entry.fill }} />
+                <span className="font-medium text-foreground">{diskName}</span>
+                <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}%</span>
+              </div>
+              {(usedVal && totalVal) && (
+                <div className="text-[10px] text-muted-foreground ml-4 mt-0.5 font-mono border-l-2 border-border/50 pl-2">
+                  Used: {usedVal} GB / {totalVal} GB
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -254,41 +305,79 @@ export default function ServerDetail() {
     }
   }
 
+  // Find the last real online metric to prevent top cards from flashing 0 during downtime
+  const latestRun = history?.slice().reverse().find((h: any) => h.isOnline !== false) || history?.[history?.length - 1];
+  const latest = latestRun ? latestRun.metrics : {}; 
+
+  // Multi-Disk & Hardware Resolution (TS 2345 Fix via explicit cast)
+  const diskArray = Array.isArray(latest?.disk) ? latest.disk : (latest?.disk ? [latest.disk] : []);
+  const diskNames = Array.from(new Set(diskArray.map((d: any) => d.name).filter(Boolean))) as string[];
+  const primaryDiskName = diskNames[0] || '/';
+
+  const showTemperature = history?.some((h: any) => h.metrics?.hardware?.temperature > 0);
+  const showPower = history?.some((h: any) => h.metrics?.hardware?.powerDraw > 0);
+  const activeGpus = latest?.gpus || [];
+
   // --- Process Charts ---
   const chartData = useMemo(() => {
     if (!history) return [];
     const sorted = [...history].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-    return sorted.map((run: any) => ({
-      time: new Date(run.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      cpu: run.metrics.cpu?.usagePercent || 0,
-      memUsed: run.metrics.memory?.usagePercent || 0,
-      memActive: (run.metrics.memory?.active / run.metrics.memory?.total) * 100 || 0,
-      memFree: (run.metrics.memory?.free / run.metrics.memory?.total) * 100 || 0,
-      diskUsed: run.metrics.disk?.usagePercent || 0,
-      diskTotalVal: (run.metrics.disk?.total / 1e9).toFixed(1),
-      diskUsedVal: (run.metrics.disk?.used / 1e9).toFixed(1),
-      netRx: (run.metrics.network?.bytesRecvSec / 1024) || 0,
-      netTx: (run.metrics.network?.bytesSentSec / 1024) || 0,
-      latencyMs: run.metrics.network?.latencyMs || 0,
-      procBlocked: run.metrics.processes?.blocked || 0,
-      procRunning: run.metrics.processes?.running || 0,
-      procSleeping: run.metrics.processes?.sleeping || 0,
-    }));
+    return sorted.map((run: any) => {
+      const runDiskArray = Array.isArray(run.metrics?.disk) ? run.metrics.disk : (run.metrics?.disk ? [run.metrics.disk] : []);
+      const primaryDisk = runDiskArray[0] || {};
+
+      const d: any = {
+        time: new Date(run.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        cpu: run.metrics.cpu?.usagePercent || 0,
+        memUsed: run.metrics.memory?.usagePercent || 0,
+        memActive: (run.metrics.memory?.active / (run.metrics.memory?.total || 1)) * 100 || 0,
+        memFree: (run.metrics.memory?.free / (run.metrics.memory?.total || 1)) * 100 || 0,
+        diskUsed: primaryDisk.usagePercent || 0,
+        diskTotalVal: ((primaryDisk.total || 0) / 1e9).toFixed(1),
+        diskUsedVal: ((primaryDisk.used || 0) / 1e9).toFixed(1),
+        netRx: (run.metrics.network?.bytesRecvSec / 1024) || 0,
+        netTx: (run.metrics.network?.bytesSentSec / 1024) || 0,
+        latencyMs: run.metrics.network?.latencyMs || 0,
+        procBlocked: run.metrics.processes?.blocked || 0,
+        procRunning: run.metrics.processes?.running || 0,
+        procSleeping: run.metrics.processes?.sleeping || 0,
+        sysTemp: run.metrics.hardware?.temperature || 0,
+        sysPower: run.metrics.hardware?.powerDraw || 0,
+      };
+
+      // Append multi-disk dynamic series + custom Tooltip data injection
+      runDiskArray.forEach((disk: any) => {
+        if (disk.name) {
+          d[`disk_${disk.name}`] = disk.usagePercent || 0;
+          d[`diskUsedVal_${disk.name}`] = ((disk.used || 0) / 1e9).toFixed(1);
+          d[`diskTotalVal_${disk.name}`] = ((disk.total || 0) / 1e9).toFixed(1);
+        }
+      });
+
+      // Append GPU dynamic series for unified charts
+      run.metrics.gpus?.forEach((gpu: any, i: number) => {
+        d[`gpu_${i}_utilization`] = gpu.utilization || 0;
+        d[`gpu_${i}_temp`] = gpu.temperature || 0;
+        d[`gpu_${i}_power`] = gpu.powerDraw || 0;
+        d[`gpu_${i}_vram`] = ((gpu.vramUsed || 0) / (gpu.vramTotal || 1)) * 100 || 0;
+      });
+
+      return d;
+    });
   }, [history]);
 
   if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></DashboardLayout>;
   if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></DashboardLayout>;
   if (!vps) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></DashboardLayout>;
 
-  // Find the last real online metric to prevent top cards from flashing 0 during downtime
-  const latestRun = history?.slice().reverse().find((h: any) => h.isOnline !== false) || history?.[history?.length - 1];
-  const latest = latestRun ? latestRun.metrics : {}; 
-
-  // Helper to get color based on Mode
+  // Original Helper to get color based on Mode
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
-  // If mono, fills matching stroke
+  // Original If mono, fills matching stroke
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
+
+  // Dedicated Dynamic Color resolver for new charts
+  const getDynamicColor = (key: string) => isMono ? 'hsl(var(--chart-mono))' : CHART_COLORS[getStringHash(key) % CHART_COLORS.length];
 
   // Integrations Flags (Check if active or if data exists)
   const hasNginx = vps.activeIntegrations?.nginx || (latest.nginx !== null && latest.nginx !== undefined);
@@ -341,7 +430,7 @@ export default function ServerDetail() {
           <StatCard title="Containers" value={latest.docker?.filter((c: any) => c.state === 'running').length || 0} sub={`Total: ${latest.docker?.length || 0}`} icon={Box} color="text-purple-500" progressBarValue={(latest.docker?.filter((c: any) => c.state === 'running')?.length || 0) / (latest.docker?.length || 100) * 100} isMono={isMono} />
         </div>
 
-        {/* Charts Grid (Restored Memory & Processes) */}
+        {/* Charts Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <ChartCard title="CPU Load (%)">
             <AreaChart data={chartData}>
@@ -401,31 +490,38 @@ export default function ServerDetail() {
             </AreaChart>
           </ChartCard>
 
-          <ChartCard title={`Disk Usage (${latest.disk?.name || '/'})`}>
+          <ChartCard title={diskNames.length > 1 ? "Mounted Disk Usage (%)" : `Disk Usage (${primaryDiskName})`}>
             <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorDisk" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={getColor("#9B5DE5")} stopOpacity={0.2} />
-                  <stop offset="95%" stopColor={getColor("#9B5DE5")} stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis domain={[0, 100]} hide />
-              <Tooltip content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  const data = payload[0].payload;
-                  return (
-                    <div className="bg-popover border p-2 text-xs rounded shadow z-50">
-                      <div className="font-bold mb-1">{data.time}</div>
-                      <div style={{ color: getColor("#9B5DE5") }}>Usage: {data.diskUsed}%</div>
-                      <div className="text-muted-foreground">Used: {data.diskUsedVal}GB / {data.diskTotalVal}GB</div>
-                    </div>
-                  )
-                }
-                return null;
-              }} />
-              <Area type="step" dataKey="diskUsed" stroke={getColor("#9B5DE5")} strokeWidth={2} fill={"url(#colorDisk)"} name="Disk" />
+              <Tooltip content={<DiskTooltip />} />
+              
+              {diskNames.length > 1 ? diskNames.map((diskName: string, i: number) => {
+                 const color = getDynamicColor(`disk_${diskName}`);
+                 const safeId = `color-disk-${i}`;
+                 return (
+                   <React.Fragment key={diskName}>
+                      <defs>
+                       <linearGradient id={safeId} x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor={color} stopOpacity={0.2} />
+                         <stop offset="95%" stopColor={color} stopOpacity={0} />
+                       </linearGradient>
+                     </defs>
+                     <Area type="step" dataKey={`disk_${diskName}`} stackId="1" stroke={color} fill={`url(#${safeId})`} name={diskName} />
+                   </React.Fragment>
+                 )
+              }) : (
+                 <React.Fragment>
+                    <defs>
+                      <linearGradient id="colorDiskFallback" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={getColor("#9B5DE5")} stopOpacity={0.2} />
+                        <stop offset="95%" stopColor={getColor("#9B5DE5")} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                   <Area type="step" dataKey="diskUsed" stroke={getColor("#9B5DE5")} strokeWidth={2} fill={"url(#colorDiskFallback)"} name="Disk" />
+                 </React.Fragment>
+              )}
             </AreaChart>
           </ChartCard>
 
@@ -436,10 +532,49 @@ export default function ServerDetail() {
               <YAxis hide />
               <Tooltip content={<CustomTooltip unit="" />} />
               <Bar dataKey="procRunning" stackId="a" fill={getColor("#10b981")} name="Running" />
-              <Bar dataKey="procSleeping" stackId="a" fill={getColor('#636165')} name="Sleeping" opacity="0.3" />
+              <Bar dataKey="procSleeping" stackId="a" fill={getColor('#636165')} name="Sleeping" opacity="0.4" />
               <Bar dataKey="procBlocked" stackId="a" fill={getColor("#ef4444")} name="Blocked" />
             </BarChart>
           </ChartCard>
+
+          {/* --- EXTENSIONS (Appended untouched after existing core loop) --- */}
+
+          {showTemperature && (
+            <ChartCard title="System Temperature (°C)">
+              <AreaChart data={chartData}>
+                 <defs>
+                  <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={getDynamicColor("sysTemp")} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={getDynamicColor("sysTemp")} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="time" hide />
+                <YAxis hide />
+                <Tooltip content={<CustomTooltip unit=" °C" />} />
+                <Area type="monotone" dataKey="sysTemp" stroke={getDynamicColor("sysTemp")} strokeWidth={2} fillOpacity={1} fill={"url(#colorTemp)"} name="Core Temp" />
+              </AreaChart>
+            </ChartCard>
+          )}
+
+          {showPower && (
+            <ChartCard title="System Power Draw (W)">
+              <AreaChart data={chartData}>
+                 <defs>
+                  <linearGradient id="colorPower" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={getDynamicColor("sysPower")} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={getDynamicColor("sysPower")} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="time" hide />
+                <YAxis hide />
+                <Tooltip content={<CustomTooltip unit=" W" />} />
+                <Area type="monotone" dataKey="sysPower" stroke={getDynamicColor("sysPower")} strokeWidth={2} fillOpacity={1} fill={"url(#colorPower)"} name="Wattage" />
+              </AreaChart>
+            </ChartCard>
+          )}
+
         </div>
 
         {/* Docker Table */}
@@ -448,6 +583,88 @@ export default function ServerDetail() {
         >
           <DistributionTable data={latest.docker} router={router} id={id} />
         </DistributionCard>
+
+        
+        {/* --- HARDWARE ACCELERATORS (GPU) CONSOLIDATED --- */}
+        {activeGpus.length > 0 && (
+          <div className="space-y-6 pt-6 border-t border-border/50">
+            <div className="flex items-center gap-2">
+              <Cpu className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold tracking-tight">Hardware Accelerators</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Utilization (Overlaid Lines for precision) */}
+              <ChartCard title="GPU Utilization (%)">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="time" hide />
+                  <YAxis domain={[0, 100]} hide />
+                  <Tooltip content={<CustomTooltip unit="%" />} />
+                  {activeGpus.map((gpu: any, i: number) => {
+                     const color = getDynamicColor(`gpu_util_${i}`);
+                     return <Line key={i} type="monotone" dataKey={`gpu_${i}_utilization`} stroke={color} strokeWidth={2} dot={false} name={gpu.model || `GPU ${i}`} />
+                  })}
+                </LineChart>
+              </ChartCard>
+
+              {/* VRAM (Overlaid Lines) */}
+              <ChartCard title="GPU VRAM Usage (%)">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="time" hide />
+                  <YAxis domain={[0, 100]} hide />
+                  <Tooltip content={<CustomTooltip unit="%" />} />
+                  {activeGpus.map((gpu: any, i: number) => {
+                     const color = getDynamicColor(`gpu_vram_${i}`);
+                     return <Line key={i} type="monotone" dataKey={`gpu_${i}_vram`} stroke={color} strokeWidth={2} dot={false} name={gpu.model || `GPU ${i}`} />
+                  })}
+                </LineChart>
+              </ChartCard>
+
+              {/* Temperature */}
+              <ChartCard title="GPU Temperature (°C)">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="time" hide />
+                  <YAxis hide />
+                  <Tooltip content={<CustomTooltip unit=" °C" />} />
+                  {activeGpus.map((gpu: any, i: number) => {
+                     const color = getDynamicColor(`gpu_temp_${i}`);
+                     return <Line key={i} type="monotone" dataKey={`gpu_${i}_temp`} stroke={color} strokeWidth={2} dot={false} name={gpu.model || `GPU ${i}`} />
+                  })}
+                </LineChart>
+              </ChartCard>
+
+              {/* Power Draw (Area) */}
+              <ChartCard title="GPU Power Draw (W)">
+                <AreaChart data={chartData}>
+                  {activeGpus.map((gpu: any, i: number) => {
+                     const color = getDynamicColor(`gpu_power_${i}`);
+                     const safeId = `color-gpu-power-${i}`;
+                     return (
+                        <React.Fragment key={i}>
+                            <defs>
+                             <linearGradient id={safeId} x1="0" y1="0" x2="0" y2="1">
+                               <stop offset="5%" stopColor={color} stopOpacity={0.2} />
+                               <stop offset="95%" stopColor={color} stopOpacity={0} />
+                             </linearGradient>
+                           </defs>
+                           <Area type="monotone" dataKey={`gpu_${i}_power`} stroke={color} strokeWidth={2} fill={`url(#${safeId})`} name={gpu.model || `GPU ${i}`} />
+                        </React.Fragment>
+                     );
+                  })}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="time" hide />
+                  <YAxis hide />
+                  <Tooltip content={<CustomTooltip unit=" W" />} />
+                </AreaChart>
+              </ChartCard>
+              
+            </div>
+          </div>
+        )}
 
         {/* --- INTEGRATIONS LIST --- */}
         {(hasNginx || hasTraefik || hasTerminal) && (
