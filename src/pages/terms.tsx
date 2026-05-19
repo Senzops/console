@@ -24,7 +24,7 @@ export default function TermsOfService() {
 
         <div className="max-w-4xl mx-auto px-4 md:px-8 relative z-10">
           <div className="mb-12 border-b border-border/40 pb-8">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-foreground mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tighter text-foreground mb-4">
               Terms of Service
             </h1>
             <p className="text-muted-foreground font-mono text-sm tracking-wide uppercase">
@@ -34,7 +34,7 @@ export default function TermsOfService() {
 
           <div className="space-y-10 text-base leading-relaxed text-muted-foreground">
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 1. Acceptance of Terms
               </h2>
               <p>
@@ -48,7 +48,7 @@ export default function TermsOfService() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 2. Description of Service
               </h2>
               <p>
@@ -60,7 +60,7 @@ export default function TermsOfService() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 3. Account Security & API Keys
               </h2>
               <p>
@@ -72,7 +72,7 @@ export default function TermsOfService() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 4. Data Ingestion & Fair Use
               </h2>
               <p>
@@ -87,7 +87,7 @@ export default function TermsOfService() {
 
             {/* --- PADDLE COMPLIANCE SECTION --- */}
             <section className="space-y-4 p-6 bg-card border border-border/60 rounded-xl shadow-sm">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 5. Billing, Payments, and Refund Policy
               </h2>
               <p>
@@ -117,7 +117,7 @@ export default function TermsOfService() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 6. Data Privacy & Processing
               </h2>
               <p>
@@ -131,7 +131,7 @@ export default function TermsOfService() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 7. Limitation of Liability
               </h2>
               <p>
@@ -144,7 +144,7 @@ export default function TermsOfService() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 8. Contact Information
               </h2>
               <p>

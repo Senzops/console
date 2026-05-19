@@ -24,7 +24,7 @@ export default function PrivacyPolicy() {
 
         <div className="max-w-4xl mx-auto px-4 md:px-8 relative z-10">
           <div className="mb-12 border-b border-border/40 pb-8">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-foreground mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tighter text-foreground mb-4">
               Privacy Policy
             </h1>
             <p className="text-muted-foreground font-mono text-sm tracking-wide uppercase">
@@ -45,7 +45,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 1. Dual Capacity: Controller & Processor
               </h2>
               <p>
@@ -70,10 +70,10 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 2. Information Collection
               </h2>
-              <h3 className="text-lg font-semibold text-foreground mt-4">
+              <h3 className="text-lg font-bold font-display text-foreground mt-4">
                 A. Account & Administrative Data
               </h3>
               <p>
@@ -86,7 +86,7 @@ export default function PrivacyPolicy() {
                 infrastructure.
               </p>
 
-              <h3 className="text-lg font-semibold text-foreground mt-4">
+              <h3 className="text-lg font-bold font-display text-foreground mt-4">
                 B. Operational Telemetry Data
               </h3>
               <p>
@@ -94,7 +94,7 @@ export default function PrivacyPolicy() {
                 include IP addresses, user agents, API performance metrics,
                 server resource utilization, and application logs.
               </p>
-              <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-md text-destructive mt-4">
+              <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-md text-destructive mt-4 font-sans">
                 <strong>Strict Prohibition:</strong> You are contractually
                 prohibited from transmitting Personally Identifiable Information
                 (PII), Protected Health Information (PHI), or Payment Card
@@ -104,7 +104,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 3. Utilization of Information
               </h2>
               <p>
@@ -132,7 +132,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 4. Data Sharing & Subprocessors
               </h2>
               <p>
@@ -162,7 +162,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 5. Data Retention & Lifecycle
               </h2>
               <p>
@@ -182,7 +182,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 6. International Data Transfers
               </h2>
               <p>
@@ -196,7 +196,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 7. Security Posture
               </h2>
               <p>
@@ -210,7 +210,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 8. Contact & Data Subject Rights
               </h2>
               <p>

@@ -34,7 +34,7 @@ export default function ForgotPassword() {
             <Link href="/login" className="p-2 -ml-2 rounded-full hover:bg-secondary/50 transition-colors">
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </Link>
-            <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+            <CardTitle className="text-2xl font-bold font-display">Reset Password</CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">Enter your email to receive a reset link</p>
         </CardHeader>
@@ -45,7 +45,7 @@ export default function ForgotPassword() {
                 <CheckCircle2 className="h-6 w-6 text-emerald-500" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Check your inbox</h3>
+                <h3 className="font-semibold text-lg font-display">Check your inbox</h3>
                 <p className="text-sm text-muted-foreground">We have sent a password reset link to <br /><strong>{email}</strong></p>
               </div>
               <Button variant="outline" className="w-full mt-4" onClick={() => setIsSent(false)}>Try another email</Button>

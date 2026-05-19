@@ -23,7 +23,7 @@ export default function CookiePolicy() {
 
         <div className="max-w-4xl mx-auto px-4 md:px-8 relative z-10">
           <div className="mb-12 border-b border-border/40 pb-8">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-foreground mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tighter text-foreground mb-4">
               Cookie Policy
             </h1>
             <p className="text-muted-foreground font-mono text-sm tracking-wide uppercase">
@@ -43,7 +43,7 @@ export default function CookiePolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 1. What Are Cookies?
               </h2>
               <p>
@@ -56,7 +56,7 @@ export default function CookiePolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 2. How We Use Cookies on Senzor.dev
               </h2>
               <p>
@@ -66,7 +66,7 @@ export default function CookiePolicy() {
 
               <div className="space-y-6 mt-4">
                 <div className="bg-card border border-border/60 p-5 rounded-xl shadow-sm">
-                  <h3 className="text-lg font-bold text-foreground mb-2">
+                  <h3 className="text-lg font-bold font-display text-foreground mb-2">
                     Strictly Necessary (Authentication)
                   </h3>
                   <p className="text-sm">
@@ -79,7 +79,7 @@ export default function CookiePolicy() {
                 </div>
 
                 <div className="bg-card border border-border/60 p-5 rounded-xl shadow-sm">
-                  <h3 className="text-lg font-bold text-foreground mb-2">
+                  <h3 className="text-lg font-bold font-display text-foreground mb-2">
                     Functional (Dashboard Preferences)
                   </h3>
                   <p className="text-sm">
@@ -91,7 +91,7 @@ export default function CookiePolicy() {
                 </div>
 
                 <div className="bg-card border border-border/60 p-5 rounded-xl shadow-sm">
-                  <h3 className="text-lg font-bold text-foreground mb-2">
+                  <h3 className="text-lg font-bold font-display text-foreground mb-2">
                     Strictly Necessary (Billing & Checkout)
                   </h3>
                   <p className="text-sm">
@@ -105,11 +105,11 @@ export default function CookiePolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 3. Senzor Web Agent (Customer Deployments)
               </h2>
               <div className="bg-blue-500/5 border border-blue-500/20 p-6 rounded-xl">
-                <h3 className="text-lg font-bold text-blue-500 mb-3">
+                <h3 className="text-lg font-bold font-display text-blue-500 mb-3">
                   Our Analytics are Cookie-less
                 </h3>
                 <p className="text-foreground/80 mb-3">
@@ -140,7 +140,7 @@ export default function CookiePolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 4. Managing Your Preferences
               </h2>
               <p>
@@ -158,7 +158,7 @@ export default function CookiePolicy() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 5. Contact Us
               </h2>
               <p>

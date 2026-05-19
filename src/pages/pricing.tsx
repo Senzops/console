@@ -260,7 +260,7 @@ export default function PricingPage() {
           <AnimatedBackground />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10" />
 
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter text-foreground mb-6 leading-[1.1] text-balance relative z-10">
+          <h1 className="text-5xl md:text-7xl font-bold font-display tracking-tighter text-foreground mb-6 leading-[1.1] text-balance relative z-10">
             Simple, predictable pricing.
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed relative z-10">
@@ -336,7 +336,7 @@ export default function PricingPage() {
                       )}
 
                       <div className="mb-6">
-                        <h3 className="text-2xl font-bold text-foreground mb-2">
+                        <h3 className="text-2xl font-bold font-display text-foreground mb-2">
                           {plan.name}
                         </h3>
                         <p className="text-sm text-muted-foreground h-10">
@@ -406,7 +406,7 @@ export default function PricingPage() {
                 <Building2 className="w-8 h-8 text-blue-500" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-foreground mb-2">
+                <h3 className="text-2xl font-bold font-display text-foreground mb-2">
                   Enterprise
                 </h3>
                 <p className="text-muted-foreground">
@@ -433,7 +433,7 @@ export default function PricingPage() {
         {/* --- COMPARISON MATRIX --- */}
         <section className="px-4 py-24 max-w-6xl mx-auto border-t border-border/30">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-foreground mb-4">
               Compare all features
             </h2>
             <p className="text-muted-foreground text-lg">

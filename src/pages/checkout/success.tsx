@@ -66,7 +66,7 @@ export default function CheckoutSuccessPage() {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+                  <h1 className="text-2xl md:text-3xl font-bold font-display tracking-tight text-foreground">
                     Payment Successful
                   </h1>
                   <div className="mt-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">

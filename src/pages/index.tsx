@@ -131,7 +131,7 @@ export default function Home() {
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none" />
 
           <div className="relative z-10 text-center max-w-4xl mx-auto space-y-8 mt-12">
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.1]">
+            <h1 className="text-5xl md:text-7xl font-bold font-display tracking-tight text-foreground leading-[1.1]">
               Unified Visibility.
               <br />
               Uncompromised Control.
@@ -169,11 +169,11 @@ export default function Home() {
         {/* --- LIFECYCLE ARCHITECTURE MAPPING --- */}
         <section className="px-4 py-24 border-b border-border/30 bg-muted/5 relative overflow-hidden">
           <div className="text-center max-w-3xl mx-auto mb-8 relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-foreground">
+            <h2 className="text-3xl md:text-4xl font-bold font-display tracking-tight mb-4 text-foreground">
               Full-Stack Observability Across the Development Lifecycle
             </h2>
             <p className="text-muted-foreground text-lg leading-relaxed">
-              From the client's browser to the deepest database query, Senzor
+              From the client&apos;s browser to the deepest database query, Senzor
               provides native instrumentation and seamless data correlation.
             </p>
           </div>
@@ -202,7 +202,7 @@ export default function Home() {
                   {/* Text Content */}
                   <div className="flex-1 space-y-6">
                     <div>
-                      <h3 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">
+                      <h3 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-foreground mb-3">
                         {feature.title}
                       </h3>
                       <p className="text-lg font-medium text-foreground/80 mb-4">
@@ -260,7 +260,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-background/80 z-0"></div>
 
           <div className="relative z-10 text-center max-w-3xl mx-auto space-y-6">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+            <h2 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-foreground">
               Ready to gain full visibility?
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">

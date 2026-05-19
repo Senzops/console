@@ -12,7 +12,7 @@ export const DocHeader = ({
   description: string;
 }) => (
   <div className="mb-10 pb-6 border-b border-border/40">
-    <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground mb-4">
+    <h1 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-foreground mb-4">
       {title}
     </h1>
     <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">
@@ -31,7 +31,7 @@ export const DocSection = ({
   className?: string;
 }) => (
   <section className={cn("mb-12", className)}>
-    <h2 className="text-2xl font-bold tracking-tight text-foreground mb-6 border-b border-border/40 pb-2">
+    <h2 className="text-2xl font-bold font-display tracking-tight text-foreground mb-6 border-b border-border/40 pb-2">
       {title}
     </h2>
     {children}

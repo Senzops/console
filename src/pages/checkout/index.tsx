@@ -262,7 +262,7 @@ export default function PaymentPage() {
                 {/* Header & User Context */}
                 <div className="mb-6 pb-6 border-b border-border/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+                    <h1 className="text-2xl font-bold font-display tracking-tight text-foreground">
                       Review & Checkout
                     </h1>
                     <div className="mt-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">

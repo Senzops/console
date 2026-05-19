@@ -27,7 +27,7 @@ export default function GdprCompliance() {
         <div className="max-w-4xl mx-auto px-4 md:px-8 relative z-10">
           <div className="mb-12 border-b border-border/40 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-foreground mb-4 flex items-center gap-4">
+              <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tighter text-foreground mb-4 flex items-center gap-4">
                 <ShieldCheck className="h-10 w-10 text-emerald-500" />
                 GDPR Compliance
               </h1>
@@ -60,7 +60,7 @@ export default function GdprCompliance() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-10">
               <div className="bg-card border border-border/60 p-6 rounded-xl shadow-sm">
                 <Globe className="h-6 w-6 text-blue-500 mb-3" />
-                <h3 className="text-lg font-bold text-foreground mb-2">
+                <h3 className="text-lg font-bold font-display text-foreground mb-2">
                   Cross-Border Transfers
                 </h3>
                 <p className="text-sm">
@@ -72,7 +72,7 @@ export default function GdprCompliance() {
               </div>
               <div className="bg-card border border-border/60 p-6 rounded-xl shadow-sm">
                 <Server className="h-6 w-6 text-purple-500 mb-3" />
-                <h3 className="text-lg font-bold text-foreground mb-2">
+                <h3 className="text-lg font-bold font-display text-foreground mb-2">
                   Data Minimization
                 </h3>
                 <p className="text-sm">
@@ -85,7 +85,7 @@ export default function GdprCompliance() {
             </div>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 1. Data Processing Agreement (DPA)
               </h2>
               <p>
@@ -102,7 +102,7 @@ export default function GdprCompliance() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 2. Lawful Basis for Processing
               </h2>
               <p>
@@ -128,7 +128,7 @@ export default function GdprCompliance() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 3. Data Subject Access Requests (DSAR)
               </h2>
               <p>
@@ -158,8 +158,8 @@ export default function GdprCompliance() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
-                4. Prohibited Data (The Customer's Obligation)
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
+                4. Prohibited Data (The Customer&apos;s Obligation)
               </h2>
               <p>
                 Senzor is an infrastructure and application observability
@@ -179,7 +179,7 @@ export default function GdprCompliance() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              <h2 className="text-2xl font-bold font-display text-foreground tracking-tight">
                 5. Incident Response & Breach Notification
               </h2>
               <p>

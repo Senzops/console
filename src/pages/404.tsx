@@ -32,12 +32,13 @@ export default function Custom404() {
         <div className="relative z-10 w-full max-w-2xl text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {/* 404 Typography */}
           <div className="space-y-4">
-            <h1 className="text-8xl md:text-9xl font-extrabold tracking-tighter text-foreground drop-shadow-sm">
+            <h1 className="text-8xl md:text-9xl font-bold font-display tracking-tighter text-foreground drop-shadow-sm">
               404
             </h1>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
-              Resource Not Found
+            <h2 className="text-2xl md:text-3xl font-bold font-display tracking-tight text-foreground">
+              Page Not Found
             </h2>
+
             <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto">
               The endpoint or dashboard you are looking for does not exist, has
               been moved, or you lack the required access permissions.

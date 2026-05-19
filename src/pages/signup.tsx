@@ -50,7 +50,7 @@ export default function Signup() {
             <Link href="/" className="p-2 -ml-2 rounded-full hover:bg-secondary/50 transition-colors">
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </Link>
-            <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+            <CardTitle className="text-2xl font-bold font-display">Create Account</CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">Get started with your free Senzor account</p>
         </CardHeader>

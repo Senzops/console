@@ -37,7 +37,7 @@ export default function FeaturePage() {
         <Navbar />
         <main className="flex-grow flex flex-col items-center justify-center text-center px-4 h-screen">
           <Box className="w-16 h-16 text-muted-foreground opacity-20 mb-6" />
-          <h1 className="text-4xl font-bold tracking-tight text-foreground mb-4">
+          <h1 className="text-4xl font-bold font-display tracking-tight text-foreground mb-4">
             Feature Not Found
           </h1>
           <p className="text-muted-foreground mb-8">
@@ -91,7 +91,7 @@ export default function FeaturePage() {
 
           <div className="max-w-6xl mx-auto flex flex-col items-center text-center relative z-10 mt-8">
             <div className="space-y-8 max-w-3xl">
-              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.1]">
+              <h1 className="text-5xl md:text-7xl font-bold font-display tracking-tight text-foreground leading-[1.1]">
                 {feature.title}
               </h1>
 
@@ -139,7 +139,7 @@ export default function FeaturePage() {
         <section className="py-32 bg-muted/5 border-b border-border/30">
           <div className="max-w-7xl mx-auto px-4 md:px-8">
             <div className="max-w-3xl mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-foreground mb-4">
                 Core Capabilities
               </h2>
               <p className="text-lg text-muted-foreground leading-relaxed">
@@ -166,7 +166,7 @@ export default function FeaturePage() {
                     <CheckCircle2 className={cn("w-6 h-6", textColor)} />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-foreground mb-1">
+                    <h4 className="text-lg font-bold font-display text-foreground mb-1">
                       {point}
                     </h4>
                     <p className="text-sm text-muted-foreground leading-relaxed">
@@ -185,7 +185,7 @@ export default function FeaturePage() {
                   <ShieldCheck className="w-6 h-6 text-emerald-500" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-foreground">
+                  <h4 className="text-sm font-bold font-display text-foreground">
                     Enterprise-Ready Architecture
                   </h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -207,7 +207,7 @@ export default function FeaturePage() {
         <section className="py-24 bg-background">
           <div className="max-w-7xl mx-auto px-4 md:px-8">
             <div className="flex items-center justify-between mb-12">
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              <h2 className="text-2xl font-bold font-display tracking-tight text-foreground">
                 Explore more of Senzor
               </h2>
               <Link
@@ -255,7 +255,7 @@ export default function FeaturePage() {
                       >
                         <Activity className={cn("w-5 h-5", relTextColor)} />
                       </div>
-                      <h4 className="text-lg font-bold text-foreground mb-2">
+                      <h4 className="text-lg font-bold font-display text-foreground mb-2">
                         {relFeature.title}
                       </h4>
                       <p className="text-sm text-muted-foreground leading-relaxed flex-1">
@@ -284,7 +284,7 @@ export default function FeaturePage() {
           <div className="absolute inset-0 bg-background/80 z-0"></div>
 
           <div className="relative z-10 text-center max-w-3xl mx-auto space-y-6">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+            <h2 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-foreground">
               Ready to gain full visibility?
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
