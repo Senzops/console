@@ -17,6 +17,10 @@ interface SettingsContextType {
   setSidebarMode: (m: SidebarMode) => void;
   defaultViewMode: ViewMode;
   setDefaultViewMode: (m: ViewMode) => void;
+
+  // Collapsible Sidebar Settings
+  isSidebarMinimized: boolean;
+  setIsSidebarMinimized: (m: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType>({} as any);
@@ -30,6 +34,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [sidebarMode, setSidebarModeState] =
     useState<SidebarMode>("restricted");
   const [defaultViewMode, setDefaultViewModeState] = useState<ViewMode>("list");
+  const [isSidebarMinimized, setIsSidebarMinimizedState] = useState<boolean>(false);
 
   useEffect(() => {
     // Load all settings from localStorage on mount
@@ -37,11 +42,13 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     const savedApp = localStorage.getItem("sys-appearance") as Appearance;
     const savedSidebar = localStorage.getItem("sys-sidebar") as SidebarMode;
     const savedView = localStorage.getItem("sys-viewmode") as ViewMode;
+    const savedMinimized = localStorage.getItem("sys-sidebar-minimized") === "true";
 
     if (savedTheme) setThemeState(savedTheme);
     if (savedApp) setAppearance(savedApp);
     if (savedSidebar) setSidebarModeState(savedSidebar);
     if (savedView) setDefaultViewModeState(savedView);
+    if (savedMinimized) setIsSidebarMinimizedState(true);
   }, []);
 
   const setTheme = (t: Theme) => {
@@ -68,6 +75,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem("sys-viewmode", m);
   };
 
+  const setIsSidebarMinimized = (m: boolean) => {
+    setIsSidebarMinimizedState(m);
+    localStorage.setItem("sys-sidebar-minimized", m ? "true" : "false");
+  };
+
   // Initial Theme Apply
   useEffect(() => {
     const root = window.document.documentElement;
@@ -86,6 +98,8 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         setSidebarMode,
         defaultViewMode,
         setDefaultViewMode,
+        isSidebarMinimized,
+        setIsSidebarMinimized,
       }}
     >
       {children}

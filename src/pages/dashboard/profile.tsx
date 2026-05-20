@@ -20,6 +20,7 @@ import { useAuth, api } from "../../lib/auth";
 import { toast } from "sonner";
 import {
   User as UserIcon,
+  LogOut,
   CreditCard,
   Database,
   Receipt,
@@ -300,7 +301,7 @@ export default function ProfilePage() {
             <DeterministicCoverArt hash={emailHash} />
           </div>
           <CardContent className="p-6 md:p-8 pt-0 sm:pt-0 relative">
-            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-12 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-12">
               
               <div className="relative shrink-0 p-1.5 bg-card rounded-2xl border border-border/60 shadow-sm">
                 <img
@@ -364,6 +365,21 @@ export default function ProfilePage() {
               </div>
             </div>
           </CardContent>
+
+          {/* Action Footer for Session Management */}
+          <div className="border-t border-border/40 bg-muted/15 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground text-center sm:text-left leading-relaxed">
+              You are currently authenticated as <strong className="text-foreground">{user.email}</strong>. Sign out to end your session.
+            </p>
+            <Button
+              onClick={logout}
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto border-border/60 hover:bg-destructive hover:text-white hover:border-destructive transition-all font-semibold text-xs h-9 px-4 shrink-0 shadow-sm flex items-center justify-center gap-2"
+            >
+              <LogOut className="h-3.5 w-3.5" /> Sign Out
+            </Button>
+          </div>
         </Card>
 
         {/* 2. Subscription & Quota (Decoupled Cycles) */}

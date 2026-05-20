@@ -25,6 +25,7 @@ import {
   Play,
   Box,
   ChevronRight,
+  ChevronLeft,
   LayoutGrid,
   List,
   Database,
@@ -364,6 +365,39 @@ export const Footer = () => {
   );
 };
 
+// Helper for item icons
+export const getSidebarItemIcon = (hrefPrefix: string, item: any, DefaultIcon: any = null) => {
+  let Icon = DefaultIcon;
+  if (!Icon) {
+    let statusColor = "bg-secondary";
+    if (item.status === "online" || item.status === "up")
+      statusColor = "bg-emerald-500";
+    else if (item.status === "offline" || item.status === "down")
+      statusColor = "bg-destructive";
+
+    if (hrefPrefix.includes("web"))
+      Icon = <Globe className="h-3 w-3 text-blue-500 shrink-0" />;
+    else if (hrefPrefix.includes("rum"))
+      Icon = <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />;
+    else if (hrefPrefix.includes("apm"))
+      Icon = <Box className="h-3 w-3 text-orange-500 shrink-0" />;
+    else if (hrefPrefix.includes("monitor"))
+      Icon = (
+        <Activity
+          className={cn(
+            "h-3 w-3 shrink-0",
+            item.status === "up" ? "text-emerald-500" : "text-destructive"
+          )}
+        />
+      );
+    else if (hrefPrefix.includes("task"))
+      Icon = <Workflow className="h-3 w-3 text-indigo-500 shrink-0" />;
+    else
+      Icon = <div className={cn("h-2 w-2 rounded-full shrink-0", statusColor)} />;
+  }
+  return Icon;
+};
+
 // Helper for Sidebar Sections
 export const SidebarSection = ({
   title,
@@ -372,6 +406,9 @@ export const SidebarSection = ({
   linkPrefix,
   onAdd,
   icon: DefaultIcon,
+  isMinimized = false,
+  onMouseEnter,
+  onMouseLeave,
 }: any) => {
   const router = useRouter();
   const { sidebarMode } = useTheme();
@@ -403,6 +440,57 @@ export const SidebarSection = ({
   const isAnyChildActive = items?.some((item: any) =>
     router.asPath.includes(`${hrefPrefix}/${item._id}`),
   );
+
+  if (isMinimized) {
+    let HeaderIconComponent: React.ComponentType<any> = LayoutTemplate;
+    let iconColorClass = "text-teal-500";
+
+    if (title === "Servers") {
+      HeaderIconComponent = Server;
+      iconColorClass = "text-emerald-500";
+    } else if (title === "Databases") {
+      HeaderIconComponent = Database;
+      iconColorClass = "text-blue-500";
+    } else if (title === "Web Analytics") {
+      HeaderIconComponent = Globe;
+      iconColorClass = "text-sky-500";
+    } else if (title === "Web APM (RUM)") {
+      HeaderIconComponent = MonitorSmartphone;
+      iconColorClass = "text-pink-500";
+    } else if (title === "APM Services") {
+      HeaderIconComponent = Box;
+      iconColorClass = "text-orange-500";
+    } else if (title === "Background Tasks") {
+      HeaderIconComponent = Workflow;
+      iconColorClass = "text-indigo-500";
+    } else if (title === "Uptime") {
+      HeaderIconComponent = Activity;
+      iconColorClass = "text-emerald-500";
+    }
+
+    return (
+      <div
+        className="flex justify-center py-0.5 px-1 relative"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      >
+        <Link href={linkPrefix} className="outline-none">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-9 w-9 rounded-xl transition-all duration-200 border border-transparent hover:border-border/40 hover:bg-secondary/40",
+              isAnyChildActive
+                ? "bg-secondary/60 border-border/50 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <HeaderIconComponent className={cn("h-3.5 w-3.5 shrink-0", iconColorClass)} />
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1 mb-2">
@@ -475,48 +563,7 @@ export const SidebarSection = ({
               const isActive = router.asPath.includes(
                 `${hrefPrefix}/${item._id}`,
               );
-
-              let statusColor = "bg-secondary";
-              if (item.status === "online" || item.status === "up")
-                statusColor = "bg-emerald-500";
-              else if (item.status === "offline" || item.status === "down")
-                statusColor = "bg-destructive";
-
-              let Icon = DefaultIcon;
-              if (!Icon) {
-                if (hrefPrefix.includes("web"))
-                  Icon = <Globe className="h-3 w-3 text-blue-500 shrink-0" />;
-                else if (hrefPrefix.includes("rum"))
-                  Icon = (
-                    <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
-                  );
-                else if (hrefPrefix.includes("apm"))
-                  Icon = <Box className="h-3 w-3 text-orange-500 shrink-0" />;
-                else if (hrefPrefix.includes("monitor"))
-                  Icon = (
-                    <Activity
-                      className={cn(
-                        "h-3 w-3 shrink-0",
-                        item.status === "up"
-                          ? "text-emerald-500"
-                          : "text-destructive",
-                      )}
-                    />
-                  );
-                else if (hrefPrefix.includes("task"))
-                  Icon = (
-                    <Workflow className="h-3 w-3 text-indigo-500 shrink-0" />
-                  );
-                else
-                  Icon = (
-                    <div
-                      className={cn(
-                        "h-2 w-2 rounded-full shrink-0",
-                        statusColor,
-                      )}
-                    />
-                  );
-              }
+              const Icon = getSidebarItemIcon(hrefPrefix, item, DefaultIcon);
 
               return (
                 <Link href={`${hrefPrefix}/${item._id}`} key={item._id}>
@@ -568,9 +615,15 @@ export const SidebarSection = ({
 export const SidebarGroup = ({
   title,
   links,
+  isMinimized = false,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   title: string;
   links: any[];
+  isMinimized?: boolean;
+  onMouseEnter?: (e: React.MouseEvent) => void;
+  onMouseLeave?: () => void;
 }) => {
   const router = useRouter();
 
@@ -597,6 +650,34 @@ export const SidebarGroup = ({
   const isAnyChildActive = links?.some((link: any) =>
     router.asPath.includes(link.href),
   );
+
+  if (isMinimized) {
+    const firstLink = links[0];
+    const GroupIcon = firstLink?.icon || Bot;
+
+    return (
+      <div
+        className="flex justify-center py-0.5 px-1 relative"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      >
+        <Link href={firstLink?.href || "#"} className="outline-none">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-9 w-9 rounded-xl transition-all duration-200 border border-transparent hover:border-border/40 hover:bg-secondary/40",
+              isAnyChildActive
+                ? "bg-secondary/60 border-border/50 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <GroupIcon className={cn("h-3.5 w-3.5 shrink-0", firstLink?.iconColor)} />
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1 mb-2 mt-4">
@@ -696,6 +777,8 @@ export const DashboardLayout = ({
     setSidebarMode,
     defaultViewMode,
     setDefaultViewMode,
+    isSidebarMinimized,
+    setIsSidebarMinimized,
   } = useTheme();
   const router = useRouter();
 
@@ -703,6 +786,92 @@ export const DashboardLayout = ({
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Mobile Sidebar State
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Sidebar Minimization State & Persistence
+  const isMinimized = isSidebarMinimized;
+  const [enableTransition, setEnableTransition] = useState(false);
+
+  useEffect(() => {
+    // Delay layout transitions until after the initial client-side hydration/mount
+    const timer = setTimeout(() => setEnableTransition(true), 150);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleToggleMinimized = () => {
+    setIsSidebarMinimized(!isSidebarMinimized);
+  };
+
+  // Hover Popover (Dynamic Island) State & References
+  const [hoveredSection, setHoveredSection] = useState<{
+    id: string;
+    title: string;
+    items?: any[];
+    hrefPrefix?: string;
+    linkPrefix?: string;
+    links?: any[];
+    rect: DOMRect;
+    type: "section" | "group";
+    onAdd?: () => void;
+    icon?: any;
+  } | null>(null);
+
+  const [cardTop, setCardTop] = useState<number | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!hoveredSection) {
+      setCardTop(null);
+      return;
+    }
+    const updatePosition = () => {
+      if (cardRef.current) {
+        const rect = hoveredSection.rect;
+        const height = cardRef.current.offsetHeight;
+        const viewportHeight = window.innerHeight;
+        const padding = 12;
+
+        let top = rect.top;
+        if (top + height > viewportHeight - padding) {
+          top = viewportHeight - height - padding;
+        }
+        if (top < padding) {
+          top = padding;
+        }
+        setCardTop(top);
+      }
+    };
+
+    // Run layout position check
+    updatePosition();
+    // Run again in next microtask to capture final DOM dimensions
+    const timer = setTimeout(updatePosition, 0);
+    return () => clearTimeout(timer);
+  }, [hoveredSection, hoveredSection?.items, hoveredSection?.rect?.top]);
+
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSectionMouseEnter = (sectionData: any, element: HTMLElement) => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    const rect = element.getBoundingClientRect();
+    setHoveredSection({ ...sectionData, rect });
+  };
+
+  const handleSectionMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredSection(null);
+    }, 150);
+  };
+
+  const handleCardMouseEnter = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+  };
+
+  const handleCardMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredSection(null);
+    }, 150);
+  };
+
 
   // PWA LOGIC
   const [isInstallable, setIsInstallable] = useState(false);
@@ -1171,258 +1340,651 @@ export const DashboardLayout = ({
       )}
 
       {/* --- UNIFIED ENTERPRISE SIDEBAR (Desktop + Mobile Drawer) --- */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shadow-2xl md:shadow-none",
-          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        {/* Brand Header */}
-        <div className="p-4 md:p-6 border-b shrink-0 flex items-center justify-between h-14 md:h-auto">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 font-bold text-xl tracking-tight hover:opacity-80 transition-opacity"
-          >
-            <div className="relative h-8 w-8 rounded-lg overflow-hidden">
-              <img
-                src="/logo.svg"
-                alt="Logo"
-                className="object-cover h-full w-full logo"
-              />
-            </div>
-            <span>Senzor</span>
-          </Link>
-          {/* Close button solely for Mobile UX */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden text-muted-foreground hover:text-foreground -mr-2"
-            onClick={() => setIsMobileSidebarOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Scrollable Nav Area */}
-        <div
-          ref={sidebarRef}
-          className="flex-1 overflow-y-auto py-4 px-2 space-y-6"
-        >
-          <SidebarSection
-            title="Saved Views"
-            items={viewsList?.views}
-            hrefPrefix="/dashboard/views"
-            linkPrefix="/dashboard/views"
-            onAdd={!user.isDemo ? () => setIsViewModalOpen(true) : undefined}
-            icon={<LayoutTemplate className="h-3 w-3 text-teal-500 shrink-0" />}
-          />
-          <SidebarSection
-            title="Servers"
-            items={serverList}
-            hrefPrefix="/dashboard/server"
-            linkPrefix="/dashboard/server"
-            onAdd={!user.isDemo ? () => setIsServerModalOpen(true) : undefined}
-          />
-          <SidebarSection
-            title="Databases"
-            items={dbList}
-            hrefPrefix="/dashboard/db"
-            linkPrefix="/dashboard/db"
-            onAdd={!user.isDemo ? () => setIsDbModalOpen(true) : undefined}
-            icon={<Database className="h-3 w-3 text-blue-500 shrink-0" />}
-          />
-
-          <SidebarSection
-            title="Web Analytics"
-            items={webList}
-            hrefPrefix="/dashboard/web"
-            linkPrefix="/dashboard/web"
-            onAdd={!user.isDemo ? () => setIsWebModalOpen(true) : undefined}
-          />
-
-          {/* --- RUM SECTION --- */}
-          <SidebarSection
-            title="Web APM (RUM)"
-            items={rumList}
-            hrefPrefix="/dashboard/rum"
-            linkPrefix="/dashboard/rum"
-            onAdd={!user.isDemo ? () => setIsRumModalOpen(true) : undefined}
-            icon={
-              <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
-            }
-          />
-
-          <SidebarSection
-            title="APM Services"
-            items={apmList}
-            hrefPrefix="/dashboard/apm"
-            linkPrefix="/dashboard/apm"
-            onAdd={!user.isDemo ? () => setIsApmModalOpen(true) : undefined}
-          />
-
-          <SidebarSection
-            title="Background Tasks"
-            items={taskList}
-            hrefPrefix="/dashboard/task"
-            linkPrefix="/dashboard/task"
-            onAdd={!user.isDemo ? () => setIsTaskModalOpen(true) : undefined}
-            icon={<Workflow className="h-3 w-3 text-indigo-500 shrink-0" />}
-          />
-
-          {/* --- Error Tracking --- */}
-          <SidebarGroup
-            title="Error Tracking"
-            links={[
-              {
-                href: "/dashboard/errors",
-                label: "Error Explorer",
-                icon: AlertOctagon,
-                iconColor: "text-destructive",
-              },
-            ]}
-          />
-
-          {/* --- Log Management --- */}
-          <SidebarGroup
-            title="Log Management"
-            links={[
-              {
-                href: "/dashboard/logs",
-                label: "Log Explorer",
-                icon: Terminal,
-                iconColor: "text-blue-500",
-              },
-            ]}
-          />
-
-          {/* --- AI Integrations (MCP) --- */}
-          <SidebarGroup
-            title="AI Integrations"
-            links={[
-              {
-                href: "/dashboard/ai/assistant",
-                label: "Assistant",
-                icon: Bot,
-                iconColor: "text-blue-500",
-              },
-              {
-                href: "/dashboard/ai/mcp",
-                label: "MCP Server",
-                icon: Bot,
-                iconColor: "text-blue-500",
-              },
-            ]}
-          />
-
-          {/* --- Alerts & Incidents --- */}
-          <SidebarGroup
-            title="Alerts & Incidents"
-            links={[
-              {
-                href: "/dashboard/alerts",
-                label: "Alert Policies",
-                icon: BellRing,
-                iconColor: "text-destructive",
-              },
-            ]}
-          />
-
-          <SidebarSection
-            title="Uptime"
-            items={monitorList}
-            hrefPrefix="/dashboard/monitor"
-            linkPrefix="/dashboard/monitor"
-            onAdd={!user.isDemo ? () => setIsMonitorModalOpen(true) : undefined}
-          />
-
-          {/* Settings & PWA */}
-          <div className="pt-4 border-t border-border/40">
-            {isInstallable && !isInstalled && (
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 text-primary hover:text-primary hover:bg-primary/10 h-9 font-medium transition-colors"
-                onClick={handleInstallClick}
-              >
-                <Download className="h-4 w-4 shrink-0" /> Install App
-              </Button>
+      {/* --- UNIFIED ENTERPRISE SIDEBAR (Desktop + Mobile Drawer) --- */}
+      {(() => {
+        const isActuallyMinimized = isMinimized && !isMobileSidebarOpen;
+        return (
+          <aside
+            className={cn(
+              "fixed inset-y-0 left-0 z-50 bg-card border-r flex flex-col md:relative md:translate-x-0 shadow-2xl md:shadow-none",
+              enableTransition ? "transition-all duration-300 ease-in-out" : "",
+              isActuallyMinimized ? "w-64 md:w-16" : "w-64 md:w-64",
+              isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
             )}
-
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-9"
-              onClick={() => setIsSettingsOpen(true)}
-            >
-              <Settings className="h-4 w-4" /> Global Settings
-            </Button>
-          </div>
-        </div>
-
-        {/* Profile */}
-        <div className="p-4 border-t bg-card/50 shrink-0">
-          {!user.isDemo && !user.emailVerified && (
-            <div
-              onClick={() => setIsVerifyModalOpen(true)}
-              className="mb-4 p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20 transition-colors flex items-center gap-3 group"
-            >
-              <div className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-                <AlertCircle className="h-3 w-3 text-amber-500" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wide leading-none mb-0.5 group-hover:underline">
-                  Verify Account
-                </span>
-                <span className="text-[10px] text-muted-foreground truncate">
-                  Action required
-                </span>
-              </div>
-              <ArrowRight className="h-3 w-3 text-amber-500 ml-auto opacity-50 group-hover:opacity-100" />
-            </div>
-          )}
-
-          <Link
-            href="/dashboard/profile"
-            className="block mb-4"
-            title="Manage Profile"
           >
-            <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-all border border-transparent hover:border-border/40 group cursor-pointer">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <Avatar
-                  src={getGravatar(user.email || "")}
-                  fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
-                />
-                <div className="flex flex-col overflow-hidden justify-center">
-                  <span className="text-sm font-medium truncate leading-tight flex items-center gap-2">
-                    {user.displayName || "User"}
-                    {user.isDemo && (
-                      <Badge
-                        variant="warning"
-                        className="text-[9px] px-1 py-0 h-4"
-                      >
-                        DEMO
-                      </Badge>
-                    )}
-                  </span>
-                  <span
-                    className="text-xs text-muted-foreground truncate leading-tight"
-                    title={user.email || ""}
-                  >
-                    {user.email}
-                  </span>
+            {/* Floating Toggle Button for desktop */}
+            <button
+              onClick={handleToggleMinimized}
+              className="hidden md:flex absolute top-6 -right-3 z-50 items-center justify-center h-6 w-6 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent shadow-sm transition-all focus:outline-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50 animate-slide-in"
+              title={isMinimized ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isMinimized ? (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronLeft className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            {/* Brand Header */}
+            <div className={cn(
+              "p-4 md:p-6 border-b shrink-0 flex items-center h-14 md:h-auto",
+              isActuallyMinimized ? "justify-center md:px-2" : "justify-between"
+            )}>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  "flex items-center gap-2 font-bold text-xl tracking-tight hover:opacity-80 transition-opacity",
+                  isActuallyMinimized ? "justify-center" : ""
+                )}
+              >
+                <div className="relative h-8 w-8 rounded-lg overflow-hidden shrink-0">
+                  <img
+                    src="/logo.svg"
+                    alt="Logo"
+                    className="object-cover h-full w-full logo"
+                  />
                 </div>
+                {!isActuallyMinimized && <span>Senzor</span>}
+              </Link>
+              {/* Close button solely for Mobile UX */}
+              {!isActuallyMinimized && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden text-muted-foreground hover:text-foreground -mr-2"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              )}
+            </div>
+
+            {/* Scrollable Nav Area */}
+            <div
+              ref={sidebarRef}
+              className={cn(
+                "flex-1 overflow-y-auto py-4 px-2 space-y-6",
+                isActuallyMinimized ? "space-y-1 px-1 no-scrollbar" : "space-y-6"
+              )}
+            >
+              <SidebarSection
+                title="Saved Views"
+                items={viewsList?.views}
+                hrefPrefix="/dashboard/views"
+                linkPrefix="/dashboard/views"
+                onAdd={!user.isDemo ? () => setIsViewModalOpen(true) : undefined}
+                icon={<LayoutTemplate className="h-3 w-3 text-teal-500 shrink-0" />}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "views",
+                  title: "Saved Views",
+                  items: viewsList?.views,
+                  hrefPrefix: "/dashboard/views",
+                  linkPrefix: "/dashboard/views",
+                  onAdd: !user.isDemo ? () => setIsViewModalOpen(true) : undefined,
+                  icon: <LayoutTemplate className="h-3.5 w-3.5 text-teal-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+              <SidebarSection
+                title="Servers"
+                items={serverList}
+                hrefPrefix="/dashboard/server"
+                linkPrefix="/dashboard/server"
+                onAdd={!user.isDemo ? () => setIsServerModalOpen(true) : undefined}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "servers",
+                  title: "Servers",
+                  items: serverList,
+                  hrefPrefix: "/dashboard/server",
+                  linkPrefix: "/dashboard/server",
+                  onAdd: !user.isDemo ? () => setIsServerModalOpen(true) : undefined,
+                  icon: <Server className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+              <SidebarSection
+                title="Databases"
+                items={dbList}
+                hrefPrefix="/dashboard/db"
+                linkPrefix="/dashboard/db"
+                onAdd={!user.isDemo ? () => setIsDbModalOpen(true) : undefined}
+                icon={<Database className="h-3 w-3 text-blue-500 shrink-0" />}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "databases",
+                  title: "Databases",
+                  items: dbList,
+                  hrefPrefix: "/dashboard/db",
+                  linkPrefix: "/dashboard/db",
+                  onAdd: !user.isDemo ? () => setIsDbModalOpen(true) : undefined,
+                  icon: <Database className="h-3.5 w-3.5 text-blue-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              <SidebarSection
+                title="Web Analytics"
+                items={webList}
+                hrefPrefix="/dashboard/web"
+                linkPrefix="/dashboard/web"
+                onAdd={!user.isDemo ? () => setIsWebModalOpen(true) : undefined}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "web",
+                  title: "Web Analytics",
+                  items: webList,
+                  hrefPrefix: "/dashboard/web",
+                  linkPrefix: "/dashboard/web",
+                  onAdd: !user.isDemo ? () => setIsWebModalOpen(true) : undefined,
+                  icon: <Globe className="h-3.5 w-3.5 text-sky-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* --- RUM SECTION --- */}
+              <SidebarSection
+                title="Web APM (RUM)"
+                items={rumList}
+                hrefPrefix="/dashboard/rum"
+                linkPrefix="/dashboard/rum"
+                onAdd={!user.isDemo ? () => setIsRumModalOpen(true) : undefined}
+                icon={
+                  <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
+                }
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "rum",
+                  title: "Web APM (RUM)",
+                  items: rumList,
+                  hrefPrefix: "/dashboard/rum",
+                  linkPrefix: "/dashboard/rum",
+                  onAdd: !user.isDemo ? () => setIsRumModalOpen(true) : undefined,
+                  icon: <MonitorSmartphone className="h-3.5 w-3.5 text-pink-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              <SidebarSection
+                title="APM Services"
+                items={apmList}
+                hrefPrefix="/dashboard/apm"
+                linkPrefix="/dashboard/apm"
+                onAdd={!user.isDemo ? () => setIsApmModalOpen(true) : undefined}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "apm",
+                  title: "APM Services",
+                  items: apmList,
+                  hrefPrefix: "/dashboard/apm",
+                  linkPrefix: "/dashboard/apm",
+                  onAdd: !user.isDemo ? () => setIsApmModalOpen(true) : undefined,
+                  icon: <Box className="h-3.5 w-3.5 text-orange-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              <SidebarSection
+                title="Background Tasks"
+                items={taskList}
+                hrefPrefix="/dashboard/task"
+                linkPrefix="/dashboard/task"
+                onAdd={!user.isDemo ? () => setIsTaskModalOpen(true) : undefined}
+                icon={<Workflow className="h-3 w-3 text-indigo-500 shrink-0" />}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "task",
+                  title: "Background Tasks",
+                  items: taskList,
+                  hrefPrefix: "/dashboard/task",
+                  linkPrefix: "/dashboard/task",
+                  onAdd: !user.isDemo ? () => setIsTaskModalOpen(true) : undefined,
+                  icon: <Workflow className="h-3.5 w-3.5 text-indigo-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* --- Error Tracking --- */}
+              <SidebarGroup
+                title="Error Tracking"
+                links={[
+                  {
+                    href: "/dashboard/errors",
+                    label: "Error Explorer",
+                    icon: AlertOctagon,
+                    iconColor: "text-destructive",
+                  },
+                ]}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "errors",
+                  title: "Error Tracking",
+                  links: [
+                    {
+                      href: "/dashboard/errors",
+                      label: "Error Explorer",
+                      icon: AlertOctagon,
+                      iconColor: "text-destructive",
+                    },
+                  ],
+                  type: "group"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* --- Log Management --- */}
+              <SidebarGroup
+                title="Log Management"
+                links={[
+                  {
+                    href: "/dashboard/logs",
+                    label: "Log Explorer",
+                    icon: Terminal,
+                    iconColor: "text-blue-500",
+                  },
+                ]}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "logs",
+                  title: "Log Management",
+                  links: [
+                    {
+                      href: "/dashboard/logs",
+                      label: "Log Explorer",
+                      icon: Terminal,
+                      iconColor: "text-blue-500",
+                    },
+                  ],
+                  type: "group"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* --- AI Integrations (MCP) --- */}
+              <SidebarGroup
+                title="AI Integrations"
+                links={[
+                  {
+                    href: "/dashboard/ai/assistant",
+                    label: "Assistant",
+                    icon: Bot,
+                    iconColor: "text-blue-500",
+                  },
+                  {
+                    href: "/dashboard/ai/mcp",
+                    label: "MCP Server",
+                    icon: Bot,
+                    iconColor: "text-blue-500",
+                  },
+                ]}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "ai",
+                  title: "AI Integrations",
+                  links: [
+                    {
+                      href: "/dashboard/ai/assistant",
+                      label: "Assistant",
+                      icon: Bot,
+                      iconColor: "text-blue-500",
+                    },
+                    {
+                      href: "/dashboard/ai/mcp",
+                      label: "MCP Server",
+                      icon: Bot,
+                      iconColor: "text-blue-500",
+                    },
+                  ],
+                  type: "group"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* --- Alerts & Incidents --- */}
+              <SidebarGroup
+                title="Alerts & Incidents"
+                links={[
+                  {
+                    href: "/dashboard/alerts",
+                    label: "Alert Policies",
+                    icon: BellRing,
+                    iconColor: "text-destructive",
+                  },
+                ]}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "alerts",
+                  title: "Alerts & Incidents",
+                  links: [
+                    {
+                      href: "/dashboard/alerts",
+                      label: "Alert Policies",
+                      icon: BellRing,
+                      iconColor: "text-destructive",
+                    },
+                  ],
+                  type: "group"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              <SidebarSection
+                title="Uptime"
+                items={monitorList}
+                hrefPrefix="/dashboard/monitor"
+                linkPrefix="/dashboard/monitor"
+                onAdd={!user.isDemo ? () => setIsMonitorModalOpen(true) : undefined}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "uptime",
+                  title: "Uptime",
+                  items: monitorList,
+                  hrefPrefix: "/dashboard/monitor",
+                  linkPrefix: "/dashboard/monitor",
+                  onAdd: !user.isDemo ? () => setIsMonitorModalOpen(true) : undefined,
+                  icon: <Activity className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* Settings & PWA */}
+              <div className={cn(
+                "pt-4 border-t border-border/40 flex flex-col gap-2 items-center",
+                isActuallyMinimized ? "px-1" : "items-stretch"
+              )}>
+                {isActuallyMinimized ? (
+                  <>
+                    {isInstallable && !isInstalled && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-xl text-primary hover:bg-primary/10 transition-colors"
+                        onClick={handleInstallClick}
+                        title="Install App"
+                      >
+                        <Download className="h-3.5 w-3.5 shrink-0" />
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
+                      onClick={() => setIsSettingsOpen(true)}
+                      title="Global Settings"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {isInstallable && !isInstalled && (
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-2 text-primary hover:text-primary hover:bg-primary/10 h-9 font-medium transition-colors"
+                        onClick={handleInstallClick}
+                      >
+                        <Download className="h-4 w-4 shrink-0" /> Install App
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-9"
+                      onClick={() => setIsSettingsOpen(true)}
+                    >
+                      <Settings className="h-4 w-4" /> Global Settings
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
-          </Link>
 
-          <Button
-            onClick={logout}
-            variant="outline"
-            size="sm"
-            className="w-full gap-2 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors items-center"
-          >
-            <LogOut className="h-3 w-3" /> Sign Out
-          </Button>
+            {/* Profile */}
+            <div className={cn(
+              "p-4 border-t bg-card/50 shrink-0 flex flex-col transition-all duration-300",
+              isActuallyMinimized ? "px-2 py-3 items-center gap-2" : "p-4"
+            )}>
+              {isActuallyMinimized ? (
+                <div className="flex flex-col items-center gap-2 w-full">
+                  {!user.isDemo && !user.emailVerified && (
+                    <button
+                      onClick={() => setIsVerifyModalOpen(true)}
+                      className="h-8 w-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 hover:bg-amber-500/20 transition-colors"
+                      title="Verify Account (Action Required)"
+                    >
+                      <AlertCircle className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+
+                  <Link
+                    href="/dashboard/profile"
+                    className="relative block"
+                    title="Manage Profile"
+                  >
+                    <div className="relative group">
+                      <Avatar
+                        src={getGravatar(user.email || "")}
+                        fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
+                        className="h-8 w-8 border border-border group-hover:border-primary/50 transition-colors"
+                      />
+                      {user.isDemo && (
+                        <span className="absolute -bottom-1 -right-1 bg-amber-500 text-[8px] text-white px-1 rounded-sm scale-90 origin-bottom-right font-bold">
+                          DEMO
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {!user.isDemo && !user.emailVerified && (
+                    <div
+                      onClick={() => setIsVerifyModalOpen(true)}
+                      className="mb-4 p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20 transition-colors flex items-center gap-3 group"
+                    >
+                      <div className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                        <AlertCircle className="h-3 w-3 text-amber-500" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wide leading-none mb-0.5 group-hover:underline">
+                          Verify Account
+                        </span>
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          Action required
+                        </span>
+                      </div>
+                      <ArrowRight className="h-3 w-3 text-amber-500 ml-auto opacity-50 group-hover:opacity-100" />
+                    </div>
+                  )}
+
+                  <Link
+                    href="/dashboard/profile"
+                    className="block"
+                    title="Manage Profile"
+                  >
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-all border border-transparent hover:border-border/40 group cursor-pointer">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <Avatar
+                          src={getGravatar(user.email || "")}
+                          fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
+                        />
+                        <div className="flex flex-col overflow-hidden justify-center">
+                          <span className="text-sm font-medium truncate leading-tight flex items-center gap-2">
+                            {user.displayName || "User"}
+                            {user.isDemo && (
+                              <Badge
+                                variant="warning"
+                                  className="text-[9px] px-1 py-0 h-4"
+                              >
+                                DEMO
+                              </Badge>
+                            )}
+                          </span>
+                          <span
+                            className="text-xs text-muted-foreground truncate leading-tight"
+                            title={user.email || ""}
+                          >
+                            {user.email}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </>
+              )}
+            </div>
+          </aside>
+        );
+      })()}
+
+      {/* Dynamic Island Hovering Card */}
+      {hoveredSection && (
+        <div
+          ref={cardRef}
+          className="fixed z-[100] w-60 bg-card/95 backdrop-blur-md border border-border/80 rounded-xl p-3 shadow-2xl animate-slide-in flex flex-col gap-2 transition-[opacity] duration-150"
+          style={{
+            top: cardTop !== null ? cardTop : hoveredSection.rect.top,
+            left: hoveredSection.rect.right + 3,
+            opacity: cardTop === null ? 0 : 1,
+          }}
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+        >
+          {hoveredSection.type === "section" ? (
+            <>
+              {/* Title & Add Button */}
+              <div className="flex items-center justify-between mb-1 pb-1.5 border-b border-border/40">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  {hoveredSection.title}
+                </span>
+                {hoveredSection.onAdd && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      hoveredSection.onAdd?.();
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Items */}
+              <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto pr-1 no-scrollbar">
+                {!hoveredSection.items && (
+                  <div className="flex justify-center py-2">
+                    <Spinner className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                )}
+                {(() => {
+                  const showAll = sidebarMode === "all";
+                  const visibleItems = (showAll ? hoveredSection.items : hoveredSection.items?.slice(0, 2)) || [];
+                  const remaining = (hoveredSection.items?.length || 0) - visibleItems.length;
+
+                  return (
+                    <>
+                      {visibleItems.map((item: any) => {
+                        const isActive = router.asPath.includes(
+                          `${hoveredSection.hrefPrefix}/${item._id}`
+                        );
+                        const Icon = getSidebarItemIcon(hoveredSection.hrefPrefix || "", item, hoveredSection.icon);
+
+                        return (
+                          <Link href={`${hoveredSection.hrefPrefix}/${item._id}`} key={item._id} className="w-full">
+                            <Button
+                              variant={isActive ? "secondary" : "ghost"}
+                              className={cn(
+                                "w-full justify-start gap-2.5 h-8 px-2 text-xs transition-colors",
+                                isActive
+                                  ? "bg-secondary/80 font-semibold border border-border/50 text-foreground"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
+                              )}
+                            >
+                              {Icon}
+                              <span className="truncate">{item.name}</span>
+                            </Button>
+                          </Link>
+                        );
+                      })}
+
+                      {/* "Show More" Truncation */}
+                      {!showAll && remaining > 0 && (
+                        <Link href={hoveredSection.linkPrefix || "#"} className="w-full">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-2.5 h-7 px-2 text-[11px] text-muted-foreground/70 hover:text-primary mt-0.5"
+                          >
+                            <div className="w-3 h-3 flex items-center justify-center shrink-0">
+                              <div className="h-1 w-1 rounded-full bg-current opacity-40" />
+                            </div>
+                            Show {remaining} more
+                          </Button>
+                        </Link>
+                      )}
+
+                      {hoveredSection.items?.length === 0 && (
+                        <div className="px-2 py-1.5 text-[10px] text-muted-foreground italic">
+                          No service items
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Title */}
+              <div className="mb-1 pb-1.5 border-b border-border/40">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  {hoveredSection.title}
+                </span>
+              </div>
+
+              {/* Links */}
+              <div className="flex flex-col gap-0.5">
+                {hoveredSection.links?.map((link: any, idx: number) => {
+                  const isActive = router.asPath.includes(link.href);
+                  const Icon = link.icon;
+
+                  return (
+                    <Link href={link.href} key={idx} className="w-full">
+                      <Button
+                        variant={isActive ? "secondary" : "ghost"}
+                        className={cn(
+                          "w-full justify-start gap-2.5 h-8 px-2 text-xs transition-colors",
+                          isActive
+                            ? "bg-secondary/80 font-semibold border border-border/50 text-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
+                        )}
+                      >
+                        {Icon && (
+                          <Icon className={cn("h-3.5 w-3.5 shrink-0", link.iconColor)} />
+                        )}
+                        <span className="truncate">{link.label}</span>
+                      </Button>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
-      </aside>
+      )}
 
       {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background relative">
