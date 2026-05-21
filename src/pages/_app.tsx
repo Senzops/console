@@ -8,29 +8,11 @@ import { Senzor } from "@senzops/web";
 import { Toaster } from "sonner";
 import { buildTitleFromPath } from "@/utils/title";
 import { useRouter } from "next/router";
-import { DM_Serif_Display, Inter } from "next/font/google";
-
-const dmSerif = DM_Serif_Display({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-dm-serif",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
+import { inter, dmSerif } from "@/lib/fonts";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [title, setTitle] = useState(() => buildTitleFromPath(router.asPath));
-
-  useEffect(() => {
-    // Inject font variables into the document root to fix portal/modal inheritance
-    document.documentElement.classList.add(inter.variable, dmSerif.variable);
-  }, []);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_SENZOR_WEB_ID) {
@@ -59,7 +41,7 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [router.events, router.asPath]);
 
   return (
-    <div className="font-sans">
+    <div className={`${inter.variable} ${dmSerif.variable} font-sans`}>
       <AuthProvider>
         <ThemeProvider>
           <Head>
