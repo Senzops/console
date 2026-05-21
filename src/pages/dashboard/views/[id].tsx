@@ -48,6 +48,10 @@ import {
   Trash2,
   Maximize,
   X,
+  Minus,
+  List,
+  Eye,
+  EyeOff,
   GripHorizontal,
   Terminal,
   Server,
@@ -61,7 +65,9 @@ import {
   Play,
   BookOpen,
   ChevronRight,
-  Zap
+  Zap,
+  Info,
+  RotateCcw
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -453,9 +459,291 @@ const smoothRadarPath = (points, tension = 0.3) => {
   return d + ' Z';
 };
 
+// --- Shared Chart Interactivity Components ---
+
+const LegendCard = ({
+  show,
+  title = "Legend",
+  keys,
+  hiddenSeries,
+  hoveredSeries,
+  getColor,
+  onToggle,
+  onHover,
+  onReset,
+  onMouseEnter,
+  onMouseLeave,
+  triggerRect,
+}: any) => {
+  const [cardPos, setCardPos] = useState<any>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!show || !triggerRect) {
+      setCardPos((prev: any) => (prev === null ? null : null));
+      return;
+    }
+
+    const updatePos = () => {
+      if (!cardRef.current) return;
+      const height = cardRef.current.offsetHeight;
+      const width = cardRef.current.offsetWidth || 192;
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const padding = 12;
+
+      let top = triggerRect.bottom + 8;
+      // Handle bottom overflow
+      if (top + height > viewportHeight - padding) {
+        top = triggerRect.top - height - 8;
+      }
+      if (top < padding) top = padding;
+
+      let left = triggerRect.left + (triggerRect.width / 2) - (width / 2);
+      // Handle left overflow
+      if (left < padding) left = padding;
+      // Handle right overflow
+      if (left + width > viewportWidth - padding) {
+        left = viewportWidth - width - padding;
+      }
+
+      setCardPos((prev: any) => {
+        if (prev?.top === top && prev?.left === left) return prev;
+        return { top, left };
+      });
+    };
+
+    const rafId = requestAnimationFrame(updatePos);
+    const timer = setTimeout(updatePos, 100);
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timer);
+    };
+  }, [show, triggerRect, keys.length]);
+
+  if (!show) return null;
+
+  return createPortal(
+    <div
+      ref={cardRef}
+      className={cn(
+        "fixed z-[200] w-48 bg-card/95 backdrop-blur-xl border border-border/80 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-2xl overflow-hidden transition-all duration-300 ease-out",
+        cardPos ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+      )}
+      style={{
+        top: cardPos?.top ?? 0,
+        left: cardPos?.left ?? 0,
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="p-3 border-b border-border/40 bg-muted/30 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/80">{title}</span>
+        {hiddenSeries.size > 0 && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+            onClick={onReset}
+            title="Reset All"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+      <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 no-scrollbar">
+        {keys.map((k: string, i: number) => {
+          const isHidden = hiddenSeries.has(k);
+          const isHovered = hoveredSeries === k;
+          const isDimmed = hoveredSeries && hoveredSeries !== k;
+          const color = getColor(k, i);
+
+          return (
+            <div
+              key={k}
+              className={cn(
+                "flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-200",
+                isHidden ? "opacity-25 grayscale" : "hover:bg-muted/60",
+                isDimmed ? "opacity-20" : "opacity-100",
+                isHovered ? "bg-muted/40 shadow-sm" : ""
+              )}
+              onMouseEnter={() => !isHidden && onHover(k)}
+              onMouseLeave={() => onHover(null)}
+              onClick={() => onToggle(k)}
+            >
+              <div
+                className="h-2 w-2 rounded-full shrink-0 transition-transform duration-300"
+                style={{ 
+                  backgroundColor: color,
+                  boxShadow: `0 0 10px ${color}40`,
+                  transform: isHovered ? "scale(1.25)" : "scale(1)"
+                }}
+              />
+              <span className={cn(
+                "text-[11px] font-semibold truncate flex-1 transition-colors tracking-tight", 
+                isHidden ? "line-through text-muted-foreground" : "text-foreground",
+                isHovered ? "text-primary" : ""
+              )}>
+                {k}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+const LegendTrigger = ({ onMouseEnter, onMouseLeave, active, triggerRef }: any) => (
+  <Button
+    ref={triggerRef}
+    variant="ghost"
+    size="icon"
+    className={cn(
+      "h-6 w-6 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-all duration-200",
+      active ? "bg-primary/10 text-primary opacity-100" : "opacity-100"
+    )}
+    onMouseEnter={onMouseEnter}
+    onMouseLeave={onMouseLeave}
+  >
+    <Info className="h-3.5 w-3.5" />
+  </Button>
+);
+
+const RadarShape = (props: any) => {
+  const { points, color, isHighlighted, isDimmed, safeId } = props;
+  return (
+    <path
+      d={smoothRadarPath(points)}
+      stroke={color}
+      strokeWidth={isHighlighted ? 3 : 2}
+      fill={`url(#${safeId})`}
+      fillOpacity={isDimmed ? 0.05 : isHighlighted ? 0.9 : 0.4}
+      strokeOpacity={isDimmed ? 0.1 : 1}
+      className="transition-all duration-300"
+    />
+  );
+};
+
+const ChartContainer = ({ 
+  children, 
+  showLegend, 
+  legendKeys, 
+  hiddenSeries, 
+  hoveredSeries, 
+  getColor, 
+  handleToggleSeries, 
+  setHoveredSeries, 
+  handleResetSeries,
+  buttonRef, 
+  triggerRect,
+  handleMouseEnterControls,
+  handleMouseLeaveControls,
+  activeViz,
+  headerActionsRef,
+  isParentHovered
+}: any) => {
+  const [headerContainer, setHeaderContainer] = useState<Element | null>(null);
+
+  useEffect(() => {
+    if (headerActionsRef?.current) setHeaderContainer(headerActionsRef.current);
+  }, [headerActionsRef?.current]);
+
+  const trigger = (isParentHovered || showLegend) && legendKeys.length > 0 && (
+    <LegendTrigger 
+      onMouseEnter={handleMouseEnterControls} 
+      onMouseLeave={handleMouseLeaveControls} 
+      active={showLegend} 
+      triggerRef={buttonRef} 
+    />
+  );
+
+  return (
+    <div className="w-full h-full relative group/chart">
+      {activeViz !== "table" && activeViz !== "json" && activeViz !== "map" && (
+        <>
+          {headerContainer ? createPortal(trigger, headerContainer) : trigger}
+          <LegendCard 
+            show={showLegend} 
+            keys={legendKeys} 
+            hiddenSeries={hiddenSeries} 
+            hoveredSeries={hoveredSeries} 
+            getColor={getColor}
+            onToggle={handleToggleSeries}
+            onHover={setHoveredSeries}
+            onReset={handleResetSeries}
+            onMouseEnter={handleMouseEnterControls}
+            onMouseLeave={handleMouseLeaveControls}
+            triggerRect={triggerRect}
+          />
+        </>
+      )}
+      {children}
+    </div>
+  );
+};
+
 // --- Sub-Component: Chart Renderer ---
-const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
+const ChartRenderer = ({ data, config, visualization, range, isMono, headerActionsRef, isParentHovered }: any) => {
   const activeViz = visualization || config?.viz || "table";
+
+  // Enterprise Interactive State
+  const [hoveredSeries, setHoveredSeries] = useState<string | null>(null);
+  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  const [showLegend, setShowLegend] = useState(false);
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const legendTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * Schema discovery
+   * Handles sparse/dynamic datasets safely.
+   */
+  const itemKeys = useMemo(() => {
+    const keySet = new Set<string>();
+    if (data && Array.isArray(data)) {
+      for (const item of data) {
+        if (!item || typeof item !== "object") continue;
+        for (const key of Object.keys(item)) {
+          keySet.add(key);
+        }
+      }
+    }
+    return Array.from(keySet).sort((a, b) => getStringHash(a) - getStringHash(b));
+  }, [data]);
+
+  // Determine time/categorical keys for rendering
+  const timeKey = useMemo(() => {
+    if (itemKeys.includes("time")) return "time";
+    if (itemKeys.includes("name")) return "name";
+    return itemKeys.find(k => k.toLowerCase().includes("time") || k.toLowerCase().includes("date") || k === "_id") || itemKeys[0];
+  }, [itemKeys]);
+
+  // Legend Item Discovery & Stabilization
+  const { legendKeys, nameKey, valueKey } = useMemo(() => {
+    let nK = "name";
+    let vK = "value";
+    let keys: string[] = [];
+
+    if (activeViz === "pie") {
+      // Find strings and numbers for Pie
+      const first = (data && Array.isArray(data) && data[0]) || {};
+      for (const k of Object.keys(first)) {
+        if (typeof first[k] === "string" && nK === "name") nK = k;
+        if (typeof first[k] === "number" && vK === "value") vK = k;
+      }
+      keys = (data && Array.isArray(data)) ? data.map((d: any) => String(d[nK] || "Unknown")) : [];
+    } else {
+      keys = itemKeys.filter(k => k !== timeKey && k !== "_id" && k !== "null" && k !== "undefined" && k !== "name" && k !== "value");
+    }
+
+    return { 
+      legendKeys: Array.from(new Set(keys)).sort((a, b) => getStringHash(a) - getStringHash(b)),
+      nameKey: nK, 
+      valueKey: vK 
+    };
+  }, [data, itemKeys, timeKey, activeViz]);
 
   if (
     !data ||
@@ -475,22 +763,30 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     return CHART_COLORS[hash % CHART_COLORS.length];
   };
 
-  /**
-   * Schema discovery
-   * Handles sparse/dynamic datasets safely.
-   */
-  const keySet = new Set<string>();
+  const handleToggleSeries = (k: string) => {
+    const next = new Set(hiddenSeries);
+    if (next.has(k)) next.delete(k);
+    else next.add(k);
+    setHiddenSeries(next);
+  };
 
-  for (const item of data) {
-    if (!item || typeof item !== "object") continue;
-    for (const key of Object.keys(item)) {
-      keySet.add(key);
+  const handleResetSeries = () => {
+    setHiddenSeries(new Set());
+  };
+
+  const handleMouseEnterControls = () => {
+    if (legendTimeoutRef.current) clearTimeout(legendTimeoutRef.current);
+    if (buttonRef.current) {
+      setTriggerRect(buttonRef.current.getBoundingClientRect());
     }
-  }
+    setShowLegend(true);
+  };
 
-  // Global Deterministic Key Sorting
-  // Enforces mathematical consistency for all visual column layouts, table structures, and categorical renders
-  const itemKeys = Array.from(keySet).sort((a, b) => getStringHash(a) - getStringHash(b));
+  const handleMouseLeaveControls = () => {
+    legendTimeoutRef.current = setTimeout(() => {
+      setShowLegend(false);
+    }, 200);
+  };
 
   // 1. Enterprise Billboard Render Engine
   if (activeViz === "billboard") {
@@ -648,109 +944,135 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
   }
 
   if (activeViz === "pie") {
-    let nameK = "name";
-    let valK = "value";
-
-    if (!itemKeys.includes("name") && !itemKeys.includes("value")) {
-      for (const item of data) {
-        if (!item || typeof item !== "object") continue;
-        for (const k of Object.keys(item)) {
-          if (!nameK && typeof item[k] === "string") nameK = k;
-          if (!valK && typeof item[k] === "number" && k !== nameK) valK = k;
-        }
-      }
-      if (!nameK) nameK = itemKeys[0];
-      if (!valK) valK = itemKeys.find((k) => k !== nameK) || itemKeys[0];
-    }
-
     // Deterministic Pie Slicing Order
     const sortedPieData = [...data].sort((a, b) => {
-      const keyA = String(a[nameK] || "");
-      const keyB = String(b[nameK] || "");
+      const keyA = String(a[nameKey] || "");
+      const keyB = String(b[nameKey] || "");
       return getStringHash(keyA) - getStringHash(keyB);
     });
 
     return (
-      <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
-        <PieChart className="focus:outline-none" style={{ outline: "none" }}>
-          <RechartsTooltip content={<CustomTooltip range={range} />} />
-          <Pie
-            data={sortedPieData}
-            dataKey={valK}
-            nameKey={nameK}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={90}
-            paddingAngle={2}
-            stroke="none"
-            className="focus:outline-none"
-            style={{ outline: "none" }}
-          >
-            {sortedPieData.map((entry: any, index: number) => {
-              const keyValue = String(entry[nameK] || index);
-              return <Cell key={`cell-${index}`} fill={getColor(keyValue, index)} style={{ outline: "none" }} className="focus:outline-none" />
-            })}
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
+      <ChartContainer
+        {...{
+          showLegend,
+          legendKeys,
+          hiddenSeries,
+          hoveredSeries,
+          getColor,
+          handleToggleSeries,
+          setHoveredSeries,
+          handleResetSeries,
+          buttonRef,
+          triggerRect,
+          handleMouseEnterControls,
+          handleMouseLeaveControls,
+          activeViz,
+          headerActionsRef,
+          isParentHovered
+        }}
+      >
+        <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
+          <PieChart className="focus:outline-none" style={{ outline: "none" }}>
+            <RechartsTooltip content={<CustomTooltip range={range} />} />
+            <Pie
+              data={sortedPieData.filter(d => !hiddenSeries.has(String(d[nameKey])))}
+              dataKey={valueKey}
+              nameKey={nameKey}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={90}
+              paddingAngle={2}
+              stroke="none"
+              className="focus:outline-none"
+              style={{ outline: "none" }}
+            >
+              {sortedPieData.map((entry: any, index: number) => {
+                const keyValue = String(entry[nameKey] || index);
+                if (hiddenSeries.has(keyValue)) return null;
+                const isHighlighted = hoveredSeries === keyValue;
+                const isDimmed = hoveredSeries && hoveredSeries !== keyValue;
+                return (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={getColor(keyValue, index)} 
+                    style={{ outline: "none" }} 
+                    className="focus:outline-none transition-all duration-300"
+                    opacity={isDimmed ? 0.2 : isHighlighted ? 1 : 0.9}
+                  />
+                )
+              })}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+      </ChartContainer>
     );
   }
 
   // 5. Insight Radar Chart
   if (activeViz === "radar") {
-    let timeKey = "name";
-    if (!itemKeys.includes("name")) {
-       timeKey = itemKeys.find(k => k.toLowerCase().includes("time") || k.toLowerCase().includes("date") || k === "_id") || itemKeys[0];
-    }
-    const renderKeys = itemKeys.filter(k => k !== timeKey);
-    // Note: itemKeys are globally hashed above, so renderKeys inherits determinism automatically.
-
     return (
-      <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
-        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data} className="focus:outline-none" style={{ outline: "none" }}>
-          <defs>
-            {renderKeys.map((k, i) => {
+      <ChartContainer
+        {...{
+          showLegend,
+          legendKeys,
+          hiddenSeries,
+          hoveredSeries,
+          getColor,
+          handleToggleSeries,
+          setHoveredSeries,
+          handleResetSeries,
+          buttonRef,
+          triggerRect,
+          handleMouseEnterControls,
+          handleMouseLeaveControls,
+          activeViz,
+          headerActionsRef,
+          isParentHovered
+        }}
+      >
+        <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
+          <RadarChart cx="50%" cy="50%" outerRadius="75%" data={data} className="focus:outline-none" style={{ outline: "none" }}>
+            <defs>
+              {legendKeys.map((k, i) => {
+                const color = getColor(k, i);
+                const safeId = `color-radar-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+                return (
+                  <radialGradient key={safeId} id={safeId} cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.1} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.5} />
+                  </radialGradient>
+                );
+              })}
+            </defs>
+            <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.4} />
+            <PolarAngleAxis dataKey={timeKey} tick={false} />
+            <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+            <RechartsTooltip content={<CustomTooltip range={range} />} />
+            {legendKeys.map((k, i) => {
+              const isHighlighted = hoveredSeries === k;
+              const isDimmed = hoveredSeries && hoveredSeries !== k;
               const color = getColor(k, i);
               const safeId = `color-radar-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+
               return (
-                <radialGradient key={safeId} id={safeId} cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor={color} stopOpacity={0.1} />
-                  <stop offset="100%" stopColor={color} stopOpacity={0.4} />
-                </radialGradient>
+                <Radar 
+                  key={k} 
+                  name={k} 
+                  dataKey={k} 
+                  stroke={color} 
+                  fill={`url(#${safeId})`} 
+                  fillOpacity={isDimmed ? 0.05 : isHighlighted ? 0.9 : 0.4}
+                  strokeOpacity={isDimmed ? 0.1 : 1}
+                  strokeWidth={isHighlighted ? 3 : 2}
+                  hide={hiddenSeries.has(k)}
+                  shape={<RadarShape color={color} isHighlighted={isHighlighted} isDimmed={isDimmed} safeId={safeId} />}
+                />
               );
             })}
-          </defs>
-          <PolarGrid stroke="hsl(var(--border))" />
-          <PolarAngleAxis dataKey={timeKey} tick={false} />
-          <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-          <RechartsTooltip content={<CustomTooltip range={range} />} />
-          {renderKeys.map((k, i) => {
-            const color = getColor(k, i);
-            const safeId = `color-radar-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-            return (
-              <Radar 
-                key={k} 
-                name={k} 
-                dataKey={k} 
-                stroke={color} 
-                fill={`url(#${safeId})`} 
-                fillOpacity={1}
-                strokeWidth={2} 
-                shape={({ points }) => (
-                  <path
-                    d={smoothRadarPath(points)}
-                    stroke={color}
-                    strokeWidth={2}
-                    fill={`url(#${safeId})`}
-                    fillOpacity={1}
-                  />
-                )}
-              />
-            );
-          })}
-        </RadarChart>
-      </ResponsiveContainer>
+          </RadarChart>
+        </ResponsiveContainer>
+      </ChartContainer>
     );
   }
 
@@ -788,85 +1110,121 @@ const ChartRenderer = ({ data, config, visualization, range, isMono }: any) => {
     );
   }
 
-  // Time-Series (Area, Line, Bar) automatic key mapping robustness
-  let timeKey = "time";
-  let renderKeys: string[] = [];
-
-  if (itemKeys.includes("time")) {
-    timeKey = "time";
-  } else {
-    const possibleTime = itemKeys.find(
-      (k) =>
-        k.toLowerCase().includes("time") ||
-        k.toLowerCase().includes("date") ||
-        k === "_id"
-    );
-    if (possibleTime) {
-      timeKey = possibleTime;
-    }
-  }
-
-  renderKeys = itemKeys.filter((k) => {
-    if (k === timeKey || k === "name" || k === "_id") return false;
-    return data.some((row: any) => row && row[k] !== undefined && row[k] !== null);
-  });
-
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      {activeViz === "area" ? (
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-          <XAxis dataKey={timeKey} hide />
-          <YAxis hide />
-          <RechartsTooltip
-            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-            content={<CustomTooltip range={range} />}
-          />
-          {renderKeys.map((k, i) => {
-            const color = getColor(k, i);
-            const safeId = `color-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-            return (
-              <React.Fragment key={k}>
-                <defs>
-                  <linearGradient id={safeId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={color} stopOpacity={0.4} />
-                    <stop offset="95%" stopColor={color} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey={k} stackId="1" stroke={color} fill={`url(#${safeId})`} strokeWidth={2} />
-              </React.Fragment>
-            )
-          })}
-        </AreaChart>
-      ) : activeViz === "bar" ? (
-        <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-          <XAxis dataKey={timeKey} hide />
-          <YAxis hide />
-          <RechartsTooltip
-            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-            content={<CustomTooltip range={range} />}
-            cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
-          />
-          {renderKeys.map((k, i) => (
-            <Bar key={k} dataKey={k} stackId="1" fill={getColor(k, i)} radius={[2, 2, 0, 0]} />
-          ))}
-        </BarChart>
-      ) : (
-        <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-          <XAxis dataKey={timeKey} hide />
-          <YAxis hide />
-          <RechartsTooltip
-            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-            content={<CustomTooltip range={range} />}
-          />
-          {renderKeys.map((k, i) => (
-            <Line key={k} type="monotone" dataKey={k} stroke={getColor(k, i)} strokeWidth={2} dot={false} />
-          ))}
-        </LineChart>
-      )}
-    </ResponsiveContainer>
+    <ChartContainer
+      {...{
+        showLegend,
+        legendKeys,
+        hiddenSeries,
+        hoveredSeries,
+        getColor,
+        handleToggleSeries,
+        setHoveredSeries,
+        handleResetSeries,
+        buttonRef,
+        triggerRect,
+        handleMouseEnterControls,
+        handleMouseLeaveControls,
+        activeViz,
+        headerActionsRef,
+        isParentHovered
+      }}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        {activeViz === "area" ? (
+          <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey={timeKey} hide />
+            <YAxis hide />
+            <RechartsTooltip
+              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+              content={<CustomTooltip range={range} />}
+            />
+            {legendKeys.map((k, i) => {
+              const isHighlighted = hoveredSeries === k;
+              const isDimmed = hoveredSeries && hoveredSeries !== k;
+              const color = getColor(k, i);
+              const safeId = `color-${k.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+              return (
+                <React.Fragment key={k}>
+                  <defs>
+                    <linearGradient id={safeId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={color} stopOpacity={isDimmed ? 0.05 : 0.4} />
+                      <stop offset="95%" stopColor={color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area 
+                    type="monotone" 
+                    dataKey={k} 
+                    stackId="1" 
+                    stroke={color} 
+                    fill={`url(#${safeId})`} 
+                    strokeWidth={isHighlighted ? 3 : 2} 
+                    strokeOpacity={isDimmed ? 0.1 : 1}
+                    hide={hiddenSeries.has(k)}
+                    className="transition-all duration-300"
+                  />
+                </React.Fragment>
+              )
+            })}
+          </AreaChart>
+        ) : activeViz === "bar" ? (
+          <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey={timeKey} hide />
+            <YAxis hide />
+            <RechartsTooltip
+              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+              content={<CustomTooltip range={range} />}
+              cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
+            />
+            {legendKeys.map((k, i) => {
+              const isHighlighted = hoveredSeries === k;
+              const isDimmed = hoveredSeries && hoveredSeries !== k;
+              return (
+                <Bar 
+                  key={k} 
+                  dataKey={k} 
+                  stackId="1" 
+                  fill={getColor(k, i)} 
+                  radius={[2, 2, 0, 0]} 
+                  opacity={isDimmed ? 0.2 : isHighlighted ? 1 : 0.9}
+                  hide={hiddenSeries.has(k)}
+                  className="transition-all duration-300"
+                />
+              )
+            })}
+          </BarChart>
+        ) : (
+          <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey={timeKey} hide />
+            <YAxis hide />
+            <RechartsTooltip
+              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+              content={<CustomTooltip range={range} />}
+            />
+            {legendKeys.map((k, i) => {
+              const isHighlighted = hoveredSeries === k;
+              const isDimmed = hoveredSeries && hoveredSeries !== k;
+              return (
+                <Line 
+                  key={k} 
+                  type="monotone" 
+                  dataKey={k} 
+                  stroke={getColor(k, i)} 
+                  strokeWidth={isHighlighted ? 3 : 2} 
+                  dot={false} 
+                  strokeOpacity={isDimmed ? 0.1 : 1}
+                  hide={hiddenSeries.has(k)}
+                  className="transition-all duration-300"
+                />
+              )
+            })}
+          </LineChart>
+        )}
+      </ResponsiveContainer>
+    </ChartContainer>
   );
 };
 
@@ -885,6 +1243,9 @@ const WidgetWrapper = ({
   draggedId,
 }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const headerActionsRef = useRef<HTMLDivElement>(null);
+
   const { data, error, isValidating } = useSWR(
     `/views/widgets/${widget._id}/data?range=${range}`,
     fetcher,
@@ -917,6 +1278,7 @@ const WidgetWrapper = ({
       {isValidating && (
         <RefreshCw className="h-3 w-3 text-muted-foreground animate-spin mr-1" />
       )}
+      <div ref={headerActionsRef} className="flex items-center" />
       <Button
         type="button"
         variant="ghost"
@@ -954,7 +1316,9 @@ const WidgetWrapper = ({
 
   const Content = (
     <Card
-      className={`flex flex-col relative overflow-hidden border-border/60 shadow-sm transition-all duration-300 ${isMaximized ? "fixed inset-4 z-[100] animate-in zoom-in-95 shadow-2xl bg-card" : "w-full h-full"} ${isEditing && draggedId === layoutNode.i ? "opacity-40 scale-95" : "opacity-100 scale-100"}`}
+      className={`flex flex-col relative overflow-hidden border-border/60 shadow-sm transition-all duration-300 group/widget ${isMaximized ? "fixed inset-4 z-[100] animate-in zoom-in-95 shadow-2xl bg-card" : "w-full h-full"} ${isEditing && draggedId === layoutNode.i ? "opacity-40 scale-95" : "opacity-100 scale-100"}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {Header}
       <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
@@ -974,6 +1338,8 @@ const WidgetWrapper = ({
               visualization={widget.visualization}
               range={range}
               isMono={isMono}
+              headerActionsRef={headerActionsRef}
+              isParentHovered={isHovered}
             />
           )}
         </div>
