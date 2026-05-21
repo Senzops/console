@@ -1355,7 +1355,7 @@ export const DashboardLayout = ({
             {/* Floating Toggle Button for desktop */}
             <button
               onClick={handleToggleMinimized}
-              className="hidden md:flex absolute top-6 -right-3 z-50 items-center justify-center h-6 w-6 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent shadow-sm transition-all focus:outline-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50 animate-slide-in"
+              className="hidden md:flex absolute top-6 -right-3 z-50 items-center justify-center h-6 w-6 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent shadow-sm transition-all focus:outline-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
               title={isMinimized ? "Expand Sidebar" : "Collapse Sidebar"}
             >
               {isMinimized ? (
