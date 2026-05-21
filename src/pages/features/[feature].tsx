@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/router";
+import React from "react";
+import { GetStaticProps, GetStaticPaths } from "next";
 import Link from "next/link";
 import { Navbar, Footer } from "../../components/Layout";
 import { Button, cn } from "../../components/Core";
@@ -15,22 +15,25 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 
-export default function FeaturePage() {
-  const router = useRouter();
-  const { feature: featureParam } = router.query;
+interface FeatureConfig {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  points: string[];
+  diagramId: string;
+  href: string;
+  colorClasses: string;
+}
+
+interface FeaturePageProps {
+  feature: FeatureConfig;
+}
+
+export default function FeaturePage({ feature }: FeaturePageProps) {
   const { user } = useAuth();
-  const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    // Wrapping in a timeout prevents the synchronous "cascading renders" warning from React
-    const timer = setTimeout(() => setIsMounted(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Find the requested feature from our Single Source of Truth
-  const feature = FEATURES_DATA.find((f) => f.id === featureParam);
-
-  // 404 State if feature doesn't exist
+  // 404 State if feature doesn't exist (though getStaticPaths handles this with fallback: false)
   if (!feature) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -314,3 +317,22 @@ export default function FeaturePage() {
     </div>
   );
 }
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const paths = FEATURES_DATA.map((feature) => ({
+    params: { feature: feature.id },
+  }));
+
+  return { paths, fallback: false };
+};
+
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+  const featureId = params?.feature as string;
+  const feature = FEATURES_DATA.find((f) => f.id === featureId);
+
+  return {
+    props: {
+      feature: feature || null,
+    },
+  };
+};
