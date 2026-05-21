@@ -468,7 +468,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-8">
           {items.length > 0 && viewMode === "grid" ? (
-            <div className="flex flex-wrap justify-center gap-y-4 px-8 max-w-7xl">
+            <div className="flex flex-wrap justify-center gap-y-4 px-8">
               {items.map((item, i) => {
                 const isApmActive =
                   item.type === "apm" &&
