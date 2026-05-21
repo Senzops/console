@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { GetStaticProps } from "next";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Navbar, Footer } from "../components/Layout";
@@ -214,25 +215,22 @@ const Tooltip = ({
   </div>
 );
 
-export default function PricingPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-  const [annual, setAnnual] = useState(true);
-  const [plans, setPlans] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PlanConfig {
+  id: string;
+  name: string;
+  priceMonthly: number;
+  priceAnnual: number;
+}
 
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/billing/plans`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.plans) setPlans(data.plans);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch pricing configs:", err);
-        setLoading(false);
-      });
-  }, []);
+interface PricingPageProps {
+  initialPlans: PlanConfig[];
+}
+
+export default function PricingPage({ initialPlans }: PricingPageProps) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [annual, setAnnual] = useState(true);
+  const [plans] = useState<PlanConfig[]>(initialPlans || []);
 
   const handleRoute = (planId: string) => {
     if (!user) {
@@ -305,7 +303,7 @@ export default function PricingPage() {
 
         {/* --- PRICING CARDS --- */}
         <section className="px-4 pb-24 relative z-10 max-w-7xl mx-auto">
-          {loading || authLoading ? (
+          {plans.length === 0 ? (
             <div className="flex justify-center items-center h-[400px]">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
             </div>
@@ -541,3 +539,27 @@ export default function PricingPage() {
     </div>
   );
 }
+
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+    const res = await fetch(`${apiUrl}/billing/plans`);
+    const data = await res.json();
+
+    return {
+      props: {
+        initialPlans: data.plans || [],
+      },
+      revalidate: 3600, // Revalidate every hour
+    };
+  } catch (error) {
+    console.error("Failed to fetch plans in getStaticProps:", error);
+    return {
+      props: {
+        initialPlans: [],
+      },
+      revalidate: 60, // Try again sooner if it fails
+    };
+  }
+};
