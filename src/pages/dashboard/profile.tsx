@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import md5 from "md5";
-import { DashboardLayout } from "../../components/Layout";
 import {
   Button,
   Card,
@@ -37,7 +36,7 @@ import {
   Clock,
   RefreshCw,
   Mail,
-  Shield
+  Shield,
 } from "lucide-react";
 import { extractErrorMessage } from "@/utils/axiosError";
 
@@ -61,18 +60,20 @@ const formatBytes = (bytes: number = 0, decimals = 2) => {
 const DeterministicCoverArt = ({ hash }: { hash: string }) => {
   // Parse the 32-character hex hash into an array of integers (0-255)
   const bytes = useMemo(() => {
-    return Array.from({ length: 16 }, (_, i) => parseInt(hash.substring(i * 2, i * 2 + 2), 16));
+    return Array.from({ length: 16 }, (_, i) =>
+      parseInt(hash.substring(i * 2, i * 2 + 2), 16),
+    );
   }, [hash]);
 
   // Enterprise tech palettes
   const palettes = [
-    ['#3b82f6', '#10b981'], // Blue/Emerald
-    ['#8b5cf6', '#06b6d4'], // Violet/Cyan
-    ['#f59e0b', '#ef4444'], // Amber/Red
-    ['#14b8a6', '#6366f1'], // Teal/Indigo
-    ['#64748b', '#94a3b8'], // Slate (Monochrome)
+    ["#3b82f6", "#10b981"], // Blue/Emerald
+    ["#8b5cf6", "#06b6d4"], // Violet/Cyan
+    ["#f59e0b", "#ef4444"], // Amber/Red
+    ["#14b8a6", "#6366f1"], // Teal/Indigo
+    ["#64748b", "#94a3b8"], // Slate (Monochrome)
   ];
-  
+
   const theme = palettes[bytes[0] % palettes.length];
   const c1 = theme[0];
   const c2 = theme[1];
@@ -83,12 +84,12 @@ const DeterministicCoverArt = ({ hash }: { hash: string }) => {
       const b1 = bytes[(i * 3) % 16];
       const b2 = bytes[(i * 3 + 1) % 16];
       const b3 = bytes[(i * 3 + 2) % 16];
-      
+
       const type = b1 % 3; // 0: circle, 1: rect, 2: polygon
       const x = (b2 / 255) * 800; // Map 0-255 to 0-800
       const y = (b3 / 255) * 200; // Map 0-255 to 0-200
       const size = 30 + (b1 % 80); // 30 to 110
-      const color = (b3 % 2 === 0) ? c1 : c2;
+      const color = b3 % 2 === 0 ? c1 : c2;
 
       return { type, x, y, size, color, seed: b1 };
     });
@@ -105,79 +106,195 @@ const DeterministicCoverArt = ({ hash }: { hash: string }) => {
 
   return (
     <div className="absolute inset-0 w-full h-full overflow-hidden bg-muted/10 border-b border-border/40">
-      <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 800 200">
+      <svg
+        className="absolute inset-0 w-full h-full"
+        preserveAspectRatio="xMidYMid slice"
+        viewBox="0 0 800 200"
+      >
         <defs>
-          <pattern id={`grid-${hash}`} width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1" className="text-foreground/5" />
+          <pattern
+            id={`grid-${hash}`}
+            width="40"
+            height="40"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M 40 0 L 0 0 0 40"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+              className="text-foreground/5"
+            />
           </pattern>
         </defs>
-        
+
         {/* 1. BASE: Foundation Grid */}
         <rect width="100%" height="100%" fill={`url(#grid-${hash})`} />
-        
+
         {/* 2. MID: Architectural Geometry (Hollow Blueprint Style) */}
         {shapes.map((s, i) => {
           if (s.type === 0) {
-            return <circle key={i} cx={s.x} cy={s.y} r={s.size} fill={s.color} fillOpacity="0.02" stroke={s.color} strokeWidth="1.5" strokeOpacity="0.2" />
+            return (
+              <circle
+                key={i}
+                cx={s.x}
+                cy={s.y}
+                r={s.size}
+                fill={s.color}
+                fillOpacity="0.02"
+                stroke={s.color}
+                strokeWidth="1.5"
+                strokeOpacity="0.2"
+              />
+            );
           } else if (s.type === 1) {
-            return <rect key={i} x={s.x - s.size/2} y={s.y - s.size/2} width={s.size} height={s.size} fill={s.color} fillOpacity="0.02" stroke={s.color} strokeWidth="1.5" strokeOpacity="0.2" transform={`rotate(${s.seed} ${s.x} ${s.y})`} />
+            return (
+              <rect
+                key={i}
+                x={s.x - s.size / 2}
+                y={s.y - s.size / 2}
+                width={s.size}
+                height={s.size}
+                fill={s.color}
+                fillOpacity="0.02"
+                stroke={s.color}
+                strokeWidth="1.5"
+                strokeOpacity="0.2"
+                transform={`rotate(${s.seed} ${s.x} ${s.y})`}
+              />
+            );
           } else {
             const p1 = `${s.x},${s.y - s.size}`;
-            const p2 = `${s.x + s.size},${s.y + s.size/2}`;
-            const p3 = `${s.x - s.size},${s.y + s.size/2}`;
-            return <polygon key={i} points={`${p1} ${p2} ${p3}`} fill={s.color} fillOpacity="0.02" stroke={s.color} strokeWidth="1.5" strokeOpacity="0.2" transform={`rotate(${s.seed * 2} ${s.x} ${s.y})`} />
+            const p2 = `${s.x + s.size},${s.y + s.size / 2}`;
+            const p3 = `${s.x - s.size},${s.y + s.size / 2}`;
+            return (
+              <polygon
+                key={i}
+                points={`${p1} ${p2} ${p3}`}
+                fill={s.color}
+                fillOpacity="0.02"
+                stroke={s.color}
+                strokeWidth="1.5"
+                strokeOpacity="0.2"
+                transform={`rotate(${s.seed * 2} ${s.x} ${s.y})`}
+              />
+            );
           }
         })}
 
         {/* 3. FOREGROUND: Observability Elements */}
-        
+
         {/* A. Distributed Tracing Graph */}
         <g opacity="0.5">
-          <polyline 
-            points={`${traceNodes[0].x},${traceNodes[0].y} ${traceNodes[1].x},${traceNodes[1].y} ${traceNodes[2].x},${traceNodes[2].y}`} 
-            fill="none" stroke={c1} strokeWidth="1.5" strokeDasharray="4 4" 
+          <polyline
+            points={`${traceNodes[0].x},${traceNodes[0].y} ${traceNodes[1].x},${traceNodes[1].y} ${traceNodes[2].x},${traceNodes[2].y}`}
+            fill="none"
+            stroke={c1}
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
           />
           {traceNodes.map((n, i) => (
             <g key={i} transform={`translate(${n.x}, ${n.y})`}>
-              <circle cx="0" cy="0" r="4.5" fill="hsl(var(--background))" stroke={c1} strokeWidth="2" />
+              <circle
+                cx="0"
+                cy="0"
+                r="4.5"
+                fill="hsl(var(--background))"
+                stroke={c1}
+                strokeWidth="2"
+              />
               <circle cx="0" cy="0" r="1.5" fill={c1} />
             </g>
           ))}
         </g>
 
         {/* B. Metrics Sparkline (Bar chart) */}
-        <g transform={`translate(${600 + (bytes[7] % 100)}, ${120 + (bytes[8] % 40)})`} opacity="0.4">
+        <g
+          transform={`translate(${600 + (bytes[7] % 100)}, ${120 + (bytes[8] % 40)})`}
+          opacity="0.4"
+        >
           {Array.from({ length: 6 }).map((_, i) => {
             const h = 5 + (bytes[9 + i] % 25); // Heights between 5 and 30
-            return <rect key={i} x={i * 8} y={30 - h} width="4" height={h} fill={c2} rx="1" />
+            return (
+              <rect
+                key={i}
+                x={i * 8}
+                y={30 - h}
+                width="4"
+                height={h}
+                fill={c2}
+                rx="1"
+              />
+            );
           })}
-          <line x1="-5" y1="32" x2="52" y2="32" stroke={c2} strokeWidth="1.5" opacity="0.4" />
+          <line
+            x1="-5"
+            y1="32"
+            x2="52"
+            y2="32"
+            stroke={c2}
+            strokeWidth="1.5"
+            opacity="0.4"
+          />
         </g>
 
         {/* C. Terminal/Logs Context */}
-        <g transform={`translate(${100 + (bytes[10] % 200)}, ${130 + (bytes[11] % 40)})`} opacity="0.3">
-            <text x="0" y="0" fontFamily="monospace" fontSize="24" fill={c1} fontWeight="bold">{`{`}</text>
-            <text x="25" y="0" fontFamily="monospace" fontSize="24" fill={c2} fontWeight="bold">{`}`}</text>
-            {/* Simulated syntax lines inside brackets */}
-            <rect x="8" y="-12" width="12" height="2" fill={c1} opacity="0.5" />
-            <rect x="8" y="-6" width="8" height="2" fill={c2} opacity="0.5" />
+        <g
+          transform={`translate(${100 + (bytes[10] % 200)}, ${130 + (bytes[11] % 40)})`}
+          opacity="0.3"
+        >
+          <text
+            x="0"
+            y="0"
+            fontFamily="monospace"
+            fontSize="24"
+            fill={c1}
+            fontWeight="bold"
+          >{`{`}</text>
+          <text
+            x="25"
+            y="0"
+            fontFamily="monospace"
+            fontSize="24"
+            fill={c2}
+            fontWeight="bold"
+          >{`}`}</text>
+          {/* Simulated syntax lines inside brackets */}
+          <rect x="8" y="-12" width="12" height="2" fill={c1} opacity="0.5" />
+          <rect x="8" y="-6" width="8" height="2" fill={c2} opacity="0.5" />
         </g>
 
         {/* D. Fast Data Stream Line */}
-        <line 
-          x1="0" y1={bytes[12] % 200} 
-          x2="800" y2={bytes[12] % 200} 
-          stroke={c2} strokeWidth="1" opacity="0.25" strokeDasharray="15 10 5 10" 
+        <line
+          x1="0"
+          y1={bytes[12] % 200}
+          x2="800"
+          y2={bytes[12] % 200}
+          stroke={c2}
+          strokeWidth="1"
+          opacity="0.25"
+          strokeDasharray="15 10 5 10"
         />
-        
+
         {/* E. Telemetry Crosshairs */}
-        <g transform={`translate(${bytes[13]*3}, ${bytes[14]%200})`} opacity="0.5">
+        <g
+          transform={`translate(${bytes[13] * 3}, ${bytes[14] % 200})`}
+          opacity="0.5"
+        >
           <line x1="-15" y1="0" x2="15" y2="0" stroke={c1} strokeWidth="1.5" />
           <line x1="0" y1="-15" x2="0" y2="15" stroke={c1} strokeWidth="1.5" />
-          <circle cx="0" cy="0" r="10" fill="none" stroke={c2} strokeWidth="1" strokeDasharray="2 2" />
+          <circle
+            cx="0"
+            cy="0"
+            r="10"
+            fill="none"
+            stroke={c2}
+            strokeWidth="1"
+            strokeDasharray="2 2"
+          />
         </g>
       </svg>
-      
+
       {/* 4. Vignette Fade into Card background */}
       <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent opacity-90" />
     </div>
@@ -221,8 +338,9 @@ export default function ProfilePage() {
   const quotaPercent = Math.min((currentBytes / maxBytes) * 100, 100);
   const isNearLimit = quotaPercent > 85;
 
-  
-  const emailHash = md5((user.email || "guest@senzor.dev").trim().toLowerCase());
+  const emailHash = md5(
+    (user.email || "guest@senzor.dev").trim().toLowerCase(),
+  );
   const getGravatar = (email: string) =>
     `https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?d=identicon`;
 
@@ -281,8 +399,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <DashboardLayout>
-
+    <>
       <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-24">
         {/* Page Header */}
         <div>
@@ -302,7 +419,6 @@ export default function ProfilePage() {
           </div>
           <CardContent className="p-6 md:p-8 pt-0 sm:pt-0 relative">
             <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-12">
-              
               <div className="relative shrink-0 p-1.5 bg-card rounded-2xl border border-border/60 shadow-sm">
                 <img
                   src={getGravatar(user.email || "")}
@@ -330,7 +446,12 @@ export default function ProfilePage() {
                 <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
                   {user.displayName || "Senzor Administrator"}
                   {user.isDemo && (
-                    <Badge variant="warning" className="text-[10px] uppercase tracking-wider py-0 h-5">Demo Mode</Badge>
+                    <Badge
+                      variant="warning"
+                      className="text-[10px] uppercase tracking-wider py-0 h-5"
+                    >
+                      Demo Mode
+                    </Badge>
                   )}
                 </h2>
                 <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -369,7 +490,9 @@ export default function ProfilePage() {
           {/* Action Footer for Session Management */}
           <div className="border-t border-border/40 bg-muted/15 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-muted-foreground text-center sm:text-left leading-relaxed">
-              You are currently authenticated as <strong className="text-foreground">{user.email}</strong>. Sign out to end your session.
+              You are currently authenticated as{" "}
+              <strong className="text-foreground">{user.email}</strong>. Sign
+              out to end your session.
             </p>
             <Button
               onClick={logout}
@@ -416,35 +539,67 @@ export default function ProfilePage() {
           </CardHeader>
 
           <CardContent className="p-0 flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-border/40">
-            
             {/* Left: Billing Overview */}
             <div className="p-6 lg:w-1/2 flex flex-col bg-card">
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-5">Billing Details</h3>
-              
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-5">
+                Billing Details
+              </h3>
+
               <div className="space-y-4 flex-1">
                 <div className="flex justify-between items-center border-b border-border/40 pb-3">
-                  <span className="text-sm text-muted-foreground flex items-center gap-2"><Activity className="w-4 h-4" /> Subscription Status</span>
-                  <Badge variant="outline" className={cn("text-[10px] uppercase font-bold tracking-wider", sub?.status === 'active' ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" : sub?.status === 'past_due' ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-destructive bg-destructive/10 border-destructive/20")}>
-                    {sub?.status || 'Unknown'}
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Activity className="w-4 h-4" /> Subscription Status
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[10px] uppercase font-bold tracking-wider",
+                      sub?.status === "active"
+                        ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+                        : sub?.status === "past_due"
+                          ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
+                          : "text-destructive bg-destructive/10 border-destructive/20",
+                    )}
+                  >
+                    {sub?.status || "Unknown"}
                   </Badge>
-                </div>
-                
-                <div className="flex justify-between items-center border-b border-border/40 pb-3">
-                  <span className="text-sm text-muted-foreground flex items-center gap-2"><Calendar className="w-4 h-4" /> Billing Interval</span>
-                  <span className="text-sm font-semibold capitalize text-foreground">{sub?.billingInterval || 'Monthly'}</span>
                 </div>
 
                 <div className="flex justify-between items-center border-b border-border/40 pb-3">
-                  <span className="text-sm text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4" /> Next Invoice Date</span>
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Calendar className="w-4 h-4" /> Billing Interval
+                  </span>
+                  <span className="text-sm font-semibold capitalize text-foreground">
+                    {sub?.billingInterval || "Monthly"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center border-b border-border/40 pb-3">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> Next Invoice Date
+                  </span>
                   <span className="text-sm font-semibold text-foreground">
-                    {sub?.billingCycleReset ? new Date(sub.billingCycleReset).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                    {sub?.billingCycleReset
+                      ? new Date(sub.billingCycleReset).toLocaleDateString(
+                          "en-US",
+                          { year: "numeric", month: "short", day: "numeric" },
+                        )
+                      : "N/A"}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground flex items-center gap-2"><Shield className="w-4 h-4" /> Member Since</span>
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Shield className="w-4 h-4" /> Member Since
+                  </span>
                   <span className="text-sm font-semibold text-foreground">
-                    {sub?.startedAt ? new Date(sub.startedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                    {sub?.startedAt
+                      ? new Date(sub.startedAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : "N/A"}
                   </span>
                 </div>
               </div>
@@ -472,8 +627,10 @@ export default function ProfilePage() {
 
             {/* Right: Data Quota */}
             <div className="p-6 lg:w-1/2 flex flex-col bg-muted/5">
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-5">Data Ingestion Quota</h3>
-              
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-5">
+                Data Ingestion Quota
+              </h3>
+
               <div className="bg-background border border-border/60 rounded-xl p-5 shadow-sm space-y-5">
                 <div>
                   <div className="flex justify-between text-sm mb-2.5">
@@ -484,7 +641,8 @@ export default function ProfilePage() {
                       <strong className="text-foreground font-bold text-sm">
                         {formatBytes(currentBytes)}
                       </strong>{" "}
-                      <span className="opacity-50">/</span> {formatBytes(maxBytes)}
+                      <span className="opacity-50">/</span>{" "}
+                      {formatBytes(maxBytes)}
                     </span>
                   </div>
                   <div className="h-2.5 w-full bg-secondary/80 rounded-full overflow-hidden border border-border/50 relative">
@@ -497,10 +655,13 @@ export default function ProfilePage() {
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/40">
                   <div>
-                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Status</span>
+                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                      Status
+                    </span>
                     {isNearLimit ? (
                       <span className="text-xs font-bold text-destructive flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5" /> Approaching Limit
+                        <AlertTriangle className="w-3.5 h-3.5" /> Approaching
+                        Limit
                       </span>
                     ) : (
                       <span className="text-xs font-bold text-emerald-500 flex items-center gap-1.5">
@@ -509,9 +670,16 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Quota Resets On</span>
+                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                      Quota Resets On
+                    </span>
                     <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      {sub?.quotaResetAt ? new Date(sub.quotaResetAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Pending'}
+                      {sub?.quotaResetAt
+                        ? new Date(sub.quotaResetAt).toLocaleDateString(
+                            "en-US",
+                            { year: "numeric", month: "short", day: "numeric" },
+                          )
+                        : "Pending"}
                     </span>
                   </div>
                 </div>
@@ -521,13 +689,13 @@ export default function ProfilePage() {
                 <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3 flex items-start gap-3">
                   <HardDrive className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Ingestion limits are pooled across all APM, RUM, Logs, and Tasks services. Usage automatically resets to zero on your quota reset date.
+                    Ingestion limits are pooled across all APM, RUM, Logs, and
+                    Tasks services. Usage automatically resets to zero on your
+                    quota reset date.
                   </p>
                 </div>
               </div>
-
             </div>
-
           </CardContent>
         </Card>
 
@@ -841,6 +1009,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

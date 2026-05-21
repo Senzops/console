@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
-import { DashboardLayout } from '../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, X, RefreshCw, Search, Maximize, ChartNoAxesCombined } from 'lucide-react';
@@ -299,16 +298,16 @@ export default function WebDetail() {
     });
   }, [data?.traffic?.hours]);
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Website...</p></div></DashboardLayout>;
-  if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></DashboardLayout>;
-  if (!data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load analytics.</div></div></DashboardLayout>;
+  if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Website...</p></div></>;
+  if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;
+  if (!data?.meta) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load analytics.</div></div></>;
 
   const { meta, overview, liveVisitors, pages, sources, geo, system, traffic } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
@@ -470,6 +469,6 @@ export default function WebDetail() {
           <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>Cancel</Button><Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>{isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm</Button></div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

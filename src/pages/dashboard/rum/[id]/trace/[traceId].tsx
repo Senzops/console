@@ -2,7 +2,6 @@
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../../../lib/auth";
-import { DashboardLayout } from "../../../../../components/Layout";
 import {
   Button,
   Spinner,
@@ -107,31 +106,31 @@ export default function RumTraceDetail() {
 
   if (!data && !error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">
             Reconstructing Web Waterfall...
           </p>
         </div>
-      </DashboardLayout>
+      </>
     );
 
   if (error || !data?.trace)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <div className="p-8 text-destructive bg-destructive/10 border border-destructive/20 rounded-lg">
             Failed to load Trace. It may have expired or does not exist.
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
 
   const { trace, childrenTraces } = data;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto flex flex-col">
         {/* --- Header & Navigation --- */}
         <div className="flex flex-col gap-4 shrink-0">
@@ -331,6 +330,6 @@ export default function RumTraceDetail() {
           serviceType="rum"
         />
       </div>
-    </DashboardLayout>
+    </>
   );
 }

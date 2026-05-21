@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
-import { DashboardLayout } from '../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize } from 'lucide-react';
@@ -261,9 +260,9 @@ export default function MonitorDetail() {
     return [...data.history].reverse();
   }, [data?.history]);
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></DashboardLayout>;
-  if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></DashboardLayout>;
-  if (!data?.monitor) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></DashboardLayout>;
+  if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></>;
+  if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;
+  if (!data?.monitor) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></>;
 
   const { monitor, stats, history } = data;
   const health = getHealthBadge(stats.uptime, stats.avgLatency);
@@ -271,7 +270,7 @@ export default function MonitorDetail() {
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
 
         {/* Header */}
@@ -345,6 +344,6 @@ export default function MonitorDetail() {
           <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>Cancel</Button><Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>{isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm</Button></div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

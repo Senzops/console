@@ -4,7 +4,6 @@ import useSWR from "swr";
 import Editor from "@monaco-editor/react";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
-import { DashboardLayout } from "../../../components/Layout";
 import { WorldMap } from "../../../components/WorldMap";
 import {
   Card,
@@ -1266,20 +1265,20 @@ export default function CustomDashboardView() {
 
   if (!data && !error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Loading Canvas...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   if (error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError onRetry={() => mutate()} />
         </div>
-      </DashboardLayout>
+      </>
     );
 
   const { view, widgets } = data;
@@ -1288,7 +1287,7 @@ export default function CustomDashboardView() {
   const monacoTheme = theme === "light" || theme === "latte" ? "light" : "vs-dark";
 
   return (
-    <DashboardLayout>
+    <>
       {/* Background blueprint dots during edit mode for professional aesthetic */}
       <div
         className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-500 ${isEditing ? "opacity-20" : "opacity-0"}`}
@@ -1830,6 +1829,6 @@ export default function CustomDashboardView() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

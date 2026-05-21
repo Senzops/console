@@ -3,7 +3,6 @@ import useSWR from "swr";
 import { format } from "date-fns";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
-import { DashboardLayout } from "../../../components/Layout";
 import {
   Card,
   CardContent,
@@ -435,18 +434,18 @@ export default function McpSettingsDashboard() {
 
   if (!keysData && !usageData && !usageError) {
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Loading AI Telemetry...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (usageError) {
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError
             onRetry={() => {
@@ -455,14 +454,14 @@ export default function McpSettingsDashboard() {
             }}
           />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   const isDataRefreshing = keysValidating || usageValidating;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-24 relative">
         {/* --- Header (ApmView Style) --- */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border border-border/60 shadow-sm">
@@ -885,6 +884,6 @@ export default function McpSettingsDashboard() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

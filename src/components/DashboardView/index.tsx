@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { DashboardLayout } from "../Layout";
 import {
   ShieldCheck,
   Server,
@@ -156,27 +155,27 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
 
   if (hasError) {
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError onRetry={handleRetryAll} />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center">
           <Spinner className="h-8 w-8 text-emerald-500" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (isEmpty) {
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
           <div className="h-24 w-24 bg-card rounded-full flex items-center content-center justify-center mb-6 border border-border shadow-lg p-2">
             <img
@@ -193,7 +192,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
             infrastructure.
           </p>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
@@ -425,7 +424,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     : "Global Infra";
 
   return (
-    <DashboardLayout>
+    <>
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="p-8 pb-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -818,6 +817,6 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           )}
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

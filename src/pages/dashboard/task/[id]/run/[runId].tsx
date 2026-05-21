@@ -4,7 +4,6 @@ import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../../../lib/auth";
 import { useTheme } from "../../../../../lib/theme";
-import { DashboardLayout } from "../../../../../components/Layout";
 import {
   Card,
   CardContent,
@@ -147,27 +146,27 @@ export default function TaskRunDetail() {
 
   if (isLoading || !data)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Loading Task Execution...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   if (error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError onRetry={() => mutate()} />
         </div>
-      </DashboardLayout>
+      </>
     );
 
   const { run, errors } = data;
   const isFailed = run.status === "failed";
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         {/* --- Top Navigation --- */}
         <Button
@@ -337,6 +336,6 @@ export default function TaskRunDetail() {
           serviceType="task"
         />
       </div>
-    </DashboardLayout>
+    </>
   );
 }

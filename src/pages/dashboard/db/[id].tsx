@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
-import { DashboardLayout } from '../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError, Input } from '../../../components/Core';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize, Search } from 'lucide-react';
@@ -281,9 +280,9 @@ export default function DatabaseDetail() {
     }));
   }, [data?.history]);
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Database...</p></div></DashboardLayout>;
-  if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></DashboardLayout>;
-    if (!data?.database) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load database.</div></div></DashboardLayout>;
+  if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Database...</p></div></>;
+  if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;
+    if (!data?.database) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load database.</div></div></>;
 
   const { database, latest, history, collections } = data;
   const isRedis = database.type === 'redis';
@@ -383,7 +382,7 @@ export default function DatabaseDetail() {
   );
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         
         {/* --- 1. Header & Controls --- */}
@@ -526,6 +525,6 @@ export default function DatabaseDetail() {
             </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

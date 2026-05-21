@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
-import { DashboardLayout } from '../Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize, Filter } from 'lucide-react';
@@ -450,9 +449,9 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   );
 
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM service...</p></div></DashboardLayout>;
-  if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => { mutate(); mutateInvocations(); }} /></div></DashboardLayout>;
-  if (!data?.meta) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM service.</div></div></DashboardLayout>;
+  if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM service...</p></div></>;
+  if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => { mutate(); mutateInvocations(); }} /></div></>;
+  if (!data?.meta) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM service.</div></div></>;
 
   const { meta, overview, routes, referrers, channels, geo, system, statusCodes } = data;
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
@@ -466,7 +465,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         
         {/* Header */}
@@ -629,6 +628,6 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
             <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>Cancel</Button><Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>{isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm</Button></div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

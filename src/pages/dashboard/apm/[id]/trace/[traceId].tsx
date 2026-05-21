@@ -1,7 +1,6 @@
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../../../lib/auth";
-import { DashboardLayout } from "../../../../../components/Layout";
 import {
   Button,
   Spinner,
@@ -90,24 +89,24 @@ export default function TraceDetail() {
 
   if (!trace && !error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Connecting to APM trace...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   if (error || !trace)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <div className="p-8 text-destructive">Failed to load Trace.</div>
         </div>
-      </DashboardLayout>
+      </>
     );
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto flex flex-col">
         {/* --- Header --- */}
         <div className="flex flex-col gap-4 shrink-0">
@@ -282,6 +281,6 @@ export default function TraceDetail() {
           />
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

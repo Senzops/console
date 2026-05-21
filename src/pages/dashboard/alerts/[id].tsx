@@ -6,7 +6,6 @@ import { format, formatDistanceToNow } from "date-fns";
 import Editor from "@monaco-editor/react";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
-import { DashboardLayout } from "../../../components/Layout";
 import {
   Card,
   CardContent,
@@ -755,20 +754,20 @@ export default function AlertPolicyDetail() {
 
   if (!data && !error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Loading Alert Policy...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   if (error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError onRetry={() => mutate()} />
         </div>
-      </DashboardLayout>
+      </>
     );
 
   const { policy, conditions, incidents } = data;
@@ -776,7 +775,7 @@ export default function AlertPolicyDetail() {
     theme === "light" || theme === "latte" ? "light" : "vs-dark";
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-24">
         {/* --- Header --- */}
         <div className="flex flex-col gap-4">
@@ -1156,6 +1155,6 @@ export default function AlertPolicyDetail() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

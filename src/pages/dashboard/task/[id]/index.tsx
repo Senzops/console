@@ -10,7 +10,6 @@ import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../../lib/auth";
 import { useTheme } from "../../../../lib/theme";
-import { DashboardLayout } from "../../../../components/Layout";
 import {
   Card,
   CardContent,
@@ -406,30 +405,30 @@ export default function TaskServiceDashboard() {
 
   if (!data && !error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Connecting to Task Service...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   if (error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError onRetry={() => mutate()} />
         </div>
-      </DashboardLayout>
+      </>
     );
   if (!data?.service)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <div className="p-8 text-destructive">
             Failed to load Task Service.
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
 
   const { service, stats, tasksTable } = data;
@@ -448,7 +447,7 @@ export default function TaskServiceDashboard() {
     new Date().getTime() - new Date(service.lastSeen).getTime() < 5 * 60 * 1000;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col gap-4">
@@ -663,6 +662,6 @@ export default function TaskServiceDashboard() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

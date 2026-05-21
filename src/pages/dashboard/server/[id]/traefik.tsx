@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
-import { DashboardLayout } from '../../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Button, Spinner, Badge } from '../../../../components/Core';
 import { AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, Route, Activity, Maximize2, X } from 'lucide-react';
@@ -30,13 +29,13 @@ export default function TraefikDetail() {
       }));
   }, [history]);
 
-  if (!data) return <DashboardLayout><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-emerald-500" /></div></DashboardLayout>;
+  if (!data) return <><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-emerald-500" /></div></>;
 
   const latest = history && history.length > 0 ? history[0].metrics?.traefik || {} : {};
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         <Button variant="ghost" onClick={() => router.back()} className="mb-2 pl-0 hover:bg-transparent hover:text-blue-500">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Server
@@ -110,6 +109,6 @@ export default function TraefikDetail() {
           </ChartCard>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

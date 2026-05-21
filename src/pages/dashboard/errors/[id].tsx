@@ -3,7 +3,6 @@ import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
-import { DashboardLayout } from "../../../components/Layout";
 import {
   Card,
   CardContent,
@@ -231,23 +230,23 @@ export default function ErrorDetailPage() {
 
   if (!data && !error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">
             Connecting to Error Tracker...
           </p>
         </div>
-      </DashboardLayout>
+      </>
     );
 
   if (error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <DataError onRetry={() => mutate()} />
         </div>
-      </DashboardLayout>
+      </>
     );
 
   const { group, events } = data;
@@ -263,7 +262,7 @@ export default function ErrorDetailPage() {
     isMono ? "hsl(var(--chart-mono))" : defaultColor;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         <Button
           variant="ghost"
@@ -512,6 +511,6 @@ export default function ErrorDetailPage() {
           )}
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

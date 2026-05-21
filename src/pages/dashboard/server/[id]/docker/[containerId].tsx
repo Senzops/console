@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api } from '../../../../../lib/auth';
 import { useTheme } from '../../../../../lib/theme';
-import { DashboardLayout } from '../../../../../components/Layout';
 import { Card, CardHeader, CardTitle, Badge, Button, CardContent, Spinner } from '../../../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, Box, Maximize, X } from 'lucide-react';
@@ -84,19 +83,19 @@ export default function DockerDetail() {
     }).filter(Boolean);
   }, [history, containerId]);
 
-  if (!data) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Loading Container Data...</p></div></DashboardLayout>;
+  if (!data) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Loading Container Data...</p></div></>;
 
   const latestRun = history[history.length - 1];
   const containerCurrent = latestRun?.metrics.docker.find((c: any) => c.id === containerId);
 
   if (!containerCurrent) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-8">
           <Button variant="ghost" onClick={() => router.back()} className="mb-4"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
           <Card className="p-8 text-center text-muted-foreground">Container not found in latest run.</Card>
         </div>
-      </DashboardLayout>
+      </>
     )
   }
 
@@ -104,7 +103,7 @@ export default function DockerDetail() {
   const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-8 space-y-6">
         <Button variant="ghost" onClick={() => router.back()} className="mb-2 pl-0 hover:bg-transparent hover:text-emerald-500">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Server
@@ -160,6 +159,6 @@ export default function DockerDetail() {
           </ChartCard>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

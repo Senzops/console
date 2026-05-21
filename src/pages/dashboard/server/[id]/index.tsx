@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
-import { DashboardLayout } from '../../../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, cn, DataError } from '../../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal, Layers, CloudLightning, ArrowRight, Route, Thermometer, Zap } from 'lucide-react';
@@ -367,9 +366,9 @@ export default function ServerDetail() {
     });
   }, [history]);
 
-  if (!data && !error) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></DashboardLayout>;
-  if (error) return <DashboardLayout><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></DashboardLayout>;
-  if (!vps) return <DashboardLayout><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></DashboardLayout>;
+  if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></>;
+  if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;
+  if (!vps) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></>;
 
   // Original Helper to get color based on Mode
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
@@ -385,7 +384,7 @@ export default function ServerDetail() {
   const hasTerminal = vps.activeIntegrations?.terminal;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
 
         {/* Header */}
@@ -761,7 +760,7 @@ export default function ServerDetail() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }
 

@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
-import { DashboardLayout } from '../../../../components/Layout';
 import { Button, Spinner, Badge } from '../../../../components/Core';
 import { ArrowLeft, Terminal, ShieldCheck, Cpu } from 'lucide-react';
 
@@ -23,17 +22,17 @@ export default function TerminalPage() {
   const { data, error } = useSWR(token && id ? `/vps/${id}/stats` : null, fetcher);
 
   if (!data && !error) {
-    return <DashboardLayout><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-primary" /></div></DashboardLayout>;
+    return <><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-primary" /></div></>;
   }
 
   if (error || !data) {
-    return <DashboardLayout><div className="p-8 text-destructive">Server not found or access denied.</div></DashboardLayout>;
+    return <><div className="p-8 text-destructive">Server not found or access denied.</div></>;
   }
 
   const { vps } = data;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="h-[calc(100vh-2rem)] flex flex-col p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto w-full">
 
         {/* Navigation */}
@@ -73,6 +72,6 @@ export default function TerminalPage() {
           <TerminalView vpsId={id as string} />
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

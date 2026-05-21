@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
-import { DashboardLayout } from '../../../../components/Layout';
 import { Badge, Button, Spinner } from '../../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
 import { ArrowLeft, CloudLightning, Activity, RefreshCw } from 'lucide-react';
@@ -31,13 +30,13 @@ export default function NginxDetail() {
       }));
   }, [history]);
 
-  if (!data) return <DashboardLayout><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-emerald-500" /></div></DashboardLayout>;
+  if (!data) return <><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-emerald-500" /></div></>;
 
   const latest = history && history.length > 0 ? history[0].metrics?.nginx || {} : {};
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         <Button variant="ghost" onClick={() => router.back()} className="mb-2 pl-0 hover:bg-transparent hover:text-emerald-500">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Server
@@ -90,6 +89,6 @@ export default function NginxDetail() {
           </ChartCard>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

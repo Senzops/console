@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "../../../lib/auth";
-import { DashboardLayout } from "../../../components/Layout";
 import {
   Card,
   Button,
@@ -77,7 +82,10 @@ const saveChat = async (id: string, messages: ChatMessage[]) => {
 const loadChat = async (id: string): Promise<ChatMessage[]> => {
   const db = await initDB();
   return new Promise((resolve) => {
-    const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(id);
+    const request = db
+      .transaction(STORE_NAME, "readonly")
+      .objectStore(STORE_NAME)
+      .get(id);
     request.onsuccess = () => resolve(request.result?.messages || []);
   });
 };
@@ -114,9 +122,9 @@ interface LocalModelOption {
   id: string;
   name: string;
   family: string;
-  params: number;          // billions of parameters
-  vramReq: number;         // recommended VRAM (GB)
-  vramRequiredMB: number;  // exact MB required by the WebLLM bundle
+  params: number; // billions of parameters
+  vramReq: number; // recommended VRAM (GB)
+  vramRequiredMB: number; // exact MB required by the WebLLM bundle
   tier: LocalModelTier;
   description: string;
   tags: string[];
@@ -132,7 +140,8 @@ const LOCAL_MODELS: LocalModelOption[] = [
     vramReq: 8,
     vramRequiredMB: 5779,
     tier: "premium",
-    description: "Highest reasoning quality. Best for complex multi-tool workflows.",
+    description:
+      "Highest reasoning quality. Best for complex multi-tool workflows.",
     tags: ["Tool-Tuned", "Reasoning"],
   },
   {
@@ -226,7 +235,8 @@ const LOCAL_MODELS: LocalModelOption[] = [
     vramReq: 2,
     vramRequiredMB: 1630,
     tier: "ultralight",
-    description: "Runs on integrated GPUs. Surprisingly capable for tool calls.",
+    description:
+      "Runs on integrated GPUs. Surprisingly capable for tool calls.",
     tags: ["Edge", "Fast"],
   },
   {
@@ -242,7 +252,12 @@ const LOCAL_MODELS: LocalModelOption[] = [
   },
 ];
 
-const TIER_ORDER: LocalModelTier[] = ["premium", "balanced", "light", "ultralight"];
+const TIER_ORDER: LocalModelTier[] = [
+  "premium",
+  "balanced",
+  "light",
+  "ultralight",
+];
 
 const TIER_LABELS: Record<LocalModelTier, string> = {
   premium: "Premium — discrete GPU (6 GB+ VRAM)",
@@ -276,7 +291,7 @@ const ENGINE_CONTEXT_FALLBACK = 4096;
  * model if nothing fits (avoids returning undefined).
  */
 function pickModelForVram(gb: number): string {
-  const fit = LOCAL_MODELS.find(m => m.vramReq <= gb);
+  const fit = LOCAL_MODELS.find((m) => m.vramReq <= gb);
   return (fit ?? LOCAL_MODELS[LOCAL_MODELS.length - 1]).id;
 }
 
@@ -298,67 +313,441 @@ type ToolSchema = {
 
 const AI_TOOLS: ToolSchema[] = [
   // --- APM Tools ---
-  { type: "function", function: { name: "apm_list_services", description: "List all active APM (Backend) services and their IDs.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "apm_get_stats", description: "Get performance aggregations (latency, RPS) for an APM service.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
-  { type: "function", function: { name: "apm_get_invocations", description: "Get a list of recent HTTP trace invocations for a service.", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } } },
-  { type: "function", function: { name: "apm_get_trace_detail", description: "Get the full execution waterfall (spans) for a specific traceId.", parameters: { type: "object", properties: { id: { type: "string" }, traceId: { type: "string" } }, required: ["id", "traceId"] } } },
+  {
+    type: "function",
+    function: {
+      name: "apm_list_services",
+      description: "List all active APM (Backend) services and their IDs.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apm_get_stats",
+      description:
+        "Get performance aggregations (latency, RPS) for an APM service.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apm_get_invocations",
+      description: "Get a list of recent HTTP trace invocations for a service.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apm_get_trace_detail",
+      description:
+        "Get the full execution waterfall (spans) for a specific traceId.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, traceId: { type: "string" } },
+        required: ["id", "traceId"],
+      },
+    },
+  },
 
   // --- RUM (Web APM) Tools ---
-  { type: "function", function: { name: "rum_list_services", description: "List all active RUM (Frontend Web APM) applications.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "rum_get_dashboard", description: "Get Web Vitals (LCP, INP, CLS) and page views for a RUM app.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
-  { type: "function", function: { name: "rum_get_trace_detail", description: "Get the frontend execution trace (XHR/Fetch spans) for a RUM traceId.", parameters: { type: "object", properties: { id: { type: "string" }, traceId: { type: "string" } }, required: ["id", "traceId"] } } },
+  {
+    type: "function",
+    function: {
+      name: "rum_list_services",
+      description: "List all active RUM (Frontend Web APM) applications.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "rum_get_dashboard",
+      description:
+        "Get Web Vitals (LCP, INP, CLS) and page views for a RUM app.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "rum_get_trace_detail",
+      description:
+        "Get the frontend execution trace (XHR/Fetch spans) for a RUM traceId.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, traceId: { type: "string" } },
+        required: ["id", "traceId"],
+      },
+    },
+  },
 
   // --- Background Tasks Tools ---
-  { type: "function", function: { name: "task_list_services", description: "List all Background Task services.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "task_get_dashboard", description: "Get job execution metrics (failures, delays, durations).", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
-  { type: "function", function: { name: "task_get_entity_detail", description: "Get specific historical performance for a single task queue/cron name.", parameters: { type: "object", properties: { id: { type: "string" }, taskName: { type: "string" }, range: { type: "string" } }, required: ["id", "taskName"] } } },
-  { type: "function", function: { name: "task_get_run_detail", description: "Get the detailed spans and metadata for a specific task runId.", parameters: { type: "object", properties: { id: { type: "string" }, runId: { type: "string" } }, required: ["id", "runId"] } } },
+  {
+    type: "function",
+    function: {
+      name: "task_list_services",
+      description: "List all Background Task services.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "task_get_dashboard",
+      description: "Get job execution metrics (failures, delays, durations).",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "task_get_entity_detail",
+      description:
+        "Get specific historical performance for a single task queue/cron name.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          taskName: { type: "string" },
+          range: { type: "string" },
+        },
+        required: ["id", "taskName"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "task_get_run_detail",
+      description:
+        "Get the detailed spans and metadata for a specific task runId.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, runId: { type: "string" } },
+        required: ["id", "runId"],
+      },
+    },
+  },
 
   // --- Logs Tools ---
-  { type: "function", function: { name: "logs_query", description: "Search system logs. Use filters like level:error.", parameters: { type: "object", properties: { search: { type: "string" }, range: { type: "string" }, limit: { type: "number" } } } } },
-  { type: "function", function: { name: "logs_get_by_id", description: "Get the full payload of a single log by its MongoDB _id.", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } } },
-  { type: "function", function: { name: "logs_get_by_trace", description: "Get all logs explicitly attached to an APM/RUM traceId or Task runId.", parameters: { type: "object", properties: { id: { type: "string" }, traceId: { type: "string" } }, required: ["id", "traceId"] } } },
+  {
+    type: "function",
+    function: {
+      name: "logs_query",
+      description: "Search system logs. Use filters like level:error.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string" },
+          range: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "logs_get_by_id",
+      description: "Get the full payload of a single log by its MongoDB _id.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "logs_get_by_trace",
+      description:
+        "Get all logs explicitly attached to an APM/RUM traceId or Task runId.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, traceId: { type: "string" } },
+        required: ["id", "traceId"],
+      },
+    },
+  },
 
   // --- Error Tracking Tools ---
-  { type: "function", function: { name: "error_get_global", description: "Get a list of unresolved exception groups across the platform.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "error_get_group_detail", description: "Get details and recent occurrences of a specific error fingerprint (groupId).", parameters: { type: "object", properties: { groupId: { type: "string" }, range: { type: "string" } }, required: ["groupId"] } } },
-  { type: "function", function: { name: "error_get_trace_errors", description: "Get raw error events that occurred during a specific APM traceId.", parameters: { type: "object", properties: { id: { type: "string" }, traceId: { type: "string" } }, required: ["id", "traceId"] } } },
+  {
+    type: "function",
+    function: {
+      name: "error_get_global",
+      description:
+        "Get a list of unresolved exception groups across the platform.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "error_get_group_detail",
+      description:
+        "Get details and recent occurrences of a specific error fingerprint (groupId).",
+      parameters: {
+        type: "object",
+        properties: { groupId: { type: "string" }, range: { type: "string" } },
+        required: ["groupId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "error_get_trace_errors",
+      description:
+        "Get raw error events that occurred during a specific APM traceId.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, traceId: { type: "string" } },
+        required: ["id", "traceId"],
+      },
+    },
+  },
 
   // --- Web Analytics Tools ---
-  { type: "function", function: { name: "web_list_websites", description: "List all standard Web Analytics (Non-RUM) tracking properties.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "web_get_stats", description: "Get pageviews, visitors, and referriers for a standard Web Analytics property.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
+  {
+    type: "function",
+    function: {
+      name: "web_list_websites",
+      description:
+        "List all standard Web Analytics (Non-RUM) tracking properties.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_get_stats",
+      description:
+        "Get pageviews, visitors, and referriers for a standard Web Analytics property.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
 
   // --- Uptime Monitor Tools ---
-  { type: "function", function: { name: "uptime_list_monitors", description: "List all external uptime monitors (cron pingers).", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "uptime_get_stats", description: "Get uptime percentage, latency, and status history for a monitor.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
+  {
+    type: "function",
+    function: {
+      name: "uptime_list_monitors",
+      description: "List all external uptime monitors (cron pingers).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "uptime_get_stats",
+      description:
+        "Get uptime percentage, latency, and status history for a monitor.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
 
   // --- Infrastructure Tools (VPS) ---
-  { type: "function", function: { name: "vps_list", description: "List monitored Linux VPS servers.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "vps_get_stats", description: "Get CPU, RAM, Disk, Network, and Docker metrics for a VPS.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
+  {
+    type: "function",
+    function: {
+      name: "vps_list",
+      description: "List monitored Linux VPS servers.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "vps_get_stats",
+      description: "Get CPU, RAM, Disk, Network, and Docker metrics for a VPS.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
 
   // --- Database Tools ---
-  { type: "function", function: { name: "database_list", description: "List monitored database instances (MongoDB, Redis).", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "database_get_stats", description: "Get database throughput and latency metrics.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
+  {
+    type: "function",
+    function: {
+      name: "database_list",
+      description: "List monitored database instances (MongoDB, Redis).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "database_get_stats",
+      description: "Get database throughput and latency metrics.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
 
   // --- Alerts & Incident Tools ---
-  { type: "function", function: { name: "alerts_list_destinations", description: "List all configured alert destinations (channels) like Webhooks or Slack.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "alerts_list_policies", description: "List all alert policies and their summary statistics including open incident counts.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "alerts_get_policy_details", description: "Get detailed information about a specific alert policy, its evaluation conditions, and incident history.", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } } },
+  {
+    type: "function",
+    function: {
+      name: "alerts_list_destinations",
+      description:
+        "List all configured alert destinations (channels) like Webhooks or Slack.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "alerts_list_policies",
+      description:
+        "List all alert policies and their summary statistics including open incident counts.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "alerts_get_policy_details",
+      description:
+        "Get detailed information about a specific alert policy, its evaluation conditions, and incident history.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
 
   // --- Saved Views (Canvas Dashboards) Tools ---
-  { type: "function", function: { name: "views_list_dashboards", description: "List all custom saved views (dashboards) and their layouts.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "views_get_dashboard", description: "Get the layout and widget configurations for a specific custom dashboard.", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } } },
-  { type: "function", function: { name: "views_get_widget_data", description: "Execute the aggregation pipeline for a specific dashboard widget and return the computed data.", parameters: { type: "object", properties: { id: { type: "string" }, range: { type: "string" } }, required: ["id"] } } },
+  {
+    type: "function",
+    function: {
+      name: "views_list_dashboards",
+      description:
+        "List all custom saved views (dashboards) and their layouts.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "views_get_dashboard",
+      description:
+        "Get the layout and widget configurations for a specific custom dashboard.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "views_get_widget_data",
+      description:
+        "Execute the aggregation pipeline for a specific dashboard widget and return the computed data.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, range: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
 
   // --- Dynamic Schema Explorer Tool ---
-  { type: "function", function: { name: "schema_get_dynamic", description: "Get the dynamically inferred schema map for all telemetry data types.", parameters: { type: "object", properties: {} } } },
+  {
+    type: "function",
+    function: {
+      name: "schema_get_dynamic",
+      description:
+        "Get the dynamically inferred schema map for all telemetry data types.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 
   // --- Billing & Subscription Tools ---
-  { type: "function", function: { name: "billing_get_storage_stats", description: "Get current platform storage limits and actual usage statistics for the user.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "billing_get_subscription", description: "Get the user's current active subscription details, tier, and status.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "billing_get_transactions", description: "Get the user's billing transaction and payment history.", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "billing_get_transaction_receipt", description: "Get the downloadable receipt details or link for a specific billing transaction.", parameters: { type: "object", properties: { transactionId: { type: "string" } }, required: ["transactionId"] } } },
-  { type: "function", function: { name: "billing_get_active_plans", description: "List all currently available public pricing tiers and platform plans.", parameters: { type: "object", properties: {} } } },
+  {
+    type: "function",
+    function: {
+      name: "billing_get_storage_stats",
+      description:
+        "Get current platform storage limits and actual usage statistics for the user.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "billing_get_subscription",
+      description:
+        "Get the user's current active subscription details, tier, and status.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "billing_get_transactions",
+      description: "Get the user's billing transaction and payment history.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "billing_get_transaction_receipt",
+      description:
+        "Get the downloadable receipt details or link for a specific billing transaction.",
+      parameters: {
+        type: "object",
+        properties: { transactionId: { type: "string" } },
+        required: ["transactionId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "billing_get_active_plans",
+      description:
+        "List all currently available public pricing tiers and platform plans.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
 
 // ============================================================================
@@ -551,13 +940,19 @@ function extractFirstJsonArray(text: string): string | null {
 
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (escape) { escape = false; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
     if (inString) {
       if (ch === "\\") escape = true;
       else if (ch === '"') inString = false;
       continue;
     }
-    if (ch === '"') { inString = true; continue; }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
     if (ch === "[") depth++;
     else if (ch === "]") {
       depth--;
@@ -588,8 +983,11 @@ function extractMarkdownToolCalls(text: string): ParsedToolCall[] | null {
     const arrText = extractFirstJsonArray(inner);
     if (!arrText) continue;
     let parsed: any;
-    try { parsed = JSON.parse(arrText); }
-    catch { continue; }
+    try {
+      parsed = JSON.parse(arrText);
+    } catch {
+      continue;
+    }
     if (!Array.isArray(parsed)) continue;
     for (const c of parsed) {
       if (
@@ -602,7 +1000,8 @@ function extractMarkdownToolCalls(text: string): ParsedToolCall[] | null {
       ) {
         acc.push({
           name: String(c.name),
-          arguments: (c.arguments && typeof c.arguments === "object") ? c.arguments : {},
+          arguments:
+            c.arguments && typeof c.arguments === "object" ? c.arguments : {},
         });
       }
     }
@@ -644,10 +1043,14 @@ class ProtocolParser {
 
   /** Current parser state. Used by the orchestrator to decide whether to
    * synthesize a closing tag after a stream-side stop sequence fires. */
-  getState(): "idle" | "thinking" | "tool_calls" | "answer" { return this.state; }
+  getState(): "idle" | "thinking" | "tool_calls" | "answer" {
+    return this.state;
+  }
 
   /** Whatever is currently buffered but not yet emitted. */
-  remainder(): string { return this.buffer; }
+  remainder(): string {
+    return this.buffer;
+  }
 
   private process(): ParseEvent[] {
     const events: ParseEvent[] = [];
@@ -657,12 +1060,19 @@ class ProtocolParser {
       progressed = false;
 
       if (this.state === "idle") {
-        const candidates: Array<{ tag: string; next: "thinking" | "tool_calls" | "answer" }> = [
+        const candidates: Array<{
+          tag: string;
+          next: "thinking" | "tool_calls" | "answer";
+        }> = [
           { tag: PROTOCOL_TAGS.THINKING_OPEN, next: "thinking" },
           { tag: PROTOCOL_TAGS.TOOL_CALLS_OPEN, next: "tool_calls" },
           { tag: PROTOCOL_TAGS.ANSWER_OPEN, next: "answer" },
         ];
-        let earliest: { tag: string; next: "thinking" | "tool_calls" | "answer"; idx: number } | null = null;
+        let earliest: {
+          tag: string;
+          next: "thinking" | "tool_calls" | "answer";
+          idx: number;
+        } | null = null;
         for (const c of candidates) {
           const idx = this.buffer.indexOf(c.tag);
           if (idx >= 0 && (earliest === null || idx < earliest.idx)) {
@@ -677,15 +1087,27 @@ class ProtocolParser {
       } else if (this.state === "thinking") {
         const closeIdx = this.buffer.indexOf(PROTOCOL_TAGS.THINKING_CLOSE);
         if (closeIdx >= 0) {
-          if (closeIdx > 0) events.push({ kind: "thinking_delta", text: this.buffer.slice(0, closeIdx) });
+          if (closeIdx > 0)
+            events.push({
+              kind: "thinking_delta",
+              text: this.buffer.slice(0, closeIdx),
+            });
           events.push({ kind: "thinking_end" });
-          this.buffer = this.buffer.slice(closeIdx + PROTOCOL_TAGS.THINKING_CLOSE.length);
+          this.buffer = this.buffer.slice(
+            closeIdx + PROTOCOL_TAGS.THINKING_CLOSE.length,
+          );
           this.state = "idle";
           progressed = true;
         } else {
-          const safeLen = Math.max(0, this.buffer.length - PROTOCOL_TAGS.THINKING_CLOSE.length);
+          const safeLen = Math.max(
+            0,
+            this.buffer.length - PROTOCOL_TAGS.THINKING_CLOSE.length,
+          );
           if (safeLen > 0) {
-            events.push({ kind: "thinking_delta", text: this.buffer.slice(0, safeLen) });
+            events.push({
+              kind: "thinking_delta",
+              text: this.buffer.slice(0, safeLen),
+            });
             this.buffer = this.buffer.slice(safeLen);
           }
         }
@@ -696,7 +1118,10 @@ class ProtocolParser {
           // a stop-sequence-truncated stream that the orchestrator then
           // re-fed. See stripTrailingPartialCloseTag for details.
           let raw = this.buffer.slice(0, closeIdx).trim();
-          raw = stripTrailingPartialCloseTag(raw, PROTOCOL_TAGS.TOOL_CALLS_CLOSE);
+          raw = stripTrailingPartialCloseTag(
+            raw,
+            PROTOCOL_TAGS.TOOL_CALLS_CLOSE,
+          );
 
           // Salvage: extract the first balanced JSON array. Models commonly
           // emit two adjacent arrays or trailing scaffolding text (`[arr1]
@@ -710,16 +1135,28 @@ class ProtocolParser {
             const parsed = JSON.parse(salvaged);
             const arr = Array.isArray(parsed) ? parsed : [parsed];
             const calls: ParsedToolCall[] = arr
-              .filter((c: any) => c && typeof c === "object" && typeof c.name === "string")
+              .filter(
+                (c: any) =>
+                  c && typeof c === "object" && typeof c.name === "string",
+              )
               .map((c: any) => ({
                 name: String(c.name),
-                arguments: (c.arguments && typeof c.arguments === "object") ? c.arguments : {},
+                arguments:
+                  c.arguments && typeof c.arguments === "object"
+                    ? c.arguments
+                    : {},
               }));
             events.push({ kind: "tool_calls", calls });
           } catch (e: any) {
-            events.push({ kind: "tool_calls_error", raw, error: e?.message ?? "JSON parse error" });
+            events.push({
+              kind: "tool_calls_error",
+              raw,
+              error: e?.message ?? "JSON parse error",
+            });
           }
-          this.buffer = this.buffer.slice(closeIdx + PROTOCOL_TAGS.TOOL_CALLS_CLOSE.length);
+          this.buffer = this.buffer.slice(
+            closeIdx + PROTOCOL_TAGS.TOOL_CALLS_CLOSE.length,
+          );
           this.state = "idle";
           progressed = true;
         }
@@ -734,16 +1171,25 @@ class ProtocolParser {
               this.buffer.slice(0, closeIdx),
               PROTOCOL_TAGS.ANSWER_CLOSE,
             );
-            if (visible.length > 0) events.push({ kind: "answer_delta", text: visible });
+            if (visible.length > 0)
+              events.push({ kind: "answer_delta", text: visible });
           }
           events.push({ kind: "answer_end" });
-          this.buffer = this.buffer.slice(closeIdx + PROTOCOL_TAGS.ANSWER_CLOSE.length);
+          this.buffer = this.buffer.slice(
+            closeIdx + PROTOCOL_TAGS.ANSWER_CLOSE.length,
+          );
           this.state = "idle";
           progressed = true;
         } else {
-          const safeLen = Math.max(0, this.buffer.length - PROTOCOL_TAGS.ANSWER_CLOSE.length);
+          const safeLen = Math.max(
+            0,
+            this.buffer.length - PROTOCOL_TAGS.ANSWER_CLOSE.length,
+          );
           if (safeLen > 0) {
-            events.push({ kind: "answer_delta", text: this.buffer.slice(0, safeLen) });
+            events.push({
+              kind: "answer_delta",
+              text: this.buffer.slice(0, safeLen),
+            });
             this.buffer = this.buffer.slice(safeLen);
           }
         }
@@ -770,7 +1216,10 @@ class ProtocolParser {
  *     Worst-case latency = longest suppressed tag (14 chars).
  */
 class TagStripper {
-  private static readonly SUPPRESSED_TAGS: Array<{ open: string; close: string }> = [
+  private static readonly SUPPRESSED_TAGS: Array<{
+    open: string;
+    close: string;
+  }> = [
     { open: "<thinking>", close: "</thinking>" },
     { open: "<tool_calls>", close: "</tool_calls>" },
     { open: "<observations>", close: "</observations>" },
@@ -866,7 +1315,10 @@ class TagStripper {
     const limit = Math.min(this.buffer.length, 14);
     for (let i = limit; i > 0; i--) {
       const tail = this.buffer.slice(-i);
-      if (TagStripper.TAG_PREFIXES.includes(tail)) { max = i; break; }
+      if (TagStripper.TAG_PREFIXES.includes(tail)) {
+        max = i;
+        break;
+      }
     }
     return max;
   }
@@ -919,12 +1371,21 @@ function sanitizeFinalAnswerText(s: string): string {
   // Strip leaked example-block scaffolding labels — small models echo these
   // verbatim from few-shot prompts. Match a whole line so we don't accidentally
   // remove user-typed bracket prose.
-  out = out.replace(/(^|\n)\s*\[(?:Your\s+turn[^\]\n]*|System[^\]\n]*?(?:supplies|provides|then)[^\]\n]*|Continue[^\]\n]*|Example[^\]\n]*|Turn\s+\d+[^\]\n]*)\][^\n]*/gi, "$1");
+  out = out.replace(
+    /(^|\n)\s*\[(?:Your\s+turn[^\]\n]*|System[^\]\n]*?(?:supplies|provides|then)[^\]\n]*|Continue[^\]\n]*|Example[^\]\n]*|Turn\s+\d+[^\]\n]*)\][^\n]*/gi,
+    "$1",
+  );
   // Strip enumerated example labels — "Example 4 — fetching data...", etc.
   out = out.replace(/(^|\n)\s*Example\s+\d+\s*[—–-][^\n]*/gi, "$1");
   // Strip reference-card scaffolding lines from our prompt template.
-  out = out.replace(/(^|\n)\s*(?:Reference\s+card[^\n]*|Single-tool\s+call[^\n]*|Parallel\s+calls\s+in[^\n]*|Final\s+answer\s+in\s+markdown[^\n]*|Pattern\s+[ABab][^\n]*)/gi, "$1");
-  out = out.replace(/(^|\n)\s*---\s*(?:BEGIN|END)\s+REFERENCE\s*---[^\n]*/gi, "$1");
+  out = out.replace(
+    /(^|\n)\s*(?:Reference\s+card[^\n]*|Single-tool\s+call[^\n]*|Parallel\s+calls\s+in[^\n]*|Final\s+answer\s+in\s+markdown[^\n]*|Pattern\s+[ABab][^\n]*)/gi,
+    "$1",
+  );
+  out = out.replace(
+    /(^|\n)\s*---\s*(?:BEGIN|END)\s+REFERENCE\s*---[^\n]*/gi,
+    "$1",
+  );
   // Strip stray sentinel tokens leaked by some MLC tokenizers.
   out = out.replace(/<unk>/gi, "");
   out = out.replace(/<\/?s>/g, "");
@@ -937,17 +1398,21 @@ function sanitizeFinalAnswerText(s: string): string {
 // 5. SYSTEM PROMPT BUILDER
 // ============================================================================
 const buildToolListForPrompt = (tools: ToolSchema[]): string => {
-  return tools.map(t => {
-    const fn = t.function;
-    const props = fn.parameters?.properties ?? {};
-    const required = new Set(fn.parameters?.required ?? []);
-    const argParts = Object.entries(props).map(([key, schema]: [string, any]) => {
-      const opt = required.has(key) ? "" : "?";
-      return `${key}${opt}: ${schema.type ?? "any"}`;
-    });
-    const sig = argParts.length ? `(${argParts.join(", ")})` : "()";
-    return `- ${fn.name}${sig} — ${fn.description}`;
-  }).join("\n");
+  return tools
+    .map((t) => {
+      const fn = t.function;
+      const props = fn.parameters?.properties ?? {};
+      const required = new Set(fn.parameters?.required ?? []);
+      const argParts = Object.entries(props).map(
+        ([key, schema]: [string, any]) => {
+          const opt = required.has(key) ? "" : "?";
+          return `${key}${opt}: ${schema.type ?? "any"}`;
+        },
+      );
+      const sig = argParts.length ? `(${argParts.join(", ")})` : "()";
+      return `- ${fn.name}${sig} — ${fn.description}`;
+    })
+    .join("\n");
 };
 
 const buildAgentSystemPrompt = (tools: ToolSchema[]): string => {
@@ -1064,7 +1529,11 @@ const formatObservations = (
   budget: { perTool: number; total: number } = { perTool: 2400, total: 7200 },
 ): string => {
   const safeStringify = (val: any): string => {
-    try { return JSON.stringify(val); } catch { return String(val); }
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return String(val);
+    }
   };
 
   const blocks: string[] = [];
@@ -1075,7 +1544,9 @@ const formatObservations = (
     if (r.ok) {
       let payload = safeStringify(r.data);
       if (payload.length > budget.perTool) {
-        payload = payload.slice(0, budget.perTool) + ` …[truncated ${payload.length - budget.perTool} chars]`;
+        payload =
+          payload.slice(0, budget.perTool) +
+          ` …[truncated ${payload.length - budget.perTool} chars]`;
       }
       body = payload;
     } else {
@@ -1083,7 +1554,9 @@ const formatObservations = (
     }
     const block = `[${i + 1}] ${r.tool} (${r.ok ? "ok" : "fail"})\n${body}`;
     if (totalLen + block.length > budget.total) {
-      blocks.push(`[${i + 1}+] ${results.length - i} additional results omitted (context budget exceeded)`);
+      blocks.push(
+        `[${i + 1}+] ${results.length - i} additional results omitted (context budget exceeded)`,
+      );
       break;
     }
     blocks.push(block);
@@ -1104,9 +1577,31 @@ type ChatRole = "system" | "user" | "assistant";
  */
 type AgentStep =
   | { iteration: number; type: "thinking"; ts: number; content: string }
-  | { iteration: number; type: "tool_call"; ts: number; toolName: string; args: any; durationMs?: number; ok?: boolean }
-  | { iteration: number; type: "tool_result"; ts: number; toolName: string; data: any; durationMs: number }
-  | { iteration: number; type: "tool_error"; ts: number; toolName: string; error: string; durationMs: number };
+  | {
+      iteration: number;
+      type: "tool_call";
+      ts: number;
+      toolName: string;
+      args: any;
+      durationMs?: number;
+      ok?: boolean;
+    }
+  | {
+      iteration: number;
+      type: "tool_result";
+      ts: number;
+      toolName: string;
+      data: any;
+      durationMs: number;
+    }
+  | {
+      iteration: number;
+      type: "tool_error";
+      ts: number;
+      toolName: string;
+      error: string;
+      durationMs: number;
+    };
 
 interface AgentTrace {
   startedAt: number;
@@ -1142,9 +1637,12 @@ interface StreamOpts {
   stop?: string[];
 }
 
-async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void, void> {
+async function* streamCompletion(
+  opts: StreamOpts,
+): AsyncGenerator<string, void, void> {
   // OpenAI's REST API caps `stop` at 4 entries. WebLLM mirrors that contract.
-  const stop = opts.stop && opts.stop.length > 0 ? opts.stop.slice(0, 4) : undefined;
+  const stop =
+    opts.stop && opts.stop.length > 0 ? opts.stop.slice(0, 4) : undefined;
 
   if (opts.provider === "webllm") {
     if (!opts.engine) throw new Error("WebLLM engine is not initialized.");
@@ -1158,7 +1656,11 @@ async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void,
 
     for await (const chunk of stream) {
       if (opts.signal.aborted) {
-        try { await opts.engine.interruptGenerate?.(); } catch { /* best effort */ }
+        try {
+          await opts.engine.interruptGenerate?.();
+        } catch {
+          /* best effort */
+        }
         throw new DOMException("Aborted", "AbortError");
       }
       const delta = chunk?.choices?.[0]?.delta?.content;
@@ -1173,7 +1675,7 @@ async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void,
     signal: opts.signal,
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${opts.apiKey ?? ""}`,
+      Authorization: `Bearer ${opts.apiKey ?? ""}`,
     },
     body: JSON.stringify({
       model: opts.byokModel ?? "gpt-4o",
@@ -1193,7 +1695,9 @@ async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void,
     } catch {
       detail = await res.text().catch(() => "");
     }
-    throw new Error(`OpenAI API error (${res.status}): ${detail || res.statusText}`);
+    throw new Error(
+      `OpenAI API error (${res.status}): ${detail || res.statusText}`,
+    );
   }
 
   const reader = res.body.getReader();
@@ -1202,7 +1706,11 @@ async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void,
 
   while (true) {
     if (opts.signal.aborted) {
-      try { await reader.cancel(); } catch { /* noop */ }
+      try {
+        await reader.cancel();
+      } catch {
+        /* noop */
+      }
       throw new DOMException("Aborted", "AbortError");
     }
     const { done, value } = await reader.read();
@@ -1232,7 +1740,13 @@ async function* streamCompletion(opts: StreamOpts): AsyncGenerator<string, void,
 // ============================================================================
 // 8. AGENT ORCHESTRATOR
 // ============================================================================
-type AgentPhase = "thinking" | "selecting_tools" | "calling_tools" | "analyzing" | "responding" | "idle";
+type AgentPhase =
+  | "thinking"
+  | "selecting_tools"
+  | "calling_tools"
+  | "analyzing"
+  | "responding"
+  | "idle";
 
 interface AgentCallbacks {
   onIterationStart: (iteration: number) => void;
@@ -1276,7 +1790,8 @@ interface RunAgentOpts {
  *
  * Used exclusively for the in-loop trim heuristic — never for billing.
  */
-const estimateTokens = (text: string): number => Math.ceil((text?.length ?? 0) / 3.5);
+const estimateTokens = (text: string): number =>
+  Math.ceil((text?.length ?? 0) / 3.5);
 
 /**
  * Total estimated token cost of a conversation. Includes a small per-message
@@ -1326,7 +1841,12 @@ const enforceContextBudget = (
  *
  * OpenAI's API caps `stop` at 4. WebLLM mirrors that contract.
  */
-const AGENT_STOP_SEQUENCES = ["</tool_calls>", "</answer>", "<observations>", "User:"];
+const AGENT_STOP_SEQUENCES = [
+  "</tool_calls>",
+  "</answer>",
+  "<observations>",
+  "User:",
+];
 
 /**
  * Strip a string from the end if present. Used to canonicalize raw model
@@ -1391,7 +1911,11 @@ const formatDataForSynthesis = (results: ToolExecutionResult[]): string => {
   const TOTAL_LIMIT = 10000;
 
   const safeStringify = (val: any): string => {
-    try { return JSON.stringify(val, null, 2); } catch { return String(val); }
+    try {
+      return JSON.stringify(val, null, 2);
+    } catch {
+      return String(val);
+    }
   };
 
   const blocks: string[] = [];
@@ -1402,18 +1926,21 @@ const formatDataForSynthesis = (results: ToolExecutionResult[]): string => {
     if (r.ok) {
       let payload = safeStringify(r.data);
       if (payload.length > PER_TOOL_LIMIT) {
-        payload = payload.slice(0, PER_TOOL_LIMIT) + ` …[truncated ${payload.length - PER_TOOL_LIMIT} chars]`;
+        payload =
+          payload.slice(0, PER_TOOL_LIMIT) +
+          ` …[truncated ${payload.length - PER_TOOL_LIMIT} chars]`;
       }
       body = payload;
     } else {
       body = `ERROR: ${r.error || "Unknown error"}`;
     }
-    const argSummary = Object.keys(r.args || {}).length === 0
-      ? ""
-      : ` ${safeStringify(r.args)}`;
+    const argSummary =
+      Object.keys(r.args || {}).length === 0 ? "" : ` ${safeStringify(r.args)}`;
     const block = `### ${i + 1}. ${r.tool}${argSummary} (${r.ok ? "ok" : "fail"})\n\n${body}`;
     if (total + block.length > TOTAL_LIMIT) {
-      blocks.push(`*[${results.length - i} additional results omitted to fit context budget]*`);
+      blocks.push(
+        `*[${results.length - i} additional results omitted to fit context budget]*`,
+      );
       break;
     }
     blocks.push(block);
@@ -1430,9 +1957,10 @@ const formatDataForSynthesis = (results: ToolExecutionResult[]): string => {
  */
 async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
   const dataBlock = formatDataForSynthesis(opts.observations);
-  const userMessage = dataBlock.length > 0
-    ? `User question:\n\n${opts.userQuery}\n\n---\n\nLive telemetry data fetched in response (DO NOT echo this section verbatim — analyze it and reply to the user):\n\n${dataBlock}`
-    : `User question:\n\n${opts.userQuery}\n\n---\n\nThe agent attempted to gather telemetry but could not retrieve any data — most likely because no matching tool was invoked successfully. In your reply:\n  1. Acknowledge briefly and honestly that you couldn't fetch the requested data this time.\n  2. Suggest one or two concrete next steps the user can take (e.g., rephrase the question with a specific service or VPS name, narrow the time range, or check that monitoring is enabled).\n  3. Do NOT fabricate values, IDs, or status indicators.\nKeep it short — a few lines is ideal.`;
+  const userMessage =
+    dataBlock.length > 0
+      ? `User question:\n\n${opts.userQuery}\n\n---\n\nLive telemetry data fetched in response (DO NOT echo this section verbatim — analyze it and reply to the user):\n\n${dataBlock}`
+      : `User question:\n\n${opts.userQuery}\n\n---\n\nThe agent attempted to gather telemetry but could not retrieve any data — most likely because no matching tool was invoked successfully. In your reply:\n  1. Acknowledge briefly and honestly that you couldn't fetch the requested data this time.\n  2. Suggest one or two concrete next steps the user can take (e.g., rephrase the question with a specific service or VPS name, narrow the time range, or check that monitoring is enabled).\n  3. Do NOT fabricate values, IDs, or status indicators.\nKeep it short — a few lines is ideal.`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: SYNTHESIS_SYSTEM_PROMPT },
@@ -1468,7 +1996,10 @@ async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
       raw += delta;
       const clean = stripper.feed(delta);
       if (clean.length > 0) {
-        if (!started) { opts.onAnswerStart(); started = true; }
+        if (!started) {
+          opts.onAnswerStart();
+          started = true;
+        }
         opts.onAnswerDelta(clean);
       }
     }
@@ -1486,7 +2017,10 @@ async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
   if (!aborted) {
     const tail = stripper.flush();
     if (tail.length > 0) {
-      if (!started) { opts.onAnswerStart(); started = true; }
+      if (!started) {
+        opts.onAnswerStart();
+        started = true;
+      }
       opts.onAnswerDelta(tail);
     }
   }
@@ -1496,11 +2030,15 @@ async function synthesizeFinalAnswer(opts: SynthesizeOpts): Promise<string> {
   // back to a sanitized version of the raw text, then to a generic message.
   let cleaned = stripper.getEmitted().trim();
   let fallbackPath: string = "stripped stream";
-  if (!cleaned) { cleaned = sanitizeFinalAnswerText(raw); fallbackPath = "sanitized raw"; }
   if (!cleaned) {
-    cleaned = opts.observations.length > 0
-      ? "I gathered some data but couldn't formulate a complete response. Try rephrasing your question or narrowing the time range."
-      : "I couldn't gather the data needed to answer that. Please rephrase your question or check that the relevant monitoring is active.";
+    cleaned = sanitizeFinalAnswerText(raw);
+    fallbackPath = "sanitized raw";
+  }
+  if (!cleaned) {
+    cleaned =
+      opts.observations.length > 0
+        ? "I gathered some data but couldn't formulate a complete response. Try rephrasing your question or narrowing the time range."
+        : "I couldn't gather the data needed to answer that. Please rephrase your question or check that the relevant monitoring is active.";
     fallbackPath = "generic fallback";
     if (!started) opts.onAnswerStart();
     opts.onAnswerDelta(cleaned);
@@ -1534,9 +2072,8 @@ const levenshtein = (a: string, b: string): number => {
     dp[0] = i;
     for (let j = 1; j <= b.length; j++) {
       const tmp = dp[j];
-      dp[j] = a[i - 1] === b[j - 1]
-        ? prev
-        : 1 + Math.min(prev, dp[j - 1], dp[j]);
+      dp[j] =
+        a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j - 1], dp[j]);
       prev = tmp;
     }
   }
@@ -1553,7 +2090,10 @@ const levenshtein = (a: string, b: string): number => {
  * Returns null if no plausible match exists — better silence than a
  * misleading suggestion.
  */
-const closestToolName = (needle: string, knownNames: string[]): string | null => {
+const closestToolName = (
+  needle: string,
+  knownNames: string[],
+): string | null => {
   if (!needle || knownNames.length === 0) return null;
   const lower = needle.toLowerCase();
 
@@ -1599,8 +2139,11 @@ const sameToolCalls = (a: ParsedToolCall[], b: ParsedToolCall[]): boolean => {
   for (let i = 0; i < a.length; i++) {
     if (a[i].name !== b[i].name) return false;
     try {
-      if (JSON.stringify(a[i].arguments) !== JSON.stringify(b[i].arguments)) return false;
-    } catch { return false; }
+      if (JSON.stringify(a[i].arguments) !== JSON.stringify(b[i].arguments))
+        return false;
+    } catch {
+      return false;
+    }
   }
   return true;
 };
@@ -1608,15 +2151,20 @@ const sameToolCalls = (a: ParsedToolCall[], b: ParsedToolCall[]): boolean => {
 async function runAgent(opts: RunAgentOpts): Promise<string> {
   const maxIter = opts.maxIterations ?? 6;
   const systemPrompt = buildAgentSystemPrompt(opts.tools);
-  const knownToolNames = new Set(opts.tools.map(t => t.function.name));
+  const knownToolNames = new Set(opts.tools.map((t) => t.function.name));
   const runStartedAt = Date.now();
   const runId = Math.random().toString(36).slice(2, 8);
 
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     ...opts.history
-      .filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.length > 0)
-      .map(m => ({ role: m.role, content: m.content })),
+      .filter(
+        (m) =>
+          (m.role === "user" || m.role === "assistant") &&
+          typeof m.content === "string" &&
+          m.content.length > 0,
+      )
+      .map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: opts.userInput },
   ];
 
@@ -1627,7 +2175,10 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
   const contextWindow = opts.contextWindow ?? 8192;
   const responseReserve = 1536;
   const safetyMargin = 256;
-  const promptBudget = Math.max(1024, contextWindow - responseReserve - safetyMargin);
+  const promptBudget = Math.max(
+    1024,
+    contextWindow - responseReserve - safetyMargin,
+  );
 
   // Initial trim — covers the case where prior history alone is already
   // too large (long previous conversations).
@@ -1642,9 +2193,15 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     agentLogField("max iterations", maxIter);
     agentLogField("context window", contextWindow);
     agentLogField("prompt budget (tokens)", promptBudget);
-    agentLogField("estimated prompt tokens (after initial trim)", initialTrim.finalTokens);
+    agentLogField(
+      "estimated prompt tokens (after initial trim)",
+      initialTrim.finalTokens,
+    );
     if (initialTrim.trimmedCount > 0) {
-      agentLogField("initial trim — dropped messages", initialTrim.trimmedCount);
+      agentLogField(
+        "initial trim — dropped messages",
+        initialTrim.trimmedCount,
+      );
     }
   });
 
@@ -1767,9 +2324,17 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         // Once we've fully captured a tool_calls or answer block, halt the
         // stream early to save compute. The model's contract is "exactly one
         // pattern per turn" so anything after is throwaway.
-        if (turn.pendingToolCalls || turn.toolCallsError || turn.answerComplete) {
+        if (
+          turn.pendingToolCalls ||
+          turn.toolCallsError ||
+          turn.answerComplete
+        ) {
           if (opts.provider === "webllm" && opts.engine?.interruptGenerate) {
-            try { await opts.engine.interruptGenerate(); } catch { /* best effort */ }
+            try {
+              await opts.engine.interruptGenerate();
+            } catch {
+              /* best effort */
+            }
           }
           break;
         }
@@ -1779,7 +2344,11 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       // engine swallowed the closing tag (e.g. "</tool_calls>"). Re-feed the
       // appropriate closer so the parser can finalize cleanly.
       const parserState = parser.getState();
-      if (!turn.pendingToolCalls && !turn.toolCallsError && !turn.answerComplete) {
+      if (
+        !turn.pendingToolCalls &&
+        !turn.toolCallsError &&
+        !turn.answerComplete
+      ) {
         if (parserState === "tool_calls") {
           handleEvents(parser.feed("</tool_calls>"));
         } else if (parserState === "answer") {
@@ -1799,14 +2368,25 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       // still hit it, surface the error.
       const isContextOverflow =
         err?.name === "ContextWindowSizeExceededError" ||
-        /ContextWindow|Prompt tokens exceed|context window size/i.test(String(err?.message ?? ""));
+        /ContextWindow|Prompt tokens exceed|context window size/i.test(
+          String(err?.message ?? ""),
+        );
 
       if (isContextOverflow) {
-        agentLogGroup(`run ${runId} · iter ${iteration} · context overflow recovery`, () => {
-          agentLogField("error", err?.message ?? String(err));
-          agentLogField("conversation length before purge", conversation.length);
-          agentLogField("estimated tokens before purge", estimateConversationTokens(conversation));
-        });
+        agentLogGroup(
+          `run ${runId} · iter ${iteration} · context overflow recovery`,
+          () => {
+            agentLogField("error", err?.message ?? String(err));
+            agentLogField(
+              "conversation length before purge",
+              conversation.length,
+            );
+            agentLogField(
+              "estimated tokens before purge",
+              estimateConversationTokens(conversation),
+            );
+          },
+        );
 
         if (conversation.length > 2) {
           // Keep ONLY system message and the most-recent user/observation
@@ -1850,8 +2430,10 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     }
     canonical = canonical.trimEnd();
     // If we had to synthesize a closer, append it for memory consistency.
-    if (turn.pendingToolCalls && !canonical.endsWith("</tool_calls>")) canonical += "\n</tool_calls>";
-    if (turn.answerComplete && !canonical.endsWith("</answer>")) canonical += "\n</answer>";
+    if (turn.pendingToolCalls && !canonical.endsWith("</tool_calls>"))
+      canonical += "\n</tool_calls>";
+    if (turn.answerComplete && !canonical.endsWith("</answer>"))
+      canonical += "\n</answer>";
 
     conversation.push({ role: "assistant", content: canonical });
 
@@ -1917,17 +2499,29 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           content: `<observations>\n[1] system (fail)\nNone of the tool names you requested exist:\n${lines.join("\n")}\n\nUse ONLY tool names from the Available Tools list (look at the # Available Tools section of the system prompt). If unsure, finalize with <answer> instead of guessing.\n</observations>`,
         });
         consecutiveBadTurns++;
-        agentLogGroup(`run ${runId} · iter ${iteration} · CASE 1 all-hallucinated`, () => {
-          agentLogField("invalid tool names", invalidCalls.map(c => c.name));
-          agentLogField("did-you-mean lines", lines);
-          agentLogField("consecutiveBadTurns", consecutiveBadTurns);
-          agentLogField("gatheredObservations so far", gatheredObservations.length);
-        });
+        agentLogGroup(
+          `run ${runId} · iter ${iteration} · CASE 1 all-hallucinated`,
+          () => {
+            agentLogField(
+              "invalid tool names",
+              invalidCalls.map((c) => c.name),
+            );
+            agentLogField("did-you-mean lines", lines);
+            agentLogField("consecutiveBadTurns", consecutiveBadTurns);
+            agentLogField(
+              "gatheredObservations so far",
+              gatheredObservations.length,
+            );
+          },
+        );
         // Two strikes-and-out — if the model can't pick a real tool name
         // after one correction, it likely never will. Synthesize from
         // whatever (if any) prior data we have.
         if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) {
-          opts.callbacks.onPhase("analyzing", "Synthesizing final answer from available context…");
+          opts.callbacks.onPhase(
+            "analyzing",
+            "Synthesizing final answer from available context…",
+          );
           exitReason = "all-hallucinated tool names; bailing to synth";
           agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
           break;
@@ -1945,10 +2539,16 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           content: `<observations>\n[1] system (warn)\nYour <tool_calls> array was empty. Either choose a valid tool from the list or finalize with <answer>.\n</observations>`,
         });
         consecutiveBadTurns++;
-        agentLogGroup(`run ${runId} · iter ${iteration} · CASE 2 empty tool_calls`, () => {
-          agentLogField("consecutiveBadTurns", consecutiveBadTurns);
-          agentLogField("gatheredObservations so far", gatheredObservations.length);
-        });
+        agentLogGroup(
+          `run ${runId} · iter ${iteration} · CASE 2 empty tool_calls`,
+          () => {
+            agentLogField("consecutiveBadTurns", consecutiveBadTurns);
+            agentLogField(
+              "gatheredObservations so far",
+              gatheredObservations.length,
+            );
+          },
+        );
         if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) {
           exitReason = "empty <tool_calls>; bailing to synth";
           agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
@@ -1963,16 +2563,23 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       // Stuck-loop guard: same calls as the previous iteration. Hard-break
       // instead of looping; small models won't change behavior with a
       // corrective nudge, they just re-emit the same call again.
-      if (
-        lastCallSignature &&
-        sameToolCalls(lastCallSignature, validCalls)
-      ) {
-        opts.callbacks.onPhase("analyzing", "Tool data already gathered. Synthesizing final answer…");
-        exitReason = "stuck-loop guard fired (same tool calls as previous turn)";
-        agentLogGroup(`run ${runId} · iter ${iteration} · CASE 3 stuck-loop`, () => {
-          agentLogField("repeated calls", validCalls);
-          agentLogField("gatheredObservations so far", gatheredObservations.length);
-        });
+      if (lastCallSignature && sameToolCalls(lastCallSignature, validCalls)) {
+        opts.callbacks.onPhase(
+          "analyzing",
+          "Tool data already gathered. Synthesizing final answer…",
+        );
+        exitReason =
+          "stuck-loop guard fired (same tool calls as previous turn)";
+        agentLogGroup(
+          `run ${runId} · iter ${iteration} · CASE 3 stuck-loop`,
+          () => {
+            agentLogField("repeated calls", validCalls);
+            agentLogField(
+              "gatheredObservations so far",
+              gatheredObservations.length,
+            );
+          },
+        );
         break;
       }
       lastCallSignature = validCalls;
@@ -1981,14 +2588,23 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       opts.callbacks.onPhase(
         "calling_tools",
         `Executing ${calls.length} tool${calls.length > 1 ? "s" : ""}…`,
-        calls.map(c => c.name),
+        calls.map((c) => c.name),
       );
       opts.callbacks.onToolCallsStart(calls);
 
-      agentLogGroup(`run ${runId} · iter ${iteration} · CASE 3 executing tools`, () => {
-        agentLogField("calls", calls.map(c => ({ name: c.name, arguments: c.arguments })));
-        agentLogField("invalid (sibling) calls", invalidCalls.map(c => c.name));
-      });
+      agentLogGroup(
+        `run ${runId} · iter ${iteration} · CASE 3 executing tools`,
+        () => {
+          agentLogField(
+            "calls",
+            calls.map((c) => ({ name: c.name, arguments: c.arguments })),
+          );
+          agentLogField(
+            "invalid (sibling) calls",
+            invalidCalls.map((c) => c.name),
+          );
+        },
+      );
 
       const callsStartedAt = Date.now();
       const realResults: ToolExecutionResult[] = await Promise.all(
@@ -1998,21 +2614,37 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           try {
             const data = await opts.callTool(call.name, call.arguments || {});
             opts.callbacks.onToolResult(call, data);
-            agentLogGroup(`run ${runId} · iter ${iteration} · tool ok · ${call.name}`, () => {
-              agentLogField("duration", `${Date.now() - tStart}ms`);
-              agentLogField("arguments", call.arguments || {});
-              agentLogField("result", data, 6000);
-            });
-            return { tool: call.name, args: call.arguments || {}, ok: true, data };
+            agentLogGroup(
+              `run ${runId} · iter ${iteration} · tool ok · ${call.name}`,
+              () => {
+                agentLogField("duration", `${Date.now() - tStart}ms`);
+                agentLogField("arguments", call.arguments || {});
+                agentLogField("result", data, 6000);
+              },
+            );
+            return {
+              tool: call.name,
+              args: call.arguments || {},
+              ok: true,
+              data,
+            };
           } catch (e: any) {
             const message = e?.message || String(e);
             opts.callbacks.onToolError(call, message);
-            agentLogGroup(`run ${runId} · iter ${iteration} · tool fail · ${call.name}`, () => {
-              agentLogField("duration", `${Date.now() - tStart}ms`);
-              agentLogField("arguments", call.arguments || {});
-              agentLogField("error", message);
-            });
-            return { tool: call.name, args: call.arguments || {}, ok: false, error: message };
+            agentLogGroup(
+              `run ${runId} · iter ${iteration} · tool fail · ${call.name}`,
+              () => {
+                agentLogField("duration", `${Date.now() - tStart}ms`);
+                agentLogField("arguments", call.arguments || {});
+                agentLogField("error", message);
+              },
+            );
+            return {
+              tool: call.name,
+              args: call.arguments || {},
+              ok: false,
+              error: message,
+            };
           }
         }),
       );
@@ -2025,7 +2657,12 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         const hint = closest ? ` Did you mean "${closest}"?` : "";
         const message = `Unknown tool "${c.name}".${hint} Choose only from the Available Tools list.`;
         opts.callbacks.onToolError(c, message);
-        return { tool: c.name, args: c.arguments || {}, ok: false, error: message };
+        return {
+          tool: c.name,
+          args: c.arguments || {},
+          ok: false,
+          error: message,
+        };
       });
 
       // Persist real results (not invalid synthetic ones) for the synthesizer.
@@ -2035,27 +2672,42 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       const results = [...realResults, ...invalidResults];
       conversation.push({ role: "user", content: formatObservations(results) });
       consecutiveBadTurns = 0;
-      opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`);
+      opts.callbacks.onPhase(
+        "analyzing",
+        `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`,
+      );
       agentLogGroup(`run ${runId} · iter ${iteration} · CASE 3 done`, () => {
         agentLogField("total duration", `${Date.now() - callsStartedAt}ms`);
-        agentLogField("ok count", realResults.filter(r => r.ok).length);
-        agentLogField("fail count", realResults.filter(r => !r.ok).length);
-        agentLogField("gatheredObservations cumulative", gatheredObservations.length);
+        agentLogField("ok count", realResults.filter((r) => r.ok).length);
+        agentLogField("fail count", realResults.filter((r) => !r.ok).length);
+        agentLogField(
+          "gatheredObservations cumulative",
+          gatheredObservations.length,
+        );
       });
       continue;
     }
 
     if (turn.toolCallsError) {
-      agentLogGroup(`run ${runId} · iter ${iteration} · tool_calls JSON error`, () => {
-        agentLogField("parse error", turn.toolCallsError?.error);
-        agentLogField("raw block", turn.toolCallsError?.raw);
-        agentLogField("gatheredObservations so far", gatheredObservations.length);
-      });
+      agentLogGroup(
+        `run ${runId} · iter ${iteration} · tool_calls JSON error`,
+        () => {
+          agentLogField("parse error", turn.toolCallsError?.error);
+          agentLogField("raw block", turn.toolCallsError?.raw);
+          agentLogField(
+            "gatheredObservations so far",
+            gatheredObservations.length,
+          );
+        },
+      );
       // Tell the model its JSON was bad — it will retry. But if we already
       // have real data, prefer to synthesize rather than risk another bad
       // turn from a small model that can't recover.
       if (gatheredObservations.length > 0) {
-        opts.callbacks.onPhase("analyzing", "Recovering from a malformed tool call. Synthesizing final answer…");
+        opts.callbacks.onPhase(
+          "analyzing",
+          "Recovering from a malformed tool call. Synthesizing final answer…",
+        );
         exitReason = "tool_calls JSON parse error with prior data → synth";
         agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
         break;
@@ -2083,21 +2735,29 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
     // code fences instead of <tool_calls>. Treat all of these as bad turns
     // so we never accept them as a final answer.
     const looksLikeProtocolLeak =
-      /<thinking>|<tool_calls>|<\/?answer>|<\/?observations>|(?:^|\n)\s*User:|(?:^|\n)\s*Assistant:|\[Your\s+turn|\[System\s+(?:then|supplies|will|provides)|\[Continue\b|\[Example(?:\s+user)?\b|\[Turn\s+\d|\[The\s+system\s+supplies|(?:^|\n)\s*Example\s+\d+\b|(?:^|\n)\s*Reference\s+(?:card|\d+)|(?:^|\n)\s*(?:Pattern\s+[ABab]|Single-tool\s+call|Parallel\s+calls\s+in|Final\s+answer\s+in\s+markdown)\b|---\s*(?:BEGIN|END)\s+REFERENCE\s*---|```\s*json\s*[\r\n]+\s*\[[\s\S]*?"name"\s*:/i.test(fallback);
+      /<thinking>|<tool_calls>|<\/?answer>|<\/?observations>|(?:^|\n)\s*User:|(?:^|\n)\s*Assistant:|\[Your\s+turn|\[System\s+(?:then|supplies|will|provides)|\[Continue\b|\[Example(?:\s+user)?\b|\[Turn\s+\d|\[The\s+system\s+supplies|(?:^|\n)\s*Example\s+\d+\b|(?:^|\n)\s*Reference\s+(?:card|\d+)|(?:^|\n)\s*(?:Pattern\s+[ABab]|Single-tool\s+call|Parallel\s+calls\s+in|Final\s+answer\s+in\s+markdown)\b|---\s*(?:BEGIN|END)\s+REFERENCE\s*---|```\s*json\s*[\r\n]+\s*\[[\s\S]*?"name"\s*:/i.test(
+        fallback,
+      );
 
     // Salvage: maybe the model emitted tool calls inside ```json fences
     // instead of using the <tool_calls> tag. Extract them and treat as a
     // valid CASE 3 — better UX than rejecting the turn entirely.
     const salvagedMarkdownCalls = extractMarkdownToolCalls(fallback);
 
-    agentLogGroup(`run ${runId} · iter ${iteration} · no protocol output`, () => {
-      agentLogField("fallback length", fallback.length);
-      agentLogField("looksLikeProtocolLeak", looksLikeProtocolLeak);
-      agentLogField("salvaged markdown tool calls", salvagedMarkdownCalls);
-      agentLogField("fallback preview", fallback, 1500);
-      agentLogField("consecutiveBadTurns (before incr)", consecutiveBadTurns);
-      agentLogField("gatheredObservations so far", gatheredObservations.length);
-    });
+    agentLogGroup(
+      `run ${runId} · iter ${iteration} · no protocol output`,
+      () => {
+        agentLogField("fallback length", fallback.length);
+        agentLogField("looksLikeProtocolLeak", looksLikeProtocolLeak);
+        agentLogField("salvaged markdown tool calls", salvagedMarkdownCalls);
+        agentLogField("fallback preview", fallback, 1500);
+        agentLogField("consecutiveBadTurns (before incr)", consecutiveBadTurns);
+        agentLogField(
+          "gatheredObservations so far",
+          gatheredObservations.length,
+        );
+      },
+    );
 
     if (salvagedMarkdownCalls && salvagedMarkdownCalls.length > 0) {
       // Splice the salvaged calls into the same code path as a normal
@@ -2127,11 +2787,18 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           content: `<observations>\n[1] system (fail)\nYou wrote tool calls inside a markdown \`\`\`json code block AND used names that don't exist:\n${lines.join("\n")}\n\nUse <tool_calls>[...]</tool_calls> with names from the Available Tools list.\n</observations>`,
         });
         consecutiveBadTurns++;
-        agentLogGroup(`run ${runId} · iter ${iteration} · markdown salvage · all invalid`, () => {
-          agentLogField("invalid", invalidCalls.map(c => c.name));
-        });
+        agentLogGroup(
+          `run ${runId} · iter ${iteration} · markdown salvage · all invalid`,
+          () => {
+            agentLogField(
+              "invalid",
+              invalidCalls.map((c) => c.name),
+            );
+          },
+        );
         if (gatheredObservations.length > 0 || consecutiveBadTurns >= 2) {
-          exitReason = "markdown salvage failed (all invalid); bailing to synth";
+          exitReason =
+            "markdown salvage failed (all invalid); bailing to synth";
           agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
           break;
         }
@@ -2140,7 +2807,10 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
 
       // Stuck-loop guard: don't re-execute the same calls we just ran.
       if (lastCallSignature && sameToolCalls(lastCallSignature, validCalls)) {
-        opts.callbacks.onPhase("analyzing", "Tool data already gathered. Synthesizing final answer…");
+        opts.callbacks.onPhase(
+          "analyzing",
+          "Tool data already gathered. Synthesizing final answer…",
+        );
         exitReason = "markdown salvage hit stuck-loop guard";
         agentLog(`run ${runId} · iter ${iteration} · decision`, exitReason);
         break;
@@ -2150,13 +2820,19 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       opts.callbacks.onPhase(
         "calling_tools",
         `Executing ${validCalls.length} tool${validCalls.length > 1 ? "s" : ""}…`,
-        validCalls.map(c => c.name),
+        validCalls.map((c) => c.name),
       );
       opts.callbacks.onToolCallsStart(validCalls);
 
-      agentLogGroup(`run ${runId} · iter ${iteration} · markdown salvage · executing`, () => {
-        agentLogField("calls", validCalls.map(c => ({ name: c.name, arguments: c.arguments })));
-      });
+      agentLogGroup(
+        `run ${runId} · iter ${iteration} · markdown salvage · executing`,
+        () => {
+          agentLogField(
+            "calls",
+            validCalls.map((c) => ({ name: c.name, arguments: c.arguments })),
+          );
+        },
+      );
 
       const callsStartedAt = Date.now();
       const realResults: ToolExecutionResult[] = await Promise.all(
@@ -2166,21 +2842,37 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
           try {
             const data = await opts.callTool(call.name, call.arguments || {});
             opts.callbacks.onToolResult(call, data);
-            agentLogGroup(`run ${runId} · iter ${iteration} · tool ok · ${call.name}`, () => {
-              agentLogField("duration", `${Date.now() - tStart}ms`);
-              agentLogField("arguments", call.arguments || {});
-              agentLogField("result", data, 6000);
-            });
-            return { tool: call.name, args: call.arguments || {}, ok: true, data };
+            agentLogGroup(
+              `run ${runId} · iter ${iteration} · tool ok · ${call.name}`,
+              () => {
+                agentLogField("duration", `${Date.now() - tStart}ms`);
+                agentLogField("arguments", call.arguments || {});
+                agentLogField("result", data, 6000);
+              },
+            );
+            return {
+              tool: call.name,
+              args: call.arguments || {},
+              ok: true,
+              data,
+            };
           } catch (e: any) {
             const message = e?.message || String(e);
             opts.callbacks.onToolError(call, message);
-            agentLogGroup(`run ${runId} · iter ${iteration} · tool fail · ${call.name}`, () => {
-              agentLogField("duration", `${Date.now() - tStart}ms`);
-              agentLogField("arguments", call.arguments || {});
-              agentLogField("error", message);
-            });
-            return { tool: call.name, args: call.arguments || {}, ok: false, error: message };
+            agentLogGroup(
+              `run ${runId} · iter ${iteration} · tool fail · ${call.name}`,
+              () => {
+                agentLogField("duration", `${Date.now() - tStart}ms`);
+                agentLogField("arguments", call.arguments || {});
+                agentLogField("error", message);
+              },
+            );
+            return {
+              tool: call.name,
+              args: call.arguments || {},
+              ok: false,
+              error: message,
+            };
           }
         }),
       );
@@ -2193,7 +2885,12 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         const hint = closest ? ` Did you mean "${closest}"?` : "";
         const message = `Unknown tool "${c.name}".${hint}`;
         opts.callbacks.onToolError(c, message);
-        return { tool: c.name, args: c.arguments || {}, ok: false, error: message };
+        return {
+          tool: c.name,
+          args: c.arguments || {},
+          ok: false,
+          error: message,
+        };
       });
 
       const results = [...realResults, ...invalidResults];
@@ -2204,16 +2901,27 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
         content: `${formatObservations(results)}\n\n(Note: your previous tool calls were inside a markdown \`\`\`json fence. Next turn, use the <tool_calls> tag instead — markdown fences are not part of the protocol.)`,
       });
       consecutiveBadTurns = 0;
-      opts.callbacks.onPhase("analyzing", `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`);
-      agentLogGroup(`run ${runId} · iter ${iteration} · markdown salvage · done`, () => {
-        agentLogField("total duration", `${Date.now() - callsStartedAt}ms`);
-        agentLogField("ok count", realResults.filter(r => r.ok).length);
-        agentLogField("fail count", realResults.filter(r => !r.ok).length);
-      });
+      opts.callbacks.onPhase(
+        "analyzing",
+        `Synthesizing ${results.length} result${results.length === 1 ? "" : "s"}…`,
+      );
+      agentLogGroup(
+        `run ${runId} · iter ${iteration} · markdown salvage · done`,
+        () => {
+          agentLogField("total duration", `${Date.now() - callsStartedAt}ms`);
+          agentLogField("ok count", realResults.filter((r) => r.ok).length);
+          agentLogField("fail count", realResults.filter((r) => !r.ok).length);
+        },
+      );
       continue;
     }
 
-    if (iteration === 1 && fallback && !looksLikeProtocolLeak && gatheredObservations.length === 0) {
+    if (
+      iteration === 1 &&
+      fallback &&
+      !looksLikeProtocolLeak &&
+      gatheredObservations.length === 0
+    ) {
       const cleaned = sanitizeFinalAnswerText(fallback);
       if (cleaned) {
         finalAnswer = cleaned;
@@ -2257,9 +2965,18 @@ async function runAgent(opts: RunAgentOpts): Promise<string> {
       agentLogField("exit reason", exitReason);
       agentLogField("iterations used", iteration);
       agentLogField("observations to synthesize", gatheredObservations.length);
-      agentLogField("ok observations", gatheredObservations.filter(o => o.ok).length);
-      agentLogField("fail observations", gatheredObservations.filter(o => !o.ok).length);
-      agentLogField("observations summary", gatheredObservations.map(o => ({ tool: o.tool, ok: o.ok })));
+      agentLogField(
+        "ok observations",
+        gatheredObservations.filter((o) => o.ok).length,
+      );
+      agentLogField(
+        "fail observations",
+        gatheredObservations.filter((o) => !o.ok).length,
+      );
+      agentLogField(
+        "observations summary",
+        gatheredObservations.map((o) => ({ tool: o.tool, ok: o.ok })),
+      );
     });
     finalAnswer = await synthesizeFinalAnswer({
       provider: opts.provider,
@@ -2296,71 +3013,133 @@ const fetchToolData = async (toolName: string, args: any): Promise<any> => {
 
   switch (toolName) {
     // --- APM ---
-    case "apm_list_services": return (await api.get('/apm/list')).data;
-    case "apm_get_stats": return (await api.get(`/apm/${args.id}/stats`, { params })).data;
-    case "apm_get_invocations": return (await api.get(`/apm/${args.id}/invocations`, { params: { limit: 10 } })).data;
-    case "apm_get_trace_detail": return (await api.get(`/apm/${args.id}/trace/${args.traceId}`)).data;
+    case "apm_list_services":
+      return (await api.get("/apm/list")).data;
+    case "apm_get_stats":
+      return (await api.get(`/apm/${args.id}/stats`, { params })).data;
+    case "apm_get_invocations":
+      return (
+        await api.get(`/apm/${args.id}/invocations`, { params: { limit: 10 } })
+      ).data;
+    case "apm_get_trace_detail":
+      return (await api.get(`/apm/${args.id}/trace/${args.traceId}`)).data;
 
     // --- RUM ---
-    case "rum_list_services": return (await api.get('/rum/list')).data;
-    case "rum_get_dashboard": return (await api.get(`/rum/${args.id}/dashboard`, { params })).data;
-    case "rum_get_trace_detail": return (await api.get(`/rum/${args.id}/trace/${args.traceId}`)).data;
+    case "rum_list_services":
+      return (await api.get("/rum/list")).data;
+    case "rum_get_dashboard":
+      return (await api.get(`/rum/${args.id}/dashboard`, { params })).data;
+    case "rum_get_trace_detail":
+      return (await api.get(`/rum/${args.id}/trace/${args.traceId}`)).data;
 
     // --- Tasks ---
-    case "task_list_services": return (await api.get('/task/list')).data;
-    case "task_get_dashboard": return (await api.get(`/task/${args.id}/dashboard`, { params })).data;
-    case "task_get_entity_detail": return (await api.get(`/task/${args.id}/entity/${encodeURIComponent(args.taskName)}`, { params })).data;
-    case "task_get_run_detail": return (await api.get(`/task/${args.id}/run/${args.runId}`)).data;
+    case "task_list_services":
+      return (await api.get("/task/list")).data;
+    case "task_get_dashboard":
+      return (await api.get(`/task/${args.id}/dashboard`, { params })).data;
+    case "task_get_entity_detail":
+      return (
+        await api.get(
+          `/task/${args.id}/entity/${encodeURIComponent(args.taskName)}`,
+          { params },
+        )
+      ).data;
+    case "task_get_run_detail":
+      return (await api.get(`/task/${args.id}/run/${args.runId}`)).data;
 
     // --- Infra & DB ---
-    case "vps_list": return (await api.get('/vps/list')).data;
-    case "vps_get_stats": return (await api.get(`/vps/${args.id}/stats`, { params })).data;
-    case "database_list": return (await api.get('/database/list')).data;
-    case "database_get_stats": return (await api.get(`/database/${args.id}/stats`, { params })).data;
+    case "vps_list":
+      return (await api.get("/vps/list")).data;
+    case "vps_get_stats":
+      return (await api.get(`/vps/${args.id}/stats`, { params })).data;
+    case "database_list":
+      return (await api.get("/database/list")).data;
+    case "database_get_stats":
+      return (await api.get(`/database/${args.id}/stats`, { params })).data;
 
     // --- Logs & Errors ---
-    case "logs_query": return (await api.get('/logs', { params: { search: args?.search || "", limit: args?.limit || 15, range: args?.range || "24h" } })).data;
-    case "logs_get_by_id": return (await api.get(`/logs/${args.id}`)).data;
-    case "logs_get_by_trace": return (await api.get(`/apm/${args.id}/trace/${args.traceId}/logs`)).data;
+    case "logs_query":
+      return (
+        await api.get("/logs", {
+          params: {
+            search: args?.search || "",
+            limit: args?.limit || 15,
+            range: args?.range || "24h",
+          },
+        })
+      ).data;
+    case "logs_get_by_id":
+      return (await api.get(`/logs/${args.id}`)).data;
+    case "logs_get_by_trace":
+      return (await api.get(`/apm/${args.id}/trace/${args.traceId}/logs`)).data;
 
-    case "error_get_global": return (await api.get('/errors', { params: { limit: 15, status: 'unresolved' } })).data;
-    case "error_get_group_detail": return (await api.get(`/errors/${args.groupId}`, { params })).data;
-    case "error_get_trace_errors": return (await api.get(`/apm/${args.id}/trace/${args.traceId}/errors`)).data;
+    case "error_get_global":
+      return (
+        await api.get("/errors", {
+          params: { limit: 15, status: "unresolved" },
+        })
+      ).data;
+    case "error_get_group_detail":
+      return (await api.get(`/errors/${args.groupId}`, { params })).data;
+    case "error_get_trace_errors":
+      return (await api.get(`/apm/${args.id}/trace/${args.traceId}/errors`))
+        .data;
 
     // --- Web Analytics & Monitors ---
-    case "web_list_websites": return (await api.get('/web/list')).data;
-    case "web_get_stats": return (await api.get(`/web/${args.id}/stats`, { params })).data;
-    case "uptime_list_monitors": return (await api.get('/uptime/list')).data;
-    case "uptime_get_stats": return (await api.get(`/uptime/${args.id}/stats`, { params })).data;
+    case "web_list_websites":
+      return (await api.get("/web/list")).data;
+    case "web_get_stats":
+      return (await api.get(`/web/${args.id}/stats`, { params })).data;
+    case "uptime_list_monitors":
+      return (await api.get("/uptime/list")).data;
+    case "uptime_get_stats":
+      return (await api.get(`/uptime/${args.id}/stats`, { params })).data;
 
     // --- Alerts & Views ---
-    case "alerts_list_destinations": return (await api.get('/alerts/destinations')).data;
-    case "alerts_list_policies": return (await api.get('/alerts/policies')).data;
-    case "alerts_get_policy_details": return (await api.get(`/alerts/policies/${args.id}`)).data;
-    case "views_list_dashboards": return (await api.get('/views')).data;
-    case "views_get_dashboard": return (await api.get(`/views/${args.id}`)).data;
-    case "views_get_widget_data": return (await api.get(`/views/widgets/${args.id}/data`, { params })).data;
+    case "alerts_list_destinations":
+      return (await api.get("/alerts/destinations")).data;
+    case "alerts_list_policies":
+      return (await api.get("/alerts/policies")).data;
+    case "alerts_get_policy_details":
+      return (await api.get(`/alerts/policies/${args.id}`)).data;
+    case "views_list_dashboards":
+      return (await api.get("/views")).data;
+    case "views_get_dashboard":
+      return (await api.get(`/views/${args.id}`)).data;
+    case "views_get_widget_data":
+      return (await api.get(`/views/widgets/${args.id}/data`, { params })).data;
 
     // --- Schema & Billing ---
-    case "schema_get_dynamic": return (await api.get('/schema')).data;
-    case "billing_get_storage_stats": return (await api.get('/billing/storage-stats')).data;
-    case "billing_get_subscription": return (await api.get('/billing/subscription')).data;
-    case "billing_get_transactions": return (await api.get('/billing/transactions')).data;
-    case "billing_get_transaction_receipt": return (await api.get(`/billing/transactions/${args.transactionId}/receipt`)).data;
-    case "billing_get_active_plans": return (await api.get('/billing/plans')).data;
+    case "schema_get_dynamic":
+      return (await api.get("/schema")).data;
+    case "billing_get_storage_stats":
+      return (await api.get("/billing/storage-stats")).data;
+    case "billing_get_subscription":
+      return (await api.get("/billing/subscription")).data;
+    case "billing_get_transactions":
+      return (await api.get("/billing/transactions")).data;
+    case "billing_get_transaction_receipt":
+      return (
+        await api.get(`/billing/transactions/${args.transactionId}/receipt`)
+      ).data;
+    case "billing_get_active_plans":
+      return (await api.get("/billing/plans")).data;
 
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
 };
 
-const fetchToolDataWithRetry = async (toolName: string, args: any): Promise<any> => {
+const fetchToolDataWithRetry = async (
+  toolName: string,
+  args: any,
+): Promise<any> => {
   try {
     return await fetchToolData(toolName, args);
   } catch (err: any) {
     const status = err?.response?.status;
     if (status && TOOL_RETRYABLE_STATUSES.has(status)) {
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 600));
       return await fetchToolData(toolName, args);
     }
     // Surface the most useful error message available
@@ -2449,16 +3228,37 @@ const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
   },
 ];
 
-const PHASE_META: Record<AgentPhase, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
+const PHASE_META: Record<
+  AgentPhase,
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    color: string;
+  }
+> = {
   thinking: { icon: Brain, label: "Reasoning", color: "text-violet-500" },
-  selecting_tools: { icon: Sparkles, label: "Planning", color: "text-amber-500" },
-  calling_tools: { icon: Wrench, label: "Calling tools", color: "text-blue-500" },
+  selecting_tools: {
+    icon: Sparkles,
+    label: "Planning",
+    color: "text-amber-500",
+  },
+  calling_tools: {
+    icon: Wrench,
+    label: "Calling tools",
+    color: "text-blue-500",
+  },
   analyzing: { icon: Zap, label: "Analyzing", color: "text-cyan-500" },
   responding: { icon: Bot, label: "Responding", color: "text-emerald-500" },
   idle: { icon: Bot, label: "Idle", color: "text-muted-foreground" },
 };
 
-const PHASE_ORDER: AgentPhase[] = ["thinking", "selecting_tools", "calling_tools", "analyzing", "responding"];
+const PHASE_ORDER: AgentPhase[] = [
+  "thinking",
+  "selecting_tools",
+  "calling_tools",
+  "analyzing",
+  "responding",
+];
 
 const formatDuration = (ms: number): string => {
   if (ms < 1000) return `${Math.round(ms)}ms`;
@@ -2467,7 +3267,11 @@ const formatDuration = (ms: number): string => {
 };
 
 /** Compact button with an icon-only mode and a copy-to-clipboard helper. */
-const CopyButton: React.FC<{ value: string; className?: string; label?: string }> = ({ value, className, label }) => {
+const CopyButton: React.FC<{
+  value: string;
+  className?: string;
+  label?: string;
+}> = ({ value, className, label }) => {
   const [copied, setCopied] = useState(false);
   const onCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2489,7 +3293,11 @@ const CopyButton: React.FC<{ value: string; className?: string; label?: string }
         className,
       )}
     >
-      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+      {copied ? (
+        <Check className="h-3 w-3 text-emerald-500" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
       {label && <span>{copied ? "Copied" : label}</span>}
     </button>
   );
@@ -2500,54 +3308,130 @@ const CopyButton: React.FC<{ value: string; className?: string; label?: string }
  * raw HTML (security) and we restrict to GFM (tables, task lists, autolinks,
  * strikethrough) which is what we instruct the model to produce.
  */
-const AssistantMarkdown: React.FC<{ content: string; className?: string }> = ({ content, className }) => {
-  const components = useMemo(() => ({
-    h1: (props: any) => <h1 className="text-base font-bold text-foreground mt-4 mb-2 first:mt-0" {...props} />,
-    h2: (props: any) => <h2 className="text-[15px] font-bold text-foreground mt-4 mb-2 first:mt-0 tracking-tight" {...props} />,
-    h3: (props: any) => <h3 className="text-sm font-bold text-foreground mt-3 mb-1.5 first:mt-0" {...props} />,
-    h4: (props: any) => <h4 className="text-sm font-semibold text-foreground mt-3 mb-1.5 first:mt-0" {...props} />,
-    p: (props: any) => <p className="text-sm leading-relaxed text-foreground my-2 first:mt-0 last:mb-0" {...props} />,
-    ul: (props: any) => <ul className="my-2 list-disc pl-5 space-y-1 text-sm text-foreground marker:text-muted-foreground" {...props} />,
-    ol: (props: any) => <ol className="my-2 list-decimal pl-5 space-y-1 text-sm text-foreground marker:text-muted-foreground" {...props} />,
-    li: (props: any) => <li className="leading-relaxed" {...props} />,
-    strong: (props: any) => <strong className="font-bold text-foreground" {...props} />,
-    em: (props: any) => <em className="italic" {...props} />,
-    a: (props: any) => <a className="text-primary underline underline-offset-2 hover:text-primary/80" target="_blank" rel="noopener noreferrer" {...props} />,
-    blockquote: (props: any) => <blockquote className="border-l-2 border-border pl-3 my-2 text-muted-foreground italic" {...props} />,
-    hr: () => <hr className="my-3 border-border/60" />,
-    table: (props: any) => (
-      <div className="my-3 overflow-x-auto rounded-lg border border-border/60">
-        <table className="w-full text-xs" {...props} />
-      </div>
-    ),
-    thead: (props: any) => <thead className="bg-muted/50" {...props} />,
-    tbody: (props: any) => <tbody className="divide-y divide-border/40" {...props} />,
-    tr: (props: any) => <tr {...props} />,
-    th: (props: any) => <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/60" {...props} />,
-    td: (props: any) => <td className="px-3 py-2 text-foreground" {...props} />,
-    code: ({ inline, className: cls, children, ...props }: any) => {
-      const text = String(children ?? "").replace(/\n$/, "");
-      // Heuristic: react-markdown 10 doesn't always pass `inline`; treat
-      // single-line code without `language-` class as inline.
-      const isInline = inline ?? (!cls && !text.includes("\n"));
-      if (isInline) {
-        return <code className="px-1.5 py-0.5 rounded bg-muted text-[12px] font-mono text-foreground border border-border/60" {...props}>{children}</code>;
-      }
-      const lang = (cls ?? "").replace("language-", "") || "code";
-      return (
-        <div className="my-3 rounded-lg overflow-hidden border border-border/60 bg-[#0d1117] shadow-sm group/code">
-          <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/10">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">{lang}</span>
-            <CopyButton value={text} className="text-slate-400 hover:text-slate-100 hover:bg-white/10" />
-          </div>
-          <pre className="p-3 overflow-x-auto text-xs font-mono leading-relaxed text-slate-200">
-            <code {...props}>{children}</code>
-          </pre>
+const AssistantMarkdown: React.FC<{ content: string; className?: string }> = ({
+  content,
+  className,
+}) => {
+  const components = useMemo(
+    () => ({
+      h1: (props: any) => (
+        <h1
+          className="text-base font-bold text-foreground mt-4 mb-2 first:mt-0"
+          {...props}
+        />
+      ),
+      h2: (props: any) => (
+        <h2
+          className="text-[15px] font-bold text-foreground mt-4 mb-2 first:mt-0 tracking-tight"
+          {...props}
+        />
+      ),
+      h3: (props: any) => (
+        <h3
+          className="text-sm font-bold text-foreground mt-3 mb-1.5 first:mt-0"
+          {...props}
+        />
+      ),
+      h4: (props: any) => (
+        <h4
+          className="text-sm font-semibold text-foreground mt-3 mb-1.5 first:mt-0"
+          {...props}
+        />
+      ),
+      p: (props: any) => (
+        <p
+          className="text-sm leading-relaxed text-foreground my-2 first:mt-0 last:mb-0"
+          {...props}
+        />
+      ),
+      ul: (props: any) => (
+        <ul
+          className="my-2 list-disc pl-5 space-y-1 text-sm text-foreground marker:text-muted-foreground"
+          {...props}
+        />
+      ),
+      ol: (props: any) => (
+        <ol
+          className="my-2 list-decimal pl-5 space-y-1 text-sm text-foreground marker:text-muted-foreground"
+          {...props}
+        />
+      ),
+      li: (props: any) => <li className="leading-relaxed" {...props} />,
+      strong: (props: any) => (
+        <strong className="font-bold text-foreground" {...props} />
+      ),
+      em: (props: any) => <em className="italic" {...props} />,
+      a: (props: any) => (
+        <a
+          className="text-primary underline underline-offset-2 hover:text-primary/80"
+          target="_blank"
+          rel="noopener noreferrer"
+          {...props}
+        />
+      ),
+      blockquote: (props: any) => (
+        <blockquote
+          className="border-l-2 border-border pl-3 my-2 text-muted-foreground italic"
+          {...props}
+        />
+      ),
+      hr: () => <hr className="my-3 border-border/60" />,
+      table: (props: any) => (
+        <div className="my-3 overflow-x-auto rounded-lg border border-border/60">
+          <table className="w-full text-xs" {...props} />
         </div>
-      );
-    },
-    pre: (props: any) => <>{props.children}</>,
-  }), []);
+      ),
+      thead: (props: any) => <thead className="bg-muted/50" {...props} />,
+      tbody: (props: any) => (
+        <tbody className="divide-y divide-border/40" {...props} />
+      ),
+      tr: (props: any) => <tr {...props} />,
+      th: (props: any) => (
+        <th
+          className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/60"
+          {...props}
+        />
+      ),
+      td: (props: any) => (
+        <td className="px-3 py-2 text-foreground" {...props} />
+      ),
+      code: ({ inline, className: cls, children, ...props }: any) => {
+        const text = String(children ?? "").replace(/\n$/, "");
+        // Heuristic: react-markdown 10 doesn't always pass `inline`; treat
+        // single-line code without `language-` class as inline.
+        const isInline = inline ?? (!cls && !text.includes("\n"));
+        if (isInline) {
+          return (
+            <code
+              className="px-1.5 py-0.5 rounded bg-muted text-[12px] font-mono text-foreground border border-border/60"
+              {...props}
+            >
+              {children}
+            </code>
+          );
+        }
+        const lang = (cls ?? "").replace("language-", "") || "code";
+        return (
+          <div className="my-3 rounded-lg overflow-hidden border border-border/60 bg-[#0d1117] shadow-sm group/code">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/10">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                {lang}
+              </span>
+              <CopyButton
+                value={text}
+                className="text-slate-400 hover:text-slate-100 hover:bg-white/10"
+              />
+            </div>
+            <pre className="p-3 overflow-x-auto text-xs font-mono leading-relaxed text-slate-200">
+              <code {...props}>{children}</code>
+            </pre>
+          </div>
+        );
+      },
+      pre: (props: any) => <>{props.children}</>,
+    }),
+    [],
+  );
 
   return (
     <div className={cn("min-w-0", className)}>
@@ -2562,7 +3446,10 @@ const AssistantMarkdown: React.FC<{ content: string; className?: string }> = ({ 
  * Persisted per-message agent activity (collapsible). Renders the trace
  * captured during the assistant's turn so users can audit past investigations.
  */
-const AgentActivityTimeline: React.FC<{ trace: AgentTrace; defaultOpen?: boolean }> = ({ trace, defaultOpen = false }) => {
+const AgentActivityTimeline: React.FC<{
+  trace: AgentTrace;
+  defaultOpen?: boolean;
+}> = ({ trace, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
   const elapsedMs = (trace.endedAt ?? Date.now()) - trace.startedAt;
   const summary = `${trace.iterations} iteration${trace.iterations === 1 ? "" : "s"} · ${trace.toolCallCount} tool call${trace.toolCallCount === 1 ? "" : "s"} · ${formatDuration(elapsedMs)}`;
@@ -2571,20 +3458,30 @@ const AgentActivityTimeline: React.FC<{ trace: AgentTrace; defaultOpen?: boolean
     <div className="rounded-lg border border-border/60 bg-muted/30 overflow-hidden mb-2">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/50 transition-colors text-left"
       >
         <div className="flex items-center gap-2 min-w-0">
-          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          )}
           <Brain className="h-3.5 w-3.5 text-violet-500 shrink-0" />
-          <span className="text-xs font-semibold text-foreground">Reasoning trace</span>
+          <span className="text-xs font-semibold text-foreground">
+            Reasoning trace
+          </span>
         </div>
-        <span className="text-[10px] font-mono text-muted-foreground truncate">{summary}</span>
+        <span className="text-[10px] font-mono text-muted-foreground truncate">
+          {summary}
+        </span>
       </button>
       {open && (
         <div className="border-t border-border/40 bg-background/50 p-3 space-y-2 max-h-[420px] overflow-y-auto">
           {trace.steps.length === 0 ? (
-            <div className="text-xs text-muted-foreground italic">No recorded steps for this turn.</div>
+            <div className="text-xs text-muted-foreground italic">
+              No recorded steps for this turn.
+            </div>
           ) : (
             trace.steps.map((step, i) => <AgentStepRow key={i} step={step} />)
           )}
@@ -2605,10 +3502,16 @@ const AgentStepRow: React.FC<{ step: AgentStep }> = ({ step }) => {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-500">Thought</span>
-            <span className="text-[10px] font-mono text-muted-foreground">step {step.iteration}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-500">
+              Thought
+            </span>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              step {step.iteration}
+            </span>
           </div>
-          <div className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">{step.content}</div>
+          <div className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+            {step.content}
+          </div>
         </div>
       </div>
     );
@@ -2621,10 +3524,22 @@ const AgentStepRow: React.FC<{ step: AgentStep }> = ({ step }) => {
           <Wrench className="h-3 w-3 text-blue-500" />
         </div>
         <div className="min-w-0 flex-1">
-          <button type="button" onClick={() => setExpanded(e => !e)} className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Call</span>
-            <span className="text-xs font-mono text-foreground truncate">{step.toolName}</span>
-            {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
+              Call
+            </span>
+            <span className="text-xs font-mono text-foreground truncate">
+              {step.toolName}
+            </span>
+            {expanded ? (
+              <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+            )}
           </button>
           {expanded && (
             <pre className="mt-1 text-[10px] font-mono text-muted-foreground bg-muted/40 rounded px-2 py-1 overflow-x-auto whitespace-pre-wrap break-all">
@@ -2643,11 +3558,25 @@ const AgentStepRow: React.FC<{ step: AgentStep }> = ({ step }) => {
           <CheckCircle2 className="h-3 w-3 text-emerald-500" />
         </div>
         <div className="min-w-0 flex-1">
-          <button type="button" onClick={() => setExpanded(e => !e)} className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">Result</span>
-            <span className="text-xs font-mono text-foreground truncate">{step.toolName}</span>
-            <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">{formatDuration(step.durationMs)}</span>
-            {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">
+              Result
+            </span>
+            <span className="text-xs font-mono text-foreground truncate">
+              {step.toolName}
+            </span>
+            <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">
+              {formatDuration(step.durationMs)}
+            </span>
+            {expanded ? (
+              <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+            )}
           </button>
           {expanded && (
             <pre className="mt-1 text-[10px] font-mono text-muted-foreground bg-muted/40 rounded px-2 py-1 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
@@ -2667,11 +3596,19 @@ const AgentStepRow: React.FC<{ step: AgentStep }> = ({ step }) => {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Error</span>
-          <span className="text-xs font-mono text-foreground truncate">{step.toolName}</span>
-          <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">{formatDuration(step.durationMs)}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
+            Error
+          </span>
+          <span className="text-xs font-mono text-foreground truncate">
+            {step.toolName}
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">
+            {formatDuration(step.durationMs)}
+          </span>
         </div>
-        <div className="text-xs leading-relaxed text-rose-500/90 mt-0.5 break-words">{step.error}</div>
+        <div className="text-xs leading-relaxed text-rose-500/90 mt-0.5 break-words">
+          {step.error}
+        </div>
       </div>
     </div>
   );
@@ -2698,15 +3635,25 @@ const LiveAgentTimeline: React.FC<{
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-foreground">{meta.label}</span>
+            <span className="text-xs font-bold text-foreground">
+              {meta.label}
+            </span>
             <div className="flex space-x-1 items-center justify-center">
-              <span className="w-1 h-1 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "-0.3s" }} />
-              <span className="w-1 h-1 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "-0.15s" }} />
+              <span
+                className="w-1 h-1 bg-primary/40 rounded-full animate-bounce"
+                style={{ animationDelay: "-0.3s" }}
+              />
+              <span
+                className="w-1 h-1 bg-primary/60 rounded-full animate-bounce"
+                style={{ animationDelay: "-0.15s" }}
+              />
               <span className="w-1 h-1 bg-primary/80 rounded-full animate-bounce" />
             </div>
           </div>
           {status?.detail && (
-            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5 line-clamp-2 break-words">{status.detail}</div>
+            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5 line-clamp-2 break-words">
+              {status.detail}
+            </div>
           )}
         </div>
       </div>
@@ -2716,17 +3663,27 @@ const LiveAgentTimeline: React.FC<{
         {PHASE_ORDER.map((p) => {
           const m = PHASE_META[p];
           const isActive = status?.phase === p;
-          const isPast = status ? PHASE_ORDER.indexOf(status.phase) > PHASE_ORDER.indexOf(p) : false;
+          const isPast = status
+            ? PHASE_ORDER.indexOf(status.phase) > PHASE_ORDER.indexOf(p)
+            : false;
           const Icon = m.icon;
           return (
             <span
               key={p}
               className={cn(
                 "inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-2 py-0.5 border transition-all whitespace-nowrap",
-                isActive ? "border-primary/40 bg-primary/10 text-primary" : isPast ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-500/80" : "border-border/40 bg-background text-muted-foreground/60",
+                isActive
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : isPast
+                    ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-500/80"
+                    : "border-border/40 bg-background text-muted-foreground/60",
               )}
             >
-              {isPast ? <Check className="h-2.5 w-2.5" /> : <Icon className="h-2.5 w-2.5" />}
+              {isPast ? (
+                <Check className="h-2.5 w-2.5" />
+              ) : (
+                <Icon className="h-2.5 w-2.5" />
+              )}
               {m.label}
             </span>
           );
@@ -2737,7 +3694,10 @@ const LiveAgentTimeline: React.FC<{
       {status?.tools && status.tools.length > 0 && (
         <div className="px-4 py-2 border-b border-border/40 flex flex-wrap gap-1.5">
           {status.tools.map((tool, i) => (
-            <span key={i} className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20"
+            >
               <Spinner className="h-2.5 w-2.5" /> {tool}
             </span>
           ))}
@@ -2747,7 +3707,9 @@ const LiveAgentTimeline: React.FC<{
       {/* Live timeline */}
       {trace && trace.steps.length > 0 && (
         <div className="px-4 py-3 max-h-[280px] overflow-y-auto space-y-2">
-          {trace.steps.slice(-12).map((step, i) => <AgentStepRow key={i} step={step} />)}
+          {trace.steps.slice(-12).map((step, i) => (
+            <AgentStepRow key={i} step={step} />
+          ))}
         </div>
       )}
     </div>
@@ -2790,7 +3752,9 @@ const MessageBubble: React.FC<{
           {msg.content ? (
             <AssistantMarkdown content={msg.content} />
           ) : (
-            <span className="text-xs italic text-muted-foreground">No response generated.</span>
+            <span className="text-xs italic text-muted-foreground">
+              No response generated.
+            </span>
           )}
         </div>
         {msg.content && (
@@ -2820,14 +3784,20 @@ const MessageBubble: React.FC<{
 
 export default function AiAssistantPage() {
   // --- Engine & State ---
-  const [engineMode, setEngineMode] = useState<"setup" | "loading" | "ready">("setup");
+  const [engineMode, setEngineMode] = useState<"setup" | "loading" | "ready">(
+    "setup",
+  );
   const [provider, setProvider] = useState<"webllm" | "byok">("webllm");
   const [hardwareProfile, setHardwareProfile] = useState<any>(null);
   const [selectedModel, setSelectedModel] = useState(DEFAULT_LOCAL_MODEL_ID);
   const [byokKey, setByokKey] = useState("");
 
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
-  const [loadProgress, setLoadProgress] = useState({ text: "", progress: 0, stats: null as any });
+  const [loadProgress, setLoadProgress] = useState({
+    text: "",
+    progress: 0,
+    stats: null as any,
+  });
   const [chatId] = useState("default-session");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -2848,18 +3818,25 @@ export default function AiAssistantPage() {
   }, [messages, isGenerating, contextLogs, liveTrace]);
 
   useEffect(() => {
-    loadChat(chatId).then(msgs => {
+    loadChat(chatId).then((msgs) => {
       // Defensive: only accept clean user/assistant text from disk. Older
       // builds persisted tool / assistant-with-tool_calls messages; strip them.
       // We accept the optional `trace` field (UI-only metadata) so users can
       // re-open past investigations.
       const cleaned = (Array.isArray(msgs) ? msgs : [])
-        .filter((m: any) =>
-          m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string"
+        .filter(
+          (m: any) =>
+            m &&
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string",
         )
         .map((m: any) => {
           const out: ChatMessage = { role: m.role, content: m.content };
-          if (m.role === "assistant" && m.trace && typeof m.trace === "object") {
+          if (
+            m.role === "assistant" &&
+            m.trace &&
+            typeof m.trace === "object"
+          ) {
             out.trace = m.trace as AgentTrace;
           }
           return out;
@@ -2881,7 +3858,10 @@ export default function AiAssistantPage() {
 
     const checkHardware = async () => {
       if (!navigator.gpu) {
-        setHardwareProfile({ supported: false, reason: "WebGPU is not enabled in this browser." });
+        setHardwareProfile({
+          supported: false,
+          reason: "WebGPU is not enabled in this browser.",
+        });
         setProvider("byok");
         return;
       }
@@ -2908,13 +3888,17 @@ export default function AiAssistantPage() {
         setHardwareProfile({
           supported: true,
           vramEstimate,
-          name: adapter.info?.isFallbackAdapter ? "Software Renderer" : "Hardware GPU"
+          name: adapter.info?.isFallbackAdapter
+            ? "Software Renderer"
+            : "Hardware GPU",
         });
 
         setSelectedModel(pickModelForVram(vramEstimate));
-
       } catch (err) {
-        setHardwareProfile({ supported: false, reason: "Failed to access GPU adapter." });
+        setHardwareProfile({
+          supported: false,
+          reason: "Failed to access GPU adapter.",
+        });
         setProvider("byok");
       }
     };
@@ -2944,17 +3928,24 @@ export default function AiAssistantPage() {
             const mb = report.text.match(/(\d+\s*MB)/i)?.[1] || "-";
             const time = report.text.match(/(\d+\s*secs)/i)?.[1] || "-";
             stats = { chunks, mb, time };
-          } else if (report.text.includes("Loading GPU") || report.text.includes("Loading model")) {
+          } else if (
+            report.text.includes("Loading GPU") ||
+            report.text.includes("Loading model")
+          ) {
             cleanText = "Allocating VRAM";
             stats = { chunks: "100%", mb: "Done", time: "Finalizing" };
           } else if (report.text.includes("Finish") || report.progress === 1) {
             cleanText = "Compilation Complete";
             stats = { chunks: "Ready", mb: "Ready", time: "Ready" };
           } else {
-            cleanText = report.text.replace(/It can take a while.*/, '').trim();
+            cleanText = report.text.replace(/It can take a while.*/, "").trim();
           }
 
-          setLoadProgress({ text: cleanText, stats, progress: Math.round(report.progress * 100) });
+          setLoadProgress({
+            text: cleanText,
+            stats,
+            progress: Math.round(report.progress * 100),
+          });
         };
 
         // Try the wider window first (8192). If a particular wasm lib can't
@@ -2972,7 +3963,7 @@ export default function AiAssistantPage() {
         } catch (primaryErr: any) {
           console.warn(
             `[Senzor Intelligence] context_window_size=${ENGINE_CONTEXT_TARGET} init failed; ` +
-            `retrying with ${ENGINE_CONTEXT_FALLBACK}.`,
+              `retrying with ${ENGINE_CONTEXT_FALLBACK}.`,
             primaryErr,
           );
           try {
@@ -2994,7 +3985,9 @@ export default function AiAssistantPage() {
         setEngineMode("ready");
       } catch (err: any) {
         console.error("[Senzor Intelligence] engine init failed:", err);
-        toast.error("Failed to load local model. Ensure your browser supports WebGPU.");
+        toast.error(
+          "Failed to load local model. Ensure your browser supports WebGPU.",
+        );
         setEngineMode("setup");
       }
     } else {
@@ -3005,229 +3998,272 @@ export default function AiAssistantPage() {
   };
 
   // --- UI-aware tool caller (logs to inspector + retries on transient failures) ---
-  const callToolForAgent = useCallback(async (name: string, args: any): Promise<any> => {
-    setContextLogs(prev => [...prev, { time: new Date(), type: "tool_call", name, args }]);
-    setIsInspectorOpen(true);
-    try {
-      const data = await fetchToolDataWithRetry(name, args);
-      setContextLogs(prev => [...prev, { time: new Date(), type: "tool_result", name, data }]);
-      return data;
-    } catch (err: any) {
-      const message = err?.message || String(err);
-      setContextLogs(prev => [...prev, { time: new Date(), type: "tool_error", name, error: message }]);
-      throw err;
-    }
-  }, []);
+  const callToolForAgent = useCallback(
+    async (name: string, args: any): Promise<any> => {
+      setContextLogs((prev) => [
+        ...prev,
+        { time: new Date(), type: "tool_call", name, args },
+      ]);
+      setIsInspectorOpen(true);
+      try {
+        const data = await fetchToolDataWithRetry(name, args);
+        setContextLogs((prev) => [
+          ...prev,
+          { time: new Date(), type: "tool_result", name, data },
+        ]);
+        return data;
+      } catch (err: any) {
+        const message = err?.message || String(err);
+        setContextLogs((prev) => [
+          ...prev,
+          { time: new Date(), type: "tool_error", name, error: message },
+        ]);
+        throw err;
+      }
+    },
+    [],
+  );
 
   /**
    * Core turn runner. Drives runAgent with React-state-aware callbacks,
    * captures a structured trace, and reconciles streaming UI state.
    * Used by both the user send flow and the regenerate flow.
    */
-  const runTurn = useCallback(async (userText: string, history: ChatMessage[]) => {
-    if (provider === "webllm" && !engineRef.current) {
-      toast.error("Local engine is not ready.");
-      return;
-    }
-    if (provider === "byok" && !byokKey) {
-      toast.error("Please provide an OpenAI API Key.");
-      return;
-    }
+  const runTurn = useCallback(
+    async (userText: string, history: ChatMessage[]) => {
+      if (provider === "webllm" && !engineRef.current) {
+        toast.error("Local engine is not ready.");
+        return;
+      }
+      if (provider === "byok" && !byokKey) {
+        toast.error("Please provide an OpenAI API Key.");
+        return;
+      }
 
-    setIsGenerating(true);
-    setAgentStatus({ phase: "thinking", detail: "Analyzing your request…" });
+      setIsGenerating(true);
+      setAgentStatus({ phase: "thinking", detail: "Analyzing your request…" });
 
-    const abort = new AbortController();
-    abortRef.current = abort;
+      const abort = new AbortController();
+      abortRef.current = abort;
 
-    const trace: AgentTrace = {
-      startedAt: Date.now(),
-      iterations: 0,
-      toolCallCount: 0,
-      steps: [],
-      provider,
-      modelHint: provider === "webllm" ? selectedModel : "gpt-4o",
-    };
-    setLiveTrace(trace);
+      const trace: AgentTrace = {
+        startedAt: Date.now(),
+        iterations: 0,
+        toolCallCount: 0,
+        steps: [],
+        provider,
+        modelHint: provider === "webllm" ? selectedModel : "gpt-4o",
+      };
+      setLiveTrace(trace);
 
-    const toolStartTimes = new WeakMap<ParsedToolCall, number>();
-    let assistantIndex: number | null = null;
-    let streamingContent = "";
-    let thinkingTail = "";
+      const toolStartTimes = new WeakMap<ParsedToolCall, number>();
+      let assistantIndex: number | null = null;
+      let streamingContent = "";
+      let thinkingTail = "";
 
-    const pushStep = (step: AgentStep) => {
-      trace.steps.push(step);
-      // Trigger React re-render for the live timeline by replacing the ref.
-      setLiveTrace({ ...trace, steps: [...trace.steps] });
-    };
+      const pushStep = (step: AgentStep) => {
+        trace.steps.push(step);
+        // Trigger React re-render for the live timeline by replacing the ref.
+        setLiveTrace({ ...trace, steps: [...trace.steps] });
+      };
 
-    const callbacks: AgentCallbacks = {
-      onIterationStart: (iteration) => {
-        trace.iterations = Math.max(trace.iterations, iteration);
-        setAgentStatus({ phase: "thinking", detail: `Reasoning (step ${iteration})…` });
-        thinkingTail = "";
-      },
-      onPhase: (phase, detail, tools) => {
-        setAgentStatus(prev => ({
-          phase,
-          detail: detail ?? prev?.detail,
-          tools: tools ?? (phase === "calling_tools" ? prev?.tools : undefined),
-        }));
-      },
-      onThinkingDelta: (text) => {
-        thinkingTail = (thinkingTail + text).slice(-220);
-        setAgentStatus(prev => ({
-          phase: prev?.phase === "responding" ? prev.phase : "thinking",
-          detail: thinkingTail.trim(),
-          tools: prev?.tools,
-        }));
-      },
-      onThinkingEnd: (full, iteration) => {
-        if (full) {
-          pushStep({ iteration, type: "thinking", ts: Date.now(), content: full });
-          setContextLogs(prev => [...prev, {
-            time: new Date(),
-            type: "thinking",
-            name: `Reasoning · step ${iteration}`,
-            content: full,
-          }]);
-        }
-        thinkingTail = "";
-      },
-      onToolCallsStart: (calls) => {
-        trace.toolCallCount += calls.length;
-        setAgentStatus({
-          phase: "calling_tools",
-          detail: `Calling ${calls.length} tool${calls.length > 1 ? "s" : ""}: ${calls.map(c => c.name).join(", ")}`,
-          tools: calls.map(c => c.name),
+      const callbacks: AgentCallbacks = {
+        onIterationStart: (iteration) => {
+          trace.iterations = Math.max(trace.iterations, iteration);
+          setAgentStatus({
+            phase: "thinking",
+            detail: `Reasoning (step ${iteration})…`,
+          });
+          thinkingTail = "";
+        },
+        onPhase: (phase, detail, tools) => {
+          setAgentStatus((prev) => ({
+            phase,
+            detail: detail ?? prev?.detail,
+            tools:
+              tools ?? (phase === "calling_tools" ? prev?.tools : undefined),
+          }));
+        },
+        onThinkingDelta: (text) => {
+          thinkingTail = (thinkingTail + text).slice(-220);
+          setAgentStatus((prev) => ({
+            phase: prev?.phase === "responding" ? prev.phase : "thinking",
+            detail: thinkingTail.trim(),
+            tools: prev?.tools,
+          }));
+        },
+        onThinkingEnd: (full, iteration) => {
+          if (full) {
+            pushStep({
+              iteration,
+              type: "thinking",
+              ts: Date.now(),
+              content: full,
+            });
+            setContextLogs((prev) => [
+              ...prev,
+              {
+                time: new Date(),
+                type: "thinking",
+                name: `Reasoning · step ${iteration}`,
+                content: full,
+              },
+            ]);
+          }
+          thinkingTail = "";
+        },
+        onToolCallsStart: (calls) => {
+          trace.toolCallCount += calls.length;
+          setAgentStatus({
+            phase: "calling_tools",
+            detail: `Calling ${calls.length} tool${calls.length > 1 ? "s" : ""}: ${calls.map((c) => c.name).join(", ")}`,
+            tools: calls.map((c) => c.name),
+          });
+        },
+        onToolStart: (call) => {
+          toolStartTimes.set(call, performance.now());
+          pushStep({
+            iteration: trace.iterations,
+            type: "tool_call",
+            ts: Date.now(),
+            toolName: call.name,
+            args: call.arguments,
+          });
+        },
+        onToolResult: (call, data) => {
+          const start = toolStartTimes.get(call) ?? performance.now();
+          const durationMs = performance.now() - start;
+          pushStep({
+            iteration: trace.iterations,
+            type: "tool_result",
+            ts: Date.now(),
+            toolName: call.name,
+            data,
+            durationMs,
+          });
+        },
+        onToolError: (call, error) => {
+          const start = toolStartTimes.get(call) ?? performance.now();
+          const durationMs = performance.now() - start;
+          pushStep({
+            iteration: trace.iterations,
+            type: "tool_error",
+            ts: Date.now(),
+            toolName: call.name,
+            error,
+            durationMs,
+          });
+        },
+        onAnswerStart: () => {
+          setAgentStatus({
+            phase: "responding",
+            detail: "Streaming response…",
+          });
+          setMessages((prev) => {
+            const next = [...prev, { role: "assistant" as const, content: "" }];
+            assistantIndex = next.length - 1;
+            return next;
+          });
+        },
+        onAnswerDelta: (text) => {
+          streamingContent += text;
+          setMessages((prev) => {
+            if (assistantIndex === null || assistantIndex >= prev.length)
+              return prev;
+            const copy = prev.slice();
+            copy[assistantIndex] = {
+              role: "assistant",
+              content: streamingContent,
+            };
+            return copy;
+          });
+        },
+        onAnswerEnd: () => {
+          /* finalization happens after runAgent returns */
+        },
+      };
+
+      try {
+        const finalAnswer = await runAgent({
+          provider,
+          engine: engineRef.current,
+          apiKey: provider === "byok" ? byokKey : undefined,
+          history,
+          userInput: userText,
+          tools: AI_TOOLS,
+          callTool: (name, args) => callToolForAgent(name, args),
+          signal: abort.signal,
+          callbacks,
+          maxIterations: 6,
+          // Local engine: actual KV cache size we negotiated at init.
+          // BYOK (cloud): GPT-4o has 128K context; we use 32K as a safe
+          // operating budget that still leaves room for very long sessions.
+          contextWindow:
+            provider === "webllm" ? engineContextWindowRef.current : 32768,
         });
-      },
-      onToolStart: (call) => {
-        toolStartTimes.set(call, performance.now());
-        pushStep({
-          iteration: trace.iterations,
-          type: "tool_call",
-          ts: Date.now(),
-          toolName: call.name,
-          args: call.arguments,
-        });
-      },
-      onToolResult: (call, data) => {
-        const start = toolStartTimes.get(call) ?? performance.now();
-        const durationMs = performance.now() - start;
-        pushStep({
-          iteration: trace.iterations,
-          type: "tool_result",
-          ts: Date.now(),
-          toolName: call.name,
-          data,
-          durationMs,
-        });
-      },
-      onToolError: (call, error) => {
-        const start = toolStartTimes.get(call) ?? performance.now();
-        const durationMs = performance.now() - start;
-        pushStep({
-          iteration: trace.iterations,
-          type: "tool_error",
-          ts: Date.now(),
-          toolName: call.name,
-          error,
-          durationMs,
-        });
-      },
-      onAnswerStart: () => {
-        setAgentStatus({ phase: "responding", detail: "Streaming response…" });
-        setMessages(prev => {
-          const next = [...prev, { role: "assistant" as const, content: "" }];
-          assistantIndex = next.length - 1;
+
+        trace.endedAt = Date.now();
+
+        setMessages((prev) => {
+          let next: ChatMessage[];
+          const finalMsg: ChatMessage = {
+            role: "assistant",
+            content: finalAnswer,
+            trace,
+          };
+          if (assistantIndex === null) {
+            next = [...prev, finalMsg];
+          } else {
+            next = prev.slice();
+            next[assistantIndex] = finalMsg;
+          }
+          saveChat(chatId, next).catch((err) =>
+            console.warn("[Senzor Intelligence] saveChat failed:", err),
+          );
           return next;
         });
-      },
-      onAnswerDelta: (text) => {
-        streamingContent += text;
-        setMessages(prev => {
-          if (assistantIndex === null || assistantIndex >= prev.length) return prev;
-          const copy = prev.slice();
-          copy[assistantIndex] = { role: "assistant", content: streamingContent };
-          return copy;
-        });
-      },
-      onAnswerEnd: () => { /* finalization happens after runAgent returns */ },
-    };
-
-    try {
-      const finalAnswer = await runAgent({
-        provider,
-        engine: engineRef.current,
-        apiKey: provider === "byok" ? byokKey : undefined,
-        history,
-        userInput: userText,
-        tools: AI_TOOLS,
-        callTool: (name, args) => callToolForAgent(name, args),
-        signal: abort.signal,
-        callbacks,
-        maxIterations: 6,
-        // Local engine: actual KV cache size we negotiated at init.
-        // BYOK (cloud): GPT-4o has 128K context; we use 32K as a safe
-        // operating budget that still leaves room for very long sessions.
-        contextWindow: provider === "webllm" ? engineContextWindowRef.current : 32768,
-      });
-
-      trace.endedAt = Date.now();
-
-      setMessages(prev => {
-        let next: ChatMessage[];
-        const finalMsg: ChatMessage = { role: "assistant", content: finalAnswer, trace };
-        if (assistantIndex === null) {
-          next = [...prev, finalMsg];
+      } catch (err: any) {
+        if (err?.name === "AbortError") {
+          trace.endedAt = Date.now();
+          // Keep whatever was streamed; attach the partial trace so the user
+          // can still inspect what happened. Drop the bubble only if it never
+          // produced any content.
+          setMessages((prev) => {
+            if (assistantIndex === null) return prev;
+            const copy = prev.slice();
+            const current = copy[assistantIndex];
+            if (current && !current.content) {
+              copy.splice(assistantIndex, 1);
+            } else if (current) {
+              copy[assistantIndex] = { ...current, trace };
+            }
+            saveChat(chatId, copy).catch(() => {});
+            return copy;
+          });
+          toast.info("Generation cancelled");
         } else {
-          next = prev.slice();
-          next[assistantIndex] = finalMsg;
+          console.error("[Senzor Intelligence] runAgent error:", err);
+          toast.error(
+            "Generation failed: " + (err?.message || "Unknown error"),
+          );
+          setMessages((prev) => {
+            if (assistantIndex === null) return prev;
+            const copy = prev.slice();
+            if (copy[assistantIndex] && !copy[assistantIndex].content) {
+              copy.splice(assistantIndex, 1);
+            }
+            return copy;
+          });
         }
-        saveChat(chatId, next).catch(err =>
-          console.warn("[Senzor Intelligence] saveChat failed:", err)
-        );
-        return next;
-      });
-    } catch (err: any) {
-      if (err?.name === "AbortError") {
-        trace.endedAt = Date.now();
-        // Keep whatever was streamed; attach the partial trace so the user
-        // can still inspect what happened. Drop the bubble only if it never
-        // produced any content.
-        setMessages(prev => {
-          if (assistantIndex === null) return prev;
-          const copy = prev.slice();
-          const current = copy[assistantIndex];
-          if (current && !current.content) {
-            copy.splice(assistantIndex, 1);
-          } else if (current) {
-            copy[assistantIndex] = { ...current, trace };
-          }
-          saveChat(chatId, copy).catch(() => {});
-          return copy;
-        });
-        toast.info("Generation cancelled");
-      } else {
-        console.error("[Senzor Intelligence] runAgent error:", err);
-        toast.error("Generation failed: " + (err?.message || "Unknown error"));
-        setMessages(prev => {
-          if (assistantIndex === null) return prev;
-          const copy = prev.slice();
-          if (copy[assistantIndex] && !copy[assistantIndex].content) {
-            copy.splice(assistantIndex, 1);
-          }
-          return copy;
-        });
+      } finally {
+        setIsGenerating(false);
+        setAgentStatus(null);
+        setLiveTrace(null);
+        abortRef.current = null;
       }
-    } finally {
-      setIsGenerating(false);
-      setAgentStatus(null);
-      setLiveTrace(null);
-      abortRef.current = null;
-    }
-  }, [provider, byokKey, selectedModel, chatId, callToolForAgent]);
+    },
+    [provider, byokKey, selectedModel, chatId, callToolForAgent],
+  );
 
   // --- Agentic Send ---
   const handleSendMessage = async () => {
@@ -3236,7 +4272,7 @@ export default function AiAssistantPage() {
 
     const userMessage: ChatMessage = { role: "user", content: trimmed };
     const historyBeforeTurn = messages;
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     await runTurn(trimmed, historyBeforeTurn);
   };
@@ -3246,7 +4282,7 @@ export default function AiAssistantPage() {
     if (isGenerating) return;
     const userMessage: ChatMessage = { role: "user", content: prompt };
     const historyBeforeTurn = messages;
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     runTurn(prompt, historyBeforeTurn);
   };
@@ -3256,7 +4292,10 @@ export default function AiAssistantPage() {
     if (isGenerating) return;
     let lastUserIdx = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") { lastUserIdx = i; break; }
+      if (messages[i].role === "user") {
+        lastUserIdx = i;
+        break;
+      }
     }
     if (lastUserIdx < 0) return;
     const lastUserText = messages[lastUserIdx].content;
@@ -3274,8 +4313,10 @@ export default function AiAssistantPage() {
 
   // --- History Management ---
   const handleExport = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(messages));
-    const dlAnchorElem = document.createElement('a');
+    const dataStr =
+      "data:text/json;charset=utf-8," +
+      encodeURIComponent(JSON.stringify(messages));
+    const dlAnchorElem = document.createElement("a");
     dlAnchorElem.setAttribute("href", dataStr);
     dlAnchorElem.setAttribute("download", `senzor_chat_${Date.now()}.json`);
     dlAnchorElem.click();
@@ -3289,8 +4330,11 @@ export default function AiAssistantPage() {
       try {
         const imported = JSON.parse(e.target?.result as string);
         if (Array.isArray(imported)) {
-          const cleaned: ChatMessage[] = imported.filter((m: any) =>
-            m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string"
+          const cleaned: ChatMessage[] = imported.filter(
+            (m: any) =>
+              m &&
+              (m.role === "user" || m.role === "assistant") &&
+              typeof m.content === "string",
           );
           setMessages(cleaned);
           await saveChat(chatId, cleaned);
@@ -3311,8 +4355,11 @@ export default function AiAssistantPage() {
     toast.success("Local chat history wiped.");
   };
 
-  const selectedModelData = LOCAL_MODELS.find(m => m.id === selectedModel);
-  const showVramWarning = hardwareProfile && selectedModelData && hardwareProfile.vramEstimate < selectedModelData.vramReq;
+  const selectedModelData = LOCAL_MODELS.find((m) => m.id === selectedModel);
+  const showVramWarning =
+    hardwareProfile &&
+    selectedModelData &&
+    hardwareProfile.vramEstimate < selectedModelData.vramReq;
 
   // ============================================================================
   // UI RENDERERS
@@ -3320,7 +4367,7 @@ export default function AiAssistantPage() {
 
   if (engineMode === "setup") {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex-1 flex items-center justify-center p-4 bg-muted/10 h-full min-h-0">
           {/*
             Card is constrained to the viewport via `max-h-[calc(100%-1rem)]`
@@ -3334,51 +4381,82 @@ export default function AiAssistantPage() {
             scrollable body and matches our app shell elsewhere.
           */}
           <Card className="max-w-2xl w-full max-h-[calc(100%-1rem)] flex flex-col border-border/60 shadow-xl bg-card rounded-xl overflow-hidden">
-            
             <div className="p-6 border-b border-border/40 shrink-0">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <Sparkles className="h-4 w-4 text-primary" />
                 </div>
-                <h1 className="text-xl font-bold text-foreground">Senzor Intelligence</h1>
+                <h1 className="text-xl font-bold text-foreground">
+                  Senzor Intelligence
+                </h1>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Configure your execution engine. Process telemetry natively in your browser for absolute privacy, or use a cloud API for higher throughput.
+                Configure your execution engine. Process telemetry natively in
+                your browser for absolute privacy, or use a cloud API for higher
+                throughput.
               </p>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-muted/5 flex flex-col gap-4">
-              
-              <div 
-                className={cn("p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col", provider === "webllm" ? "bg-background border-primary shadow-sm ring-1 ring-primary/20" : "bg-card border-border hover:border-primary/50")} 
+              <div
+                className={cn(
+                  "p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col",
+                  provider === "webllm"
+                    ? "bg-background border-primary shadow-sm ring-1 ring-primary/20"
+                    : "bg-card border-border hover:border-primary/50",
+                )}
                 onClick={() => setProvider("webllm")}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <Cpu className="h-5 w-5 text-foreground" />
-                  <h3 className="text-sm font-bold text-foreground">Local Hardware Execution</h3>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Local Hardware Execution
+                  </h3>
                 </div>
                 <p className="text-xs text-muted-foreground mb-4 leading-relaxed flex-1">
                   Runs an LLM locally in your browser via WebGPU. 100% private.
                 </p>
-                
+
                 {provider === "webllm" && (
                   <div className="space-y-3 mt-auto border-t border-border/40 pt-3">
                     {hardwareProfile ? (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded border border-border/50">
-                          <span className="text-muted-foreground">GPU Detected</span>
-                          {hardwareProfile.supported ? <span className="text-emerald-500 font-bold flex items-center gap-1"><Check className="h-3 w-3"/> ~{hardwareProfile.vramEstimate}GB VRAM</span> : <span className="text-destructive font-bold flex items-center gap-1"><X className="h-3 w-3"/> Failed</span>}
+                          <span className="text-muted-foreground">
+                            GPU Detected
+                          </span>
+                          {hardwareProfile.supported ? (
+                            <span className="text-emerald-500 font-bold flex items-center gap-1">
+                              <Check className="h-3 w-3" /> ~
+                              {hardwareProfile.vramEstimate}GB VRAM
+                            </span>
+                          ) : (
+                            <span className="text-destructive font-bold flex items-center gap-1">
+                              <X className="h-3 w-3" /> Failed
+                            </span>
+                          )}
                         </div>
                         {hardwareProfile.supported && (
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Model Weights</label>
-                            <Select value={selectedModel} onChange={e => setSelectedModel(e.target.value)} className="h-8 text-xs bg-background shadow-sm">
-                              {TIER_ORDER.map(tier => {
-                                const tierModels = LOCAL_MODELS.filter(m => m.tier === tier);
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Select Model Weights
+                            </label>
+                            <Select
+                              value={selectedModel}
+                              onChange={(e) => setSelectedModel(e.target.value)}
+                              className="h-8 text-xs bg-background shadow-sm"
+                            >
+                              {TIER_ORDER.map((tier) => {
+                                const tierModels = LOCAL_MODELS.filter(
+                                  (m) => m.tier === tier,
+                                );
                                 if (tierModels.length === 0) return null;
                                 return (
-                                  <optgroup key={tier} label={TIER_LABELS[tier]}>
-                                    {tierModels.map(m => (
+                                  <optgroup
+                                    key={tier}
+                                    label={TIER_LABELS[tier]}
+                                  >
+                                    {tierModels.map((m) => (
                                       <option key={m.id} value={m.id}>
                                         {m.name} · {m.vramReq}GB VRAM
                                       </option>
@@ -3394,7 +4472,7 @@ export default function AiAssistantPage() {
                                 </p>
                                 {selectedModelData.tags.length > 0 && (
                                   <div className="flex flex-wrap gap-1">
-                                    {selectedModelData.tags.map(tag => (
+                                    {selectedModelData.tags.map((tag) => (
                                       <span
                                         key={tag}
                                         className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-border/60 bg-muted/40 text-muted-foreground"
@@ -3410,8 +4488,15 @@ export default function AiAssistantPage() {
                               <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 p-3 rounded-lg mt-4 animate-in fade-in">
                                 <AlertTriangle className="h-5 w-5 shrink-0" />
                                 <div className="text-xs leading-relaxed">
-                                  <strong className="block mb-1">Hardware Warning</strong>
-                                  Your system reports ~{hardwareProfile.vramEstimate}GB of VRAM, but {selectedModelData?.name} requires at least {selectedModelData?.vramReq}GB. Generating responses may cause browser instability or out-of-memory crashes.
+                                  <strong className="block mb-1">
+                                    Hardware Warning
+                                  </strong>
+                                  Your system reports ~
+                                  {hardwareProfile.vramEstimate}GB of VRAM, but{" "}
+                                  {selectedModelData?.name} requires at least{" "}
+                                  {selectedModelData?.vramReq}GB. Generating
+                                  responses may cause browser instability or
+                                  out-of-memory crashes.
                                 </div>
                               </div>
                             )}
@@ -3419,29 +4504,49 @@ export default function AiAssistantPage() {
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground"><Spinner className="h-3 w-3"/> Profiling Environment...</div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Spinner className="h-3 w-3" /> Profiling Environment...
+                      </div>
                     )}
                   </div>
                 )}
               </div>
 
-              <div 
-                className={cn("p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col", provider === "byok" ? "bg-background border-blue-500 shadow-sm ring-1 ring-blue-500/20" : "bg-card border-border hover:border-blue-500/50")} 
+              <div
+                className={cn(
+                  "p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col",
+                  provider === "byok"
+                    ? "bg-background border-blue-500 shadow-sm ring-1 ring-blue-500/20"
+                    : "bg-card border-border hover:border-blue-500/50",
+                )}
                 onClick={() => setProvider("byok")}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <Bot className="h-5 w-5 text-foreground" />
-                  <h3 className="text-sm font-bold text-foreground">Cloud API (BYOK)</h3>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Cloud API (BYOK)
+                  </h3>
                 </div>
                 <p className="text-xs text-muted-foreground mb-4 leading-relaxed flex-1">
-                  Bring your own OpenAI key. Requests are routed directly from your browser.
+                  Bring your own OpenAI key. Requests are routed directly from
+                  your browser.
                 </p>
-                
+
                 {provider === "byok" && (
                   <div className="space-y-1.5 pt-3 border-t border-border/40 mt-auto">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">OpenAI API Key</label>
-                    <Input type="password" placeholder="sk-proj-..." value={byokKey} onChange={e => setByokKey(e.target.value)} className="h-8 text-xs bg-background font-mono shadow-sm" />
-                    <p className="text-[9px] text-muted-foreground mt-1">Stored securely in RAM only.</p>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      OpenAI API Key
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="sk-proj-..."
+                      value={byokKey}
+                      onChange={(e) => setByokKey(e.target.value)}
+                      className="h-8 text-xs bg-background font-mono shadow-sm"
+                    />
+                    <p className="text-[9px] text-muted-foreground mt-1">
+                      Stored securely in RAM only.
+                    </p>
                   </div>
                 )}
               </div>
@@ -3449,37 +4554,46 @@ export default function AiAssistantPage() {
 
             <div className="p-4 md:p-6 border-t border-border/40 bg-card flex justify-end gap-3 items-center shrink-0">
               <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1.5 mr-auto">
-                <Lock className="h-3 w-3 text-emerald-500" /> End-to-End Encrypted
+                <Lock className="h-3 w-3 text-emerald-500" /> End-to-End
+                Encrypted
               </span>
-              <Button onClick={initializeEngine} disabled={provider === "webllm" && (!hardwareProfile?.supported || showVramWarning)} className="font-bold px-6 shadow-sm">
+              <Button
+                onClick={initializeEngine}
+                disabled={
+                  provider === "webllm" &&
+                  (!hardwareProfile?.supported || showVramWarning)
+                }
+                className="font-bold px-6 shadow-sm"
+              >
                 Initialize Session <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
           </Card>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (engineMode === "loading") {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex-1 flex items-center justify-center p-4 bg-muted/20 h-full">
           <Card className="max-w-md w-full p-8 border-border/60 shadow-xl bg-card rounded-xl overflow-hidden relative">
             <div className="flex flex-col items-center text-center space-y-6 relative z-10">
               <div className="relative flex items-center justify-center">
-                  <div className="absolute inset-0 bg-muted/60 rounded-full animate-pulse" />
-                  <div className="bg-primary/10 border border-primary/20 p-4 rounded-full">
-                    <Cpu className="h-8 w-8 text-primary" />
-                  </div>
+                <div className="absolute inset-0 bg-muted/60 rounded-full animate-pulse" />
+                <div className="bg-primary/10 border border-primary/20 p-4 rounded-full">
+                  <Cpu className="h-8 w-8 text-primary" />
+                </div>
               </div>
-              
+
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-foreground mb-2">
                   Provisioning Local Engine
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Securely caching model weights to your device. This runs once and ensures zero data leaves your network.
+                  Securely caching model weights to your device. This runs once
+                  and ensures zero data leaves your network.
                 </p>
               </div>
 
@@ -3489,8 +4603,18 @@ export default function AiAssistantPage() {
                   <span className="text-primary">{loadProgress.progress}%</span>
                 </div>
                 <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden border border-border/50">
-                  <div className="bg-primary h-full transition-all duration-300 ease-out relative" style={{ width: `${loadProgress.progress}%` }}>
-                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)', transform: 'skewX(-20deg)' }} />
+                  <div
+                    className="bg-primary h-full transition-all duration-300 ease-out relative"
+                    style={{ width: `${loadProgress.progress}%` }}
+                  >
+                    <div
+                      className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)",
+                        transform: "skewX(-20deg)",
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -3498,47 +4622,66 @@ export default function AiAssistantPage() {
               {loadProgress.stats && (
                 <div className="w-full grid grid-cols-3 gap-2 mt-4">
                   <div className="bg-background border border-border/50 rounded-lg p-2 flex flex-col items-center justify-center">
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">Fetched</span>
-                    <span className="text-xs font-mono font-bold text-foreground">{loadProgress.stats.mb}</span>
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+                      Fetched
+                    </span>
+                    <span className="text-xs font-mono font-bold text-foreground">
+                      {loadProgress.stats.mb}
+                    </span>
                   </div>
                   <div className="bg-background border border-border/50 rounded-lg p-2 flex flex-col items-center justify-center">
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">Chunks</span>
-                    <span className="text-xs font-mono font-bold text-foreground">{loadProgress.stats.chunks}</span>
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+                      Chunks
+                    </span>
+                    <span className="text-xs font-mono font-bold text-foreground">
+                      {loadProgress.stats.chunks}
+                    </span>
                   </div>
                   <div className="bg-background border border-border/50 rounded-lg p-2 flex flex-col items-center justify-center">
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">Elapsed</span>
-                    <span className="text-xs font-mono font-bold text-foreground">{loadProgress.stats.time}</span>
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+                      Elapsed
+                    </span>
+                    <span className="text-xs font-mono font-bold text-foreground">
+                      {loadProgress.stats.time}
+                    </span>
                   </div>
                 </div>
               )}
-              
+
               <div className="text-[10px] text-muted-foreground font-mono bg-muted/30 px-3 py-1.5 rounded-md border border-border/50 w-full truncate">
                 {loadProgress.text || "Initializing WebGPU Context..."}
               </div>
             </div>
           </Card>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   // --- READY MODE (Dual Pane Interface) ---
   // Filter messages for the main UI so we don't display raw tool payloads in the chat bubbles
-  const displayMessages = messages.filter(m => m.role === "user" || m.role === "assistant");
+  const displayMessages = messages.filter(
+    (m) => m.role === "user" || m.role === "assistant",
+  );
 
   let lastAssistantIdx = -1;
   for (let i = displayMessages.length - 1; i >= 0; i--) {
-    if (displayMessages[i].role === "assistant") { lastAssistantIdx = i; break; }
+    if (displayMessages[i].role === "assistant") {
+      lastAssistantIdx = i;
+      break;
+    }
   }
 
-  const activeModelLabel = provider === "webllm"
-    ? (LOCAL_MODELS.find(m => m.id === selectedModel)?.name?.split(" - ")[0] ?? "Local Model")
-    : "GPT-4o (Cloud)";
+  const activeModelLabel =
+    provider === "webllm"
+      ? (LOCAL_MODELS.find((m) => m.id === selectedModel)?.name?.split(
+          " - ",
+        )[0] ?? "Local Model")
+      : "GPT-4o (Cloud)";
 
   return (
-    <DashboardLayout>
+    <>
       <div className="flex h-full flex-col overflow-hidden bg-background">
-        
         {/* Header */}
         <header className="h-14 border-b border-border/40 bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 shrink-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
@@ -3547,22 +4690,36 @@ export default function AiAssistantPage() {
               <span
                 className={cn(
                   "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-card",
-                  isGenerating ? "bg-amber-500 animate-pulse" : "bg-emerald-500",
+                  isGenerating
+                    ? "bg-amber-500 animate-pulse"
+                    : "bg-emerald-500",
                 )}
               />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-bold text-foreground leading-tight">Senzor Intelligence</h1>
+              <h1 className="text-sm font-bold text-foreground leading-tight">
+                Senzor Intelligence
+              </h1>
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
-                <span className={cn("inline-flex items-center gap-1 font-mono uppercase tracking-wider font-semibold", isGenerating ? "text-amber-500" : "text-emerald-500")}>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 font-mono uppercase tracking-wider font-semibold",
+                    isGenerating ? "text-amber-500" : "text-emerald-500",
+                  )}
+                >
                   {isGenerating ? "Working" : "Ready"}
                 </span>
                 <span className="opacity-50">·</span>
-                <span className="font-mono truncate max-w-[180px]" title={activeModelLabel}>{activeModelLabel}</span>
+                <span
+                  className="font-mono truncate max-w-[180px]"
+                  title={activeModelLabel}
+                >
+                  {activeModelLabel}
+                </span>
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-1.5 shrink-0">
             {isGenerating && (
               <Button
@@ -3578,37 +4735,70 @@ export default function AiAssistantPage() {
               variant="ghost"
               size="sm"
               onClick={() => setIsInspectorOpen(!isInspectorOpen)}
-              className={cn("h-8 text-xs font-medium hidden sm:inline-flex", isInspectorOpen ? "text-blue-500 bg-blue-500/10 hover:bg-blue-500/15 hover:text-blue-500" : "text-muted-foreground hover:text-foreground")}
+              className={cn(
+                "h-8 text-xs font-medium hidden sm:inline-flex",
+                isInspectorOpen
+                  ? "text-blue-500 bg-blue-500/10 hover:bg-blue-500/15 hover:text-blue-500"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              {isInspectorOpen ? <PanelRightClose className="h-3.5 w-3.5 mr-1.5"/> : <PanelRightOpen className="h-3.5 w-3.5 mr-1.5"/>}
+              {isInspectorOpen ? (
+                <PanelRightClose className="h-3.5 w-3.5 mr-1.5" />
+              ) : (
+                <PanelRightOpen className="h-3.5 w-3.5 mr-1.5" />
+              )}
               Inspector
             </Button>
             <div className="w-px h-4 bg-border mx-0.5 hidden sm:block" />
-            <Button variant="ghost" size="icon" onClick={handleExport} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Export chat">
-              <Download className="h-3.5 w-3.5"/>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleExport}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              title="Export chat"
+            >
+              <Download className="h-3.5 w-3.5" />
             </Button>
             <div className="relative">
-              <input type="file" id="import-chat" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".json" onChange={handleImport} />
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground pointer-events-none" title="Import chat">
-                <Upload className="h-3.5 w-3.5"/>
+              <input
+                type="file"
+                id="import-chat"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                accept=".json"
+                onChange={handleImport}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground pointer-events-none"
+                title="Import chat"
+              >
+                <Upload className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Clear conversation">
-              <Trash2 className="h-3.5 w-3.5"/>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDelete}
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              title="Clear conversation"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </header>
 
         {/* Dual Pane Layout */}
         <div className="flex-1 flex flex-row min-h-0 overflow-hidden relative w-full">
-          
           {/* Left Pane: Chat Interface */}
           <div className="flex-1 flex flex-col h-full bg-background relative z-0 min-w-0">
-            
             <div className="flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth">
               <div className="max-w-3xl mx-auto space-y-6">
                 {displayMessages.length === 0 && !isGenerating ? (
-                  <EmptyState onSelect={handleSuggestedPrompt} disabled={isGenerating} />
+                  <EmptyState
+                    onSelect={handleSuggestedPrompt}
+                    disabled={isGenerating}
+                  />
                 ) : (
                   displayMessages.map((msg, idx) => (
                     <MessageBubble
@@ -3626,7 +4816,10 @@ export default function AiAssistantPage() {
                       <Bot className="h-4 w-4 text-primary animate-pulse" />
                     </div>
                     <div className="flex-1 min-w-0 max-w-[92%]">
-                      <LiveAgentTimeline status={agentStatus} trace={liveTrace} />
+                      <LiveAgentTimeline
+                        status={agentStatus}
+                        trace={liveTrace}
+                      />
                     </div>
                   </div>
                 )}
@@ -3636,21 +4829,33 @@ export default function AiAssistantPage() {
 
             <div className="px-4 pb-4 pt-2 bg-background border-t border-border/40 shrink-0 relative z-10">
               <form
-                onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
                 className="relative max-w-3xl mx-auto"
               >
-                <div className={cn(
-                  "relative bg-card border border-border/60 rounded-2xl shadow-sm transition-all",
-                  "focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15",
-                  isGenerating && "opacity-90",
-                )}>
+                <div
+                  className={cn(
+                    "relative bg-card border border-border/60 rounded-2xl shadow-sm transition-all",
+                    "focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15",
+                    isGenerating && "opacity-90",
+                  )}
+                >
                   <textarea
                     className="w-full bg-transparent rounded-2xl px-4 py-3.5 text-sm focus:outline-none resize-none pr-14 min-h-[52px] max-h-40 no-scrollbar placeholder:text-muted-foreground"
-                    placeholder={isGenerating ? "Generating response — press Stop to cancel…" : "Ask about errors, performance, infrastructure, or billing…"}
+                    placeholder={
+                      isGenerating
+                        ? "Generating response — press Stop to cancel…"
+                        : "Ask about errors, performance, infrastructure, or billing…"
+                    }
                     value={input}
-                    onChange={e => setInput(e.target.value)}
+                    onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
                     }}
                     rows={1}
                     disabled={isGenerating}
@@ -3681,14 +4886,22 @@ export default function AiAssistantPage() {
                 <div className="flex items-center justify-between mt-2 px-1">
                   <span className="text-[10px] text-muted-foreground flex items-center gap-1.5">
                     <Lock className="h-2.5 w-2.5 text-emerald-500" />
-                    {provider === "webllm" ? "Runs locally on your device" : "Routed via your OpenAI key"}
+                    {provider === "webllm"
+                      ? "Runs locally on your device"
+                      : "Routed via your OpenAI key"}
                   </span>
                   <span className="text-[10px] text-muted-foreground hidden sm:flex items-center gap-2">
-                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">Enter</kbd>
+                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">
+                      Enter
+                    </kbd>
                     <span>to send</span>
-                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">Shift</kbd>
+                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">
+                      Shift
+                    </kbd>
                     <span>+</span>
-                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">Enter</kbd>
+                    <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[9px]">
+                      Enter
+                    </kbd>
                     <span>for newline</span>
                   </span>
                 </div>
@@ -3697,7 +4910,14 @@ export default function AiAssistantPage() {
           </div>
 
           {/* Right Pane: Context Inspector (Elastic) */}
-          <div className={cn("flex flex-col h-full bg-muted/10 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] border-l border-border/40 shrink-0", isInspectorOpen ? "w-full md:w-[420px] lg:w-[460px] opacity-100" : "w-0 opacity-0 border-none")}>
+          <div
+            className={cn(
+              "flex flex-col h-full bg-muted/10 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] border-l border-border/40 shrink-0",
+              isInspectorOpen
+                ? "w-full md:w-[420px] lg:w-[460px] opacity-100"
+                : "w-0 opacity-0 border-none",
+            )}
+          >
             <div className="w-full md:w-[420px] lg:w-[460px] h-full flex flex-col">
               <ContextInspector
                 logs={contextLogs}
@@ -3706,10 +4926,9 @@ export default function AiAssistantPage() {
               />
             </div>
           </div>
-          
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }
 
@@ -3726,9 +4945,13 @@ const EmptyState: React.FC<{
       <Sparkles className="h-7 w-7 text-primary" />
       <span className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-background" />
     </div>
-    <h2 className="text-lg font-bold text-foreground tracking-tight">How can I help you investigate?</h2>
+    <h2 className="text-lg font-bold text-foreground tracking-tight">
+      How can I help you investigate?
+    </h2>
     <p className="text-sm text-muted-foreground mt-1.5 max-w-md text-center leading-relaxed">
-      I can analyze logs, traces, errors, infrastructure, and billing across your Senzor workspace. Ask anything — I'll plan the steps, call the right tools, and summarize the findings.
+      I can analyze logs, traces, errors, infrastructure, and billing across
+      your Senzor workspace. Ask anything — I'll plan the steps, call the right
+      tools, and summarize the findings.
     </p>
 
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
@@ -3740,10 +4963,17 @@ const EmptyState: React.FC<{
             className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:border-border transition-colors"
           >
             <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 bg-muted/20">
-              <div className={cn("w-5 h-5 rounded-md border flex items-center justify-center shrink-0", category.accent)}>
+              <div
+                className={cn(
+                  "w-5 h-5 rounded-md border flex items-center justify-center shrink-0",
+                  category.accent,
+                )}
+              >
                 <Icon className="h-3 w-3" />
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-foreground">{category.category}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                {category.category}
+              </span>
             </div>
             <div className="p-1">
               {category.prompts.map((p, i) => (
@@ -3755,7 +4985,9 @@ const EmptyState: React.FC<{
                   className="group/p w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted/40 transition-colors flex items-start gap-2 disabled:opacity-50 disabled:pointer-events-none"
                 >
                   <ArrowRight className="h-3 w-3 text-muted-foreground mt-1 shrink-0 group-hover/p:text-primary group-hover/p:translate-x-0.5 transition-all" />
-                  <span className="text-xs text-muted-foreground group-hover/p:text-foreground leading-relaxed">{p}</span>
+                  <span className="text-xs text-muted-foreground group-hover/p:text-foreground leading-relaxed">
+                    {p}
+                  </span>
                 </button>
               ))}
             </div>
@@ -3788,12 +5020,15 @@ const ContextInspector: React.FC<{
     });
   }, [logs, query]);
 
-  const counts = useMemo(() => ({
-    calls: logs.filter(l => l.type === "tool_call").length,
-    results: logs.filter(l => l.type === "tool_result").length,
-    errors: logs.filter(l => l.type === "tool_error").length,
-    thoughts: logs.filter(l => l.type === "thinking").length,
-  }), [logs]);
+  const counts = useMemo(
+    () => ({
+      calls: logs.filter((l) => l.type === "tool_call").length,
+      results: logs.filter((l) => l.type === "tool_result").length,
+      errors: logs.filter((l) => l.type === "tool_error").length,
+      thoughts: logs.filter((l) => l.type === "thinking").length,
+    }),
+    [logs],
+  );
 
   return (
     <>
@@ -3813,8 +5048,13 @@ const ContextInspector: React.FC<{
                 Clear
               </button>
             )}
-            <Button variant="ghost" size="icon" className="h-6 w-6 md:hidden" onClick={onClose}>
-              <X className="h-4 w-4"/>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 md:hidden"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -3852,7 +5092,7 @@ const ContextInspector: React.FC<{
           </>
         )}
       </div>
-      
+
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {filtered.length === 0 ? (
           logs.length === 0 ? (
@@ -3860,10 +5100,15 @@ const ContextInspector: React.FC<{
               <div className="w-12 h-12 rounded-xl bg-muted/40 border border-border/50 flex items-center justify-center mb-3">
                 <Database className="h-5 w-5" />
               </div>
-              <p className="text-xs leading-relaxed max-w-[240px]">Tool calls, results, and reasoning will stream here for full auditability.</p>
+              <p className="text-xs leading-relaxed max-w-[240px]">
+                Tool calls, results, and reasoning will stream here for full
+                auditability.
+              </p>
             </div>
           ) : (
-            <div className="text-xs text-center text-muted-foreground py-8">No entries match "{query}".</div>
+            <div className="text-xs text-center text-muted-foreground py-8">
+              No entries match "{query}".
+            </div>
           )
         ) : (
           filtered.map((log, i) => <ContextInspectorRow key={i} log={log} />)
@@ -3875,39 +5120,77 @@ const ContextInspector: React.FC<{
 
 const ContextInspectorRow: React.FC<{ log: LogEntry }> = ({ log }) => {
   const meta = (() => {
-    if (log.type === "tool_call") return { Icon: Wrench, label: "Call", chip: "bg-blue-500/10 text-blue-400 border-blue-500/20" };
-    if (log.type === "tool_result") return { Icon: CheckCircle2, label: "Result", chip: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
-    if (log.type === "tool_error") return { Icon: AlertCircle, label: "Error", chip: "bg-rose-500/10 text-rose-400 border-rose-500/20" };
-    return { Icon: Brain, label: "Thought", chip: "bg-violet-500/10 text-violet-400 border-violet-500/20" };
+    if (log.type === "tool_call")
+      return {
+        Icon: Wrench,
+        label: "Call",
+        chip: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+      };
+    if (log.type === "tool_result")
+      return {
+        Icon: CheckCircle2,
+        label: "Result",
+        chip: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      };
+    if (log.type === "tool_error")
+      return {
+        Icon: AlertCircle,
+        label: "Error",
+        chip: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+      };
+    return {
+      Icon: Brain,
+      label: "Thought",
+      chip: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    };
   })();
   const { Icon } = meta;
 
-  const payload = log.type === "thinking"
-    ? log.content
-    : JSON.stringify(
-        log.type === "tool_call" ? log.args : log.type === "tool_error" ? log.error : log.data,
-        null,
-        2,
-      );
+  const payload =
+    log.type === "thinking"
+      ? log.content
+      : JSON.stringify(
+          log.type === "tool_call"
+            ? log.args
+            : log.type === "tool_error"
+              ? log.error
+              : log.data,
+          null,
+          2,
+        );
 
   return (
     <div className="bg-[#0d1117] border border-border/60 rounded-lg overflow-hidden shadow-sm group">
-      <div className={cn("px-3 py-2 text-[11px] font-bold font-mono border-b flex items-center justify-between gap-2", meta.chip)}>
+      <div
+        className={cn(
+          "px-3 py-2 text-[11px] font-bold font-mono border-b flex items-center justify-between gap-2",
+          meta.chip,
+        )}
+      >
         <span className="flex items-center gap-2 min-w-0">
           <Icon className="h-3 w-3 shrink-0" />
-          <span className="uppercase tracking-wider opacity-90 shrink-0">{meta.label}</span>
-          <span className="truncate text-slate-200/80 normal-case">{log.name}</span>
+          <span className="uppercase tracking-wider opacity-90 shrink-0">
+            {meta.label}
+          </span>
+          <span className="truncate text-slate-200/80 normal-case">
+            {log.name}
+          </span>
         </span>
         <span className="flex items-center gap-1 shrink-0">
           <span className="text-[9px] text-slate-500 whitespace-nowrap font-normal">
             <Clock className="h-2.5 w-2.5 inline mr-0.5" />
             {log.time.toLocaleTimeString()}
           </span>
-          <CopyButton value={payload} className="text-slate-400 hover:text-slate-100 hover:bg-white/10 opacity-0 group-hover:opacity-100" />
+          <CopyButton
+            value={payload}
+            className="text-slate-400 hover:text-slate-100 hover:bg-white/10 opacity-0 group-hover:opacity-100"
+          />
         </span>
       </div>
       <div className="p-3 overflow-x-auto max-h-56">
-        <pre className="text-[10px] font-mono text-[#e6edf3] whitespace-pre-wrap break-all">{payload}</pre>
+        <pre className="text-[10px] font-mono text-[#e6edf3] whitespace-pre-wrap break-all">
+          {payload}
+        </pre>
       </div>
     </div>
   );

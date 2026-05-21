@@ -9,7 +9,6 @@ import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
-import { DashboardLayout } from "../../../components/Layout";
 import {
   Card,
   CardContent,
@@ -378,22 +377,22 @@ export default function GlobalLogsDashboard() {
 
   if (!data && !error && isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Querying Log Events...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError onRetry={() => mutate()} />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
@@ -401,7 +400,7 @@ export default function GlobalLogsDashboard() {
     isMono ? "hsl(var(--chart-mono))" : defaultColor;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-24 relative">
         {/* --- Header & Range Control --- */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border border-border/60">
@@ -966,6 +965,6 @@ export default function GlobalLogsDashboard() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

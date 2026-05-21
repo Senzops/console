@@ -9,10 +9,14 @@ import { Toaster } from "sonner";
 import { buildTitleFromPath } from "@/utils/title";
 import { useRouter } from "next/router";
 import { inter, dmSerif } from "@/lib/fonts";
+import { DashboardLayout } from "@/components/Layout";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [title, setTitle] = useState(() => buildTitleFromPath(router.asPath));
+
+  // Support per-page layouts if needed, otherwise default to a basic layout
+  const getLayout = (Component as any).getLayout || ((page: any) => page);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_SENZOR_WEB_ID) {
@@ -39,6 +43,16 @@ export default function App({ Component, pageProps }: AppProps) {
       router.events.off("routeChangeComplete", handle);
     };
   }, [router.events, router.asPath]);
+
+  // Determine if this is a dashboard route to apply persistent layout
+  const isDashboard = router.pathname.startsWith("/dashboard");
+
+  let content = <Component {...pageProps} />;
+
+  // Wrap with DashboardLayout if it's a dashboard route and doesn't have a custom layout
+  if (isDashboard && !(Component as any).getLayout) {
+    content = <DashboardLayout>{content}</DashboardLayout>;
+  }
 
   return (
     <div className={`${inter.variable} ${dmSerif.variable} font-sans`}>
@@ -75,7 +89,7 @@ export default function App({ Component, pageProps }: AppProps) {
               },
             }}
           />
-          <Component {...pageProps} />
+          {getLayout(content)}
         </ThemeProvider>
       </AuthProvider>
     </div>

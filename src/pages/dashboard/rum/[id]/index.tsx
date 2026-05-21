@@ -10,7 +10,6 @@ import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../../lib/auth";
 import { useTheme } from "../../../../lib/theme";
-import { DashboardLayout } from "../../../../components/Layout";
 import {
   Card,
   CardContent,
@@ -638,30 +637,30 @@ export default function RumDashboard() {
 
   if (!data && !error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <Spinner className="h-8 w-8 text-emerald-500" />
           <p className="text-muted-foreground">Connecting to Web APM...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   if (error)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex items-center justify-center p-8">
           <DataError onRetry={() => mutate()} />
         </div>
-      </DashboardLayout>
+      </>
     );
   if (!data?.service)
     return (
-      <DashboardLayout>
+      <>
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <div className="p-8 text-destructive">
             Failed to load RUM service.
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
 
   const { service, stats, recentTraces } = data;
@@ -675,7 +674,7 @@ export default function RumDashboard() {
   const safePaths = data.paths || computePathsFallback(recentTraces);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         {/* 1. Header */}
         <div className="flex flex-col gap-4">
@@ -1110,6 +1109,6 @@ export default function RumDashboard() {
           </div>
         </div>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }
