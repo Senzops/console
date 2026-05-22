@@ -12,31 +12,202 @@ import {
   Receipt,
   Server,
   Lock,
+  XCircle,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 const getGravatar = (email: string) =>
   `https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?d=identicon`;
 
-export default function CheckoutSuccessPage() {
+export default function CheckoutOutcomePage() {
   const router = useRouter();
   const { user } = useAuth();
+  const [isMounted, setIsMounted] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(10);
 
   useEffect(() => {
-    // 1. Automatic Redirect Logic
+    setIsMounted(true);
+    if (router.isReady) {
+      const statusParam = router.query.status as string;
+      if (statusParam) {
+        setStatus(statusParam);
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        setStatus(urlParams.get("status") || "succeeded");
+      }
+    }
+  }, [router.isReady, router.query]);
+
+  useEffect(() => {
+    if (!isMounted || status === "failed" || status === "pending") return;
+
+    // Automatic Redirect Logic for Success
     if (countdown <= 0) {
       router.push("/dashboard/profile");
       return;
     }
 
-    // 2. Countdown Timer
+    // Countdown Timer for Success
     const timer = setInterval(() => {
       setCountdown((prev) => prev - 1);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [countdown, router]);
+  }, [countdown, router, isMounted, status]);
 
+  if (!isMounted || status === "pending") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 relative overflow-hidden">
+        <NetworkBackground />
+        <div className="w-full max-w-3xl relative z-10 flex flex-col items-center justify-center p-10 bg-card/95 backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl">
+          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4 text-emerald-500" />
+          <p className="text-foreground font-bold text-lg">
+            Verifying Transaction Status
+          </p>
+          <p className="text-muted-foreground text-xs mt-1 font-medium text-center max-w-[280px]">
+            Please wait while we resolve your secure checkout session.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 relative overflow-hidden">
+        <Head>
+          <title>Payment Failed | Senzor</title>
+        </Head>
+
+        {/* Consistent background with the checkout flow */}
+        <NetworkBackground />
+
+        <div className="w-full max-w-3xl relative z-10 animate-in fade-in zoom-in-95 duration-500">
+          <Card className="w-full border-border/60 shadow-2xl bg-card/95 backdrop-blur-xl overflow-hidden">
+            <CardContent className="p-6 md:p-10">
+              {/* --- Header & User Context --- */}
+              <div className="mb-8 pb-8 border-b border-border/40 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-5">
+                  {/* Animated Error Node */}
+                  <div className="relative flex items-center justify-center w-12 h-12 shrink-0">
+                    <div
+                      className="absolute inset-0 bg-destructive/20 rounded-full animate-ping opacity-50"
+                      style={{ animationDuration: "2.5s" }}
+                    />
+                    <div className="relative bg-destructive/10 border border-destructive/20 p-2.5 rounded-full">
+                      <XCircle
+                        className="w-6 h-6 text-destructive"
+                        strokeWidth={2.5}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold font-display tracking-tight text-foreground">
+                      Payment Failed
+                    </h1>
+                    <div className="mt-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Lock className="w-3.5 h-3.5 text-destructive" />{" "}
+                      Transaction verification incomplete
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Account Context (Matches Success/Checkout) */}
+                {user && (
+                  <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 min-w-[220px] shrink-0">
+                    <Avatar
+                      src={getGravatar(user.email || "")}
+                      fallback={
+                        user.email?.substring(0, 2).toUpperCase() || "US"
+                      }
+                    />
+                    <div className="flex flex-col text-left overflow-hidden">
+                      <span className="text-sm font-bold text-foreground leading-tight truncate">
+                        {user.displayName || "Senzor Account"}
+                      </span>
+                      <span className="text-xs font-medium text-muted-foreground leading-tight truncate">
+                        {user.email}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* --- Troubleshooting Information --- */}
+              <div className="space-y-4 mb-8">
+                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider opacity-80">
+                  Troubleshooting Steps
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Common Causes Block */}
+                  <div className="bg-background border border-border/60 rounded-xl p-5 shadow-sm flex items-start gap-4 transition-colors hover:border-destructive/30">
+                    <div className="mt-0.5 bg-destructive/10 border border-destructive/20 p-2 rounded-lg shrink-0">
+                      <AlertCircle className="w-5 h-5 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground">
+                        Common Causes
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        Insufficient funds, temporary bank hold, expired card,
+                        or incorrect security code (CVC).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Assistance Block */}
+                  <div className="bg-background border border-border/60 rounded-xl p-5 shadow-sm flex items-start gap-4 transition-colors hover:border-blue-500/30">
+                    <div className="mt-0.5 bg-blue-500/10 border border-blue-500/20 p-2 rounded-lg shrink-0">
+                      <Server className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground">
+                        Need Assistance?
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        If funds were deducted or you believe this was an error,
+                        please reach out to our support channel.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* --- Footer: Actions --- */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-6 border-t border-border/40">
+                <div className="text-xs text-muted-foreground max-w-sm">
+                  You can retry checkout now or choose to return to your
+                  dashboard settings. No subscriptions were charged.
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto h-11 text-sm font-bold border-border/60 hover:bg-secondary/40 shrink-0"
+                    onClick={() => router.push("/dashboard/profile")}
+                  >
+                    Return to Dashboard
+                  </Button>
+                  <Button
+                    className="w-full sm:w-auto h-11 text-sm font-bold shadow-md hover:scale-[1.01] transition-transform group shrink-0"
+                    onClick={() => router.push("/checkout")}
+                  >
+                    Try Payment Again
+                    <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: Success Screen (status !== "failed")
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 relative overflow-hidden">
       <Head>
@@ -112,8 +283,8 @@ export default function CheckoutSuccessPage() {
                       Capacity Upgraded
                     </p>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Your new capacity limits are active across all
-                      registered services.
+                      Your new capacity limits are active across all registered
+                      services.
                     </p>
                   </div>
                 </div>
