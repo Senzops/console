@@ -379,7 +379,7 @@ export default function ProfilePage() {
   const handleDownloadReceipt = async (transactionId: string) => {
     setDownloadingTx(transactionId);
     try {
-      // The API handles both cached URLs and JIT Paddle fetching
+      // The API handles both cached URLs and JIT Dodo Payments receipt fetching
       const res = await api.get(
         `/billing/transactions/${transactionId}/receipt`,
       );

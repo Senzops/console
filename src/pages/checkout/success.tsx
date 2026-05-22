@@ -128,7 +128,7 @@ export default function CheckoutSuccessPage() {
                       Invoice Generating
                     </p>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Your official receipt from Paddle.com is processing and
+                      Your official receipt from Dodo Payments is processing and
                       will appear in your billing history.
                     </p>
                   </div>

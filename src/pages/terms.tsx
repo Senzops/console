@@ -92,8 +92,8 @@ export default function TermsOfService() {
               </h2>
               <p>
                 <strong>Merchant of Record:</strong> Our order process is
-                conducted by our online reseller Paddle.com. Paddle.com is the
-                Merchant of Record for all our orders. Paddle provides all
+                conducted by our online reseller Dodo Payments. Dodo Payments is the
+                Merchant of Record for all our orders. Dodo Payments provides all
                 customer service inquiries and handles returns.
               </p>
               <p>
@@ -105,13 +105,13 @@ export default function TermsOfService() {
               </p>
               <p>
                 <strong>Refund Policy:</strong> Refunds are processed entirely
-                by our Merchant of Record, Paddle.com, in strict accordance with
-                Paddle's Consumer Terms and Conditions. We honor Paddle's
+                by our Merchant of Record, Dodo Payments, in strict accordance with
+                Dodo Payments' Consumer Terms and Conditions. We honor Dodo Payments'
                 standard refund policies{" "}
                 <strong>
                   without any additional qualifiers, usage limits, or exceptions
                 </strong>
-                . If you request a refund through Paddle within their allowable
+                . If you request a refund through Dodo Payments within their allowable
                 window, it will be granted without question.
               </p>
             </section>

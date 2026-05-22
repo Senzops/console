@@ -81,7 +81,7 @@ export default function PrivacyPolicy() {
                 including your email address, name, and authentication
                 credentials (secured via Firebase Auth). If you upgrade to a
                 paid tier, your financial information is collected and processed
-                securely by our Merchant of Record, Paddle.com. Senzor does not
+                securely by our Merchant of Record, Dodo Payments. Senzor does not
                 store, process, or transmit full credit card numbers on our
                 infrastructure.
               </p>
@@ -147,7 +147,7 @@ export default function PrivacyPolicy() {
                   compute hosting.
                 </li>
                 <li>
-                  <strong>Paddle.com:</strong> Merchant of Record for
+                  <strong>Dodo Payments:</strong> Merchant of Record for
                   subscription management and global tax compliance.
                 </li>
                 <li>

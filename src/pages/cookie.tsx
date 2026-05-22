@@ -96,7 +96,7 @@ export default function CookiePolicy() {
                   </h3>
                   <p className="text-sm">
                     When you access the pricing page or upgrade your plan, our
-                    Merchant of Record, Paddle.com, deploys essential cookies to
+                    Merchant of Record, Dodo Payments, deploys essential cookies to
                     manage the secure checkout flow, calculate local taxes, and
                     process payment securely.
                   </p>
