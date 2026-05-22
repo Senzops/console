@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import Script from "next/script";
 import Link from "next/link";
 import md5 from "md5";
 import {
@@ -34,97 +33,7 @@ const getGravatar = (email: string) =>
     email.trim().toLowerCase(),
   )}?d=identicon`;
 
-// Helper to resolve Dodo Payments theme colors matching our app's active theme
-const getDodoThemeConfig = (theme: string) => {
-  let colors;
-  if (theme === "nord") {
-    colors = {
-      bgPrimary: "#3b4252",
-      bgSecondary: "#2e3440",
-      borderPrimary: "#4c566a",
-      borderSecondary: "#434c5e",
-      textPrimary: "#d8dee9",
-      textSecondary: "#8892b0",
-      textPlaceholder: "#4c566a",
-      textError: "#bf616a",
-      textSuccess: "#a3be8c",
-      buttonPrimary: "#88c0d0",
-      buttonPrimaryHover: "#8fbcbb",
-      buttonTextPrimary: "#2e3440",
-      buttonSecondary: "#434c5e",
-      buttonSecondaryHover: "#4c566a",
-      buttonTextSecondary: "#d8dee9",
-      inputFocusBorder: "#88c0d0",
-    };
-  } else if (theme === "latte") {
-    colors = {
-      bgPrimary: "#f4efe9",
-      bgSecondary: "#fcfaf6",
-      borderPrimary: "#cfc5bc",
-      borderSecondary: "#b6a89c",
-      textPrimary: "#443f3b",
-      textSecondary: "#7f7670",
-      textPlaceholder: "#b6a89c",
-      textError: "#e05f5f",
-      textSuccess: "#5f8a5f",
-      buttonPrimary: "#90684f",
-      buttonPrimaryHover: "#7a5641",
-      buttonTextPrimary: "#fcfaf6",
-      buttonSecondary: "#e4ded7",
-      buttonSecondaryHover: "#cfc5bc",
-      buttonTextSecondary: "#443f3b",
-      inputFocusBorder: "#90684f",
-    };
-  } else if (theme === "light") {
-    colors = {
-      bgPrimary: "#fcfcff",
-      bgSecondary: "#f4f4f5",
-      borderPrimary: "#e4e4e7",
-      borderSecondary: "#d4d4d8",
-      textPrimary: "#09090b",
-      textSecondary: "#71717a",
-      textPlaceholder: "#a1a1aa",
-      textError: "#ef4444",
-      textSuccess: "#10b981",
-      buttonPrimary: "#18181b",
-      buttonPrimaryHover: "#27272a",
-      buttonTextPrimary: "#ffffff",
-      buttonSecondary: "#e4e4e7",
-      buttonSecondaryHover: "#d4d4d8",
-      buttonTextSecondary: "#18181b",
-      inputFocusBorder: "#18181b",
-    };
-  } else {
-    // Default Zinc Dark
-    colors = {
-      bgPrimary: "#0f0f11",
-      bgSecondary: "#18181b",
-      borderPrimary: "#27272a",
-      borderSecondary: "#3f3f46",
-      textPrimary: "#fafafa",
-      textSecondary: "#a1a1aa",
-      textPlaceholder: "#52525b",
-      textError: "#ef4444",
-      textSuccess: "#10b981",
-      buttonPrimary: "#fafafa",
-      buttonPrimaryHover: "#e4e4e7",
-      buttonTextPrimary: "#18181b",
-      buttonSecondary: "#27272a",
-      buttonSecondaryHover: "#3f3f46",
-      buttonTextSecondary: "#fafafa",
-      inputFocusBorder: "#fafafa",
-    };
-  }
 
-  // Pass active colors for both light and dark mode configurations
-  // so that regardless of how Dodo determines the system mode,
-  // it matches our app's active selected theme.
-  return {
-    light: colors,
-    dark: colors,
-    radius: "8px",
-  };
-};
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -133,42 +42,7 @@ export default function PaymentPage() {
 
   const [plans, setPlans] = useState<BackendPlan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dodoReady, setDodoReady] = useState(false);
-
-  // --- Inline Checkout State ---
-  const [checkoutStep, setCheckoutStep] = useState<"summary" | "payment">(
-    "summary",
-  );
-  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
-
-  const frameContainerRef = useRef<HTMLDivElement>(null);
-
-  // --- Native Iframe DOM Trapping ---
-  // Cross-origin iframes ignore parent CSS scrollbar rules. We must trap the iframe
-  // the millisecond Paddle injects it into the DOM and apply the native HTML attribute.
-  useEffect(() => {
-    if (checkoutStep !== "payment" || !frameContainerRef.current) return;
-
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node instanceof HTMLElement) {
-            const iframe =
-              node.tagName === "IFRAME" ? node : node.querySelector("iframe");
-            if (iframe) {
-              iframe.setAttribute("scrolling", "no");
-            }
-          }
-        });
-      });
-    });
-
-    observer.observe(frameContainerRef.current, {
-      childList: true,
-      subtree: true,
-    });
-    return () => observer.disconnect();
-  }, [checkoutStep]);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Synchronous initialization to avoid React set-state-in-effect cascading render warnings
   const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
@@ -187,11 +61,6 @@ export default function PaymentPage() {
     }
     return "annual";
   });
-
-  // --- Decoupled Dodo Event Listener ---
-  useEffect(() => {
-    // Left empty for lifecycle extensions if needed.
-  }, []);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/billing/plans`)
@@ -214,24 +83,6 @@ export default function PaymentPage() {
       });
   }, []);
 
-  const initializeDodo = () => {
-    if (typeof window !== "undefined" && (window as any).DodoPaymentsCheckout) {
-      if (!(window as any).__senzorDodoInitialized) {
-        (window as any).DodoPaymentsCheckout.DodoPayments.Initialize({
-          mode: process.env.NEXT_PUBLIC_DODO_ENV === "live" ? "live" : "test",
-          displayType: "inline",
-          onEvent: (event: any) => {
-            if (event.event_type === "checkout.success") {
-              router.push("/checkout/success");
-            }
-          },
-        });
-        (window as any).__senzorDodoInitialized = true;
-      }
-      setDodoReady(true);
-    }
-  };
-
   const handleCheckout = () => {
     if (!user) {
       router.push("/login?redirect=/checkout");
@@ -251,14 +102,7 @@ export default function PaymentPage() {
       return;
     }
 
-    if (!dodoReady || !(window as any).DodoPaymentsCheckout) {
-      toast.error("Payment gateway is initializing. Please wait a second.");
-      return;
-    }
-
-    // Move to inline payment step
-    setCheckoutStep("payment");
-    setIsCheckoutLoading(true);
+    setIsRedirecting(true);
 
     const themeMode = theme === "dark" || theme === "nord" ? "dark" : "light";
     api.post("/billing/checkout-session", { productId, themeMode })
@@ -267,45 +111,13 @@ export default function PaymentPage() {
         if (!checkoutUrl) {
           throw new Error("No checkout URL returned from session creation.");
         }
-
-        // Ensure DOM has painted the container before Dodo looks for it
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            try {
-              (window as any).DodoPaymentsCheckout.DodoPayments.Checkout.open({
-                checkoutUrl,
-                elementId: "dodo-inline-checkout",
-                options: {
-                  themeConfig: getDodoThemeConfig(theme),
-                  fontSize: "sm",
-                  fontWeight: "medium",
-                  showTimer: false,
-                  showSecurityBadge: false,
-                },
-              });
-              // Give the frame a brief moment to render before turning off loading state
-              setTimeout(() => {
-                setIsCheckoutLoading(false);
-              }, 600);
-            } catch (err: any) {
-              console.error("Dodo open error:", err);
-              toast.error("Failed to open checkout window.");
-              setCheckoutStep("summary");
-              setIsCheckoutLoading(false);
-            }
-          }, 100);
-        });
+        window.location.href = checkoutUrl;
       })
       .catch((err) => {
-        // console.error("Failed to create checkout session:", err);
+        console.error("Failed to create checkout session:", err);
         toast.error("Failed to generate checkout session. Please try again.");
-        setCheckoutStep("summary");
-        setIsCheckoutLoading(false);
+        setIsRedirecting(false);
       });
-  };
-
-  const handleBackToSummary = () => {
-    setCheckoutStep("summary");
   };
 
   // Auth Protection Check
@@ -317,6 +129,23 @@ export default function PaymentPage() {
           <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
           <p className="text-muted-foreground font-medium">
             Securing checkout environment...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center relative">
+        <NetworkBackground />
+        <div className="relative z-10 flex flex-col items-center p-8 bg-card/85 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4 text-emerald-500" />
+          <p className="text-foreground font-bold text-lg">
+            Redirecting to Secure Payment Portal
+          </p>
+          <p className="text-muted-foreground text-xs mt-1 font-medium text-center max-w-[280px]">
+            Please wait while we establish a secure connection to Dodo Payments.
           </p>
         </div>
       </div>
@@ -342,18 +171,10 @@ export default function PaymentPage() {
     <div className="min-h-screen bg-background flex flex-col selection:bg-primary/20 selection:text-primary relative justify-center items-center p-4">
       <NetworkBackground />
 
-      <Script
-        src="https://cdn.jsdelivr.net/npm/dodopayments-checkout@latest/dist/index.js"
-        strategy="afterInteractive"
-        onReady={initializeDodo}
-      />
-
       <div className="w-full max-w-4xl relative z-10 animate-in fade-in zoom-in-95 duration-500">
         <Card className="w-full border-border/60 shadow-2xl bg-card/95 backdrop-blur-xl overflow-hidden">
           <CardContent className="p-6">
-            {/* STEP 1: SUMMARY (Your exact untouched code) */}
-            {checkoutStep === "summary" && (
-              <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+            <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                 {/* Header & User Context */}
                 <div className="mb-6 pb-6 border-b border-border/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
@@ -575,48 +396,6 @@ export default function PaymentPage() {
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* STEP 2: INLINE PAYMENT FRAME */}
-            {checkoutStep === "payment" && (
-              <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                {/* Header Context for Payment Step */}
-                <div className="mb-6 border-b border-border/40 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                  <div>
-                    <button
-                      onClick={handleBackToSummary}
-                      className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mb-4"
-                    >
-                      <ArrowLeft className="w-4 h-4" /> Back to Order Summary
-                    </button>
-                  </div>
-                </div>
-
-                {/* Secure Inline Frame Container */}
-                <div className="relative w-full mx-auto rounded-xl overflow-hidden bg-background/50 border border-border/60">
-                  {/* Custom Enterprise Loading Mask */}
-                  {isCheckoutLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm z-10">
-                      <Spinner className="w-8 h-8 text-primary mb-4 text-emerald-500" />
-                      <p className="text-sm font-bold text-foreground">
-                        Securing Checkout...
-                      </p>
-                      <p className="text-xs font-medium text-muted-foreground mt-1">
-                        Establishing encrypted tunnel to Dodo Payments
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Dodo injects the iframe into this div by matching ID! */}
-                  <div
-                    id="dodo-inline-checkout"
-                    ref={frameContainerRef}
-                    className="w-full min-h-[450px] flex flex-col items-center justify-center transition-opacity duration-700 ease-out p-4"
-                    style={{ opacity: isCheckoutLoading ? 0 : 1 }}
-                  />
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
