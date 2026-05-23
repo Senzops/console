@@ -814,11 +814,11 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* 3. Database Footprint Estimator (Full Width) */}
+        {/* 3. Data Breakdown (Full Width) */}
         <Card className="border-border/60 shadow-sm w-full">
           <CardContent className="p-0">
             <div className="p-6 border-b border-border/40 flex items-center gap-2 font-bold text-lg text-foreground bg-muted/20">
-              <Database className="w-5 h-5 text-blue-500" /> Database Footprint
+              <Database className="w-5 h-5 text-blue-500" /> Data Breakdown
             </div>
 
             {!storageData ? (
@@ -830,26 +830,30 @@ export default function ProfilePage() {
                 <div>
                   <div className="flex justify-between text-sm mb-3">
                     <span className="text-foreground font-medium">
-                      Estimated Disk Usage
+                      Monthly Ingestion
                     </span>
-                    <span className="font-mono text-foreground font-bold text-sm">
-                      {formatBytes(storageData.totalCalculatedBytes)}
+                    <span className="font-mono text-muted-foreground text-xs">
+                      <strong className="text-foreground font-bold text-sm">
+                        {formatBytes(storageData.currentMonthBytes)}
+                      </strong>{" "}
+                      <span className="opacity-50">/</span>{" "}
+                      {formatBytes(storageData.maxIngestionBytes)}
                     </span>
                   </div>
-                  {/* Enterprise Stacked Progress Bar */}
+                  {/* Composition Bar — proportions derived from record counts */}
                   <div className="flex h-2 w-full bg-secondary/60 rounded-full overflow-hidden border border-border/40">
-                    {storageData.totalCalculatedBytes === 0 ? (
+                    {storageData.totalCount === 0 ? (
                       <div className="w-full h-full bg-secondary/50" />
                     ) : (
                       storageData.stats.map((stat: any) => (
                         <div
                           key={stat.service}
                           style={{
-                            width: `${(stat.bytes / storageData.totalCalculatedBytes) * 100}%`,
+                            width: `${(stat.count / storageData.totalCount) * 100}%`,
                             backgroundColor: stat.color,
                           }}
                           className="h-full transition-all duration-1000 ease-out"
-                          title={`${stat.service}: ${formatBytes(stat.bytes)}`}
+                          title={`${stat.service}: ${stat.count.toLocaleString()} records`}
                         />
                       ))
                     )}
@@ -872,11 +876,11 @@ export default function ProfilePage() {
                         </span>
                       </div>
                       <div className="flex items-end justify-between mt-auto">
-                        <span className="text-muted-foreground font-mono text-xs">
-                          {stat.count.toLocaleString()} rows
-                        </span>
                         <span className="font-mono text-foreground font-bold text-sm">
-                          {formatBytes(stat.bytes, 1)}
+                          {stat.count.toLocaleString()}
+                        </span>
+                        <span className="text-muted-foreground text-xs font-medium">
+                          records
                         </span>
                       </div>
                     </div>
@@ -885,10 +889,8 @@ export default function ProfilePage() {
 
                 <div className="bg-muted/30 border border-border/40 rounded-lg p-3 mt-4">
                   <p className="text-[11px] text-muted-foreground leading-relaxed flex items-start gap-2">
-                    <span className="text-primary mt-0.5">•</span>
-                    Footprint represents actively stored data size on disk.
-                    Expired data is automatically purged by background TTL
-                    policies and will not reflect here.
+                    Record counts reflect currently stored data across all services.
+                    Expired data is automatically purged by background TTL policies.
                   </p>
                 </div>
               </div>
