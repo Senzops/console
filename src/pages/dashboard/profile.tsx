@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import useSWR from "swr";
@@ -37,6 +37,7 @@ import {
   RefreshCw,
   Mail,
   Shield,
+  ArrowUpDown,
 } from "lucide-react";
 import { extractErrorMessage } from "@/utils/axiosError";
 
@@ -324,6 +325,25 @@ export default function ProfilePage() {
 
   const [downloadingTx, setDownloadingTx] = useState<string | null>(null);
 
+  // Plan Change State
+  const [isChangePlanOpen, setIsChangePlanOpen] = useState(false);
+  const [changePlanLoading, setChangePlanLoading] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [selectedTargetPlanId, setSelectedTargetPlanId] = useState<string>("");
+  const [changePlanBilling, setChangePlanBilling] = useState<"monthly" | "annual">("monthly");
+
+  useEffect(() => {
+    if (!isChangePlanOpen) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/billing/plans`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.plans) {
+          setAvailablePlans(data.plans.filter((p: any) => p.id === "pro" || p.id === "business"));
+        }
+      })
+      .catch(() => {});
+  }, [isChangePlanOpen]);
+
   if (!user) return null;
 
   const sub = billingData?.subscription;
@@ -348,8 +368,11 @@ export default function ProfilePage() {
   const handleCancelSubscription = async () => {
     setIsCanceling(true);
     try {
-      await api.post("/billing/cancel");
-      toast.success("Subscription canceled successfully.");
+      const res = await api.post("/billing/cancel");
+      const msg = res.data?.immediateDowngrade
+        ? "Subscription canceled. You've been downgraded to the Free Starter plan."
+        : "Subscription canceled. Your plan remains active until the end of your billing cycle.";
+      toast.success(msg);
       setIsCancelModalOpen(false);
       mutateBilling();
     } catch (e: any) {
@@ -395,6 +418,40 @@ export default function ProfilePage() {
       );
     } finally {
       setDownloadingTx(null);
+    }
+  };
+
+  const canChangePlan = isPaid && !isCanceled && sub?.provider === "dodo" &&
+    sub?.status === "active";
+
+  const handleChangePlan = async () => {
+    if (!selectedTargetPlanId) {
+      toast.error("Please select a plan.");
+      return;
+    }
+
+    const targetPlan = availablePlans.find((p: any) => p.id === selectedTargetPlanId);
+    if (!targetPlan) return;
+
+    const productId = changePlanBilling === "annual"
+      ? targetPlan.dodoProductIdAnnual
+      : targetPlan.dodoProductIdMonthly;
+
+    if (!productId) {
+      toast.error("Configuration error: Product ID missing for this plan.");
+      return;
+    }
+
+    setChangePlanLoading(true);
+    try {
+      const res = await api.post("/billing/change-plan", { productId });
+      toast.success(res.data.message || "Plan change initiated.");
+      setIsChangePlanOpen(false);
+      mutateBilling();
+    } catch (e: any) {
+      toast.error(extractErrorMessage(e, "Failed to change plan."));
+    } finally {
+      setChangePlanLoading(false);
     }
   };
 
@@ -538,7 +595,36 @@ export default function ProfilePage() {
             )}
           </CardHeader>
 
-          <CardContent className="p-0 flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-border/40">
+          <CardContent className="p-0">
+            {/* Status Alert Banners */}
+            {(sub?.status === "on_hold" || sub?.status === "past_due") && (
+              <div className="m-4 mb-0 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                    {sub.status === "on_hold" ? "Subscription On Hold" : "Payment Past Due"}
+                  </p>
+                  <p className="text-xs text-amber-700/80 dark:text-amber-400/70 mt-1 leading-relaxed">
+                    {sub.status === "on_hold"
+                      ? "Your most recent payment failed. Data ingestion is paused until resolved. Your payment provider will automatically retry — if the issue persists, you can cancel and re-subscribe with a different payment method."
+                      : "Your subscription payment could not be processed. Data ingestion is paused. Please update your payment method to restore service."
+                    }
+                  </p>
+                  {sub.status === "on_hold" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 text-xs font-semibold border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                      onClick={() => setIsCancelModalOpen(true)}
+                    >
+                      Cancel & Downgrade to Free
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-border/40">
             {/* Left: Billing Overview */}
             <div className="p-6 lg:w-1/2 flex flex-col bg-card">
               <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-5">
@@ -619,14 +705,28 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-6 mt-6">
-                <Link href="/pricing" className="w-full sm:w-auto flex-1">
+                {canChangePlan ? (
                   <Button
-                    variant={isPaid ? "outline" : "default"}
-                    className="w-full shadow-sm font-semibold"
+                    variant="outline"
+                    className="w-full sm:w-auto flex-1 shadow-sm font-semibold"
+                    onClick={() => {
+                      setSelectedTargetPlanId("");
+                      setChangePlanBilling(sub?.billingInterval || "monthly");
+                      setIsChangePlanOpen(true);
+                    }}
                   >
-                    {isPaid ? "View Available Plans" : "Upgrade to Pro"}
+                    <ArrowUpDown className="w-3.5 h-3.5 mr-2" /> Change Plan
                   </Button>
-                </Link>
+                ) : (
+                  <Link href={isPaid ? "/pricing" : "/checkout"} className="w-full sm:w-auto flex-1">
+                    <Button
+                      variant={isPaid ? "outline" : "default"}
+                      className="w-full shadow-sm font-semibold"
+                    >
+                      {isPaid ? "View Plans" : "Upgrade to Pro"}
+                    </Button>
+                  </Link>
+                )}
                 {isPaid && !isCanceled && (
                   <Button
                     variant="ghost"
@@ -709,6 +809,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
               </div>
+            </div>
             </div>
           </CardContent>
         </Card>
@@ -938,10 +1039,10 @@ export default function ProfilePage() {
             <strong className="block text-amber-600 dark:text-amber-500 mb-1 font-bold">
               Downgrade Confirmation
             </strong>
-            Canceling your subscription will downgrade you to the Free Starter
-            plan at the end of your current billing cycle. You will lose access
-            to advanced features, extended retention, and increased ingestion
-            limits.
+            {sub?.status === "on_hold"
+              ? "Your subscription is currently on hold due to a failed payment. Canceling will immediately downgrade you to the Free Starter plan. You can re-subscribe to any paid plan at any time."
+              : "Canceling your subscription will downgrade you to the Free Starter plan at the end of your current billing cycle. You will lose access to advanced features, extended retention, and increased ingestion limits."
+            }
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <Button
@@ -963,6 +1064,137 @@ export default function ProfilePage() {
                 </>
               ) : (
                 "Yes, Cancel Plan"
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Change Plan Modal */}
+      <Dialog
+        open={isChangePlanOpen}
+        onClose={() => setIsChangePlanOpen(false)}
+        title="Change Plan"
+      >
+        <div className="space-y-5">
+          {/* Billing Interval Toggle */}
+          <div>
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
+              Billing Interval
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setChangePlanBilling("monthly")}
+                className={cn(
+                  "p-2.5 rounded-lg border text-left text-sm font-semibold transition-all",
+                  changePlanBilling === "monthly"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border/60 hover:border-foreground/30",
+                )}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setChangePlanBilling("annual")}
+                className={cn(
+                  "p-2.5 rounded-lg border text-left text-sm font-semibold transition-all relative",
+                  changePlanBilling === "annual"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border/60 hover:border-foreground/30",
+                )}
+              >
+                Annual
+                <span className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg">
+                  -20%
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Plan Options */}
+          <div>
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
+              Select Plan
+            </label>
+            <div className="space-y-2">
+              {availablePlans.map((p: any) => {
+                const isCurrent = p.id === sub?.planId && changePlanBilling === sub?.billingInterval;
+                const displayPrice = changePlanBilling === "annual"
+                  ? Math.floor(p.priceAnnual / 12)
+                  : p.priceMonthly;
+
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => !isCurrent && setSelectedTargetPlanId(p.id)}
+                    disabled={isCurrent}
+                    className={cn(
+                      "w-full p-4 rounded-lg border flex items-center justify-between transition-all",
+                      isCurrent
+                        ? "border-border/40 bg-muted/30 opacity-60 cursor-not-allowed"
+                        : selectedTargetPlanId === p.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border/60 hover:border-foreground/30",
+                    )}
+                  >
+                    <div className="text-left">
+                      <span className="font-bold text-sm text-foreground">{p.name}</span>
+                      {isCurrent && (
+                        <span className="ml-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-muted px-1.5 py-0.5 rounded">
+                          Current
+                        </span>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Up to {(p.maxIngestionBytes / (1024 * 1024 * 1024))}GB pooled ingestion
+                      </p>
+                    </div>
+                    <span className="font-bold text-foreground">
+                      ${displayPrice}<span className="text-[10px] text-muted-foreground font-medium">/mo</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Proration Info */}
+          {selectedTargetPlanId && (() => {
+            const currentPlan = availablePlans.find((p: any) => p.id === sub?.planId);
+            const targetPlan = availablePlans.find((p: any) => p.id === selectedTargetPlanId);
+            if (!currentPlan || !targetPlan) return null;
+            const isUpgrade = targetPlan.priceMonthly > currentPlan.priceMonthly;
+
+            return (
+              <div className={cn(
+                "p-3 rounded-lg border text-xs leading-relaxed",
+                isUpgrade
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+                  : "bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-400",
+              )}>
+                {isUpgrade
+                  ? "You will be charged a prorated amount for the remainder of your current billing cycle."
+                  : "Unused credit from your current plan will be applied to future renewals."
+                }
+              </div>
+            );
+          })()}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="ghost"
+              onClick={() => setIsChangePlanOpen(false)}
+              disabled={changePlanLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangePlan}
+              disabled={changePlanLoading || !selectedTargetPlanId}
+            >
+              {changePlanLoading ? (
+                <><Spinner className="mr-2 w-4 h-4" /> Processing...</>
+              ) : (
+                "Confirm Plan Change"
               )}
             </Button>
           </div>

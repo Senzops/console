@@ -41,8 +41,10 @@ export default function PaymentPage() {
   const { theme } = useTheme();
 
   const [plans, setPlans] = useState<BackendPlan[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [plansLoaded, setPlansLoaded] = useState(false);
+  const [subChecked, setSubChecked] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [hasActiveSub, setHasActiveSub] = useState(false);
 
   // Synchronous initialization to avoid React set-state-in-effect cascading render warnings
   const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
@@ -62,26 +64,48 @@ export default function PaymentPage() {
     return "annual";
   });
 
+  // Plans: public endpoint, fetch once on mount (no auth dependency)
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/billing/plans`)
       .then((res) => res.json())
       .then((data) => {
         if (data.plans) {
-          // Filter out Starter/Enterprise from the checkout flow
           setPlans(
             data.plans.filter(
               (p: BackendPlan) => p.id === "pro" || p.id === "business",
             ),
           );
         }
-        setLoading(false);
       })
       .catch((err) => {
         console.error("Failed to fetch plans:", err);
         toast.error("Failed to load pricing data.");
-        setLoading(false);
-      });
+      })
+      .finally(() => setPlansLoaded(true));
   }, []);
+
+  // Subscription guard: only runs once auth resolves and user is available.
+  // Kept separate so the readiness gate is derived at render time, not
+  // dependent on effect execution order (which caused the flicker).
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+
+    api.get("/billing/subscription")
+      .then((res) => {
+        const sub = res.data?.subscription;
+        if (sub && sub.planId !== "starter" && sub.provider === "dodo" &&
+            sub.status === "active") {
+          setHasActiveSub(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSubChecked(true));
+  }, [user, authLoading]);
+
+  // Derived readiness: all async prerequisites must be satisfied.
+  // For logged-out visitors (!user after auth), sub check is unnecessary — they'll be redirected to login.
+  const isReady = !authLoading && plansLoaded && (subChecked || !user);
 
   const handleCheckout = () => {
     if (!user) {
@@ -121,7 +145,7 @@ export default function PaymentPage() {
   };
 
   // Auth Protection Check
-  if (authLoading || loading) {
+  if (!isReady) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center relative">
         <NetworkBackground />
@@ -147,6 +171,29 @@ export default function PaymentPage() {
           <p className="text-muted-foreground text-xs mt-1 font-medium text-center max-w-[280px]">
             Please wait while we establish a secure connection to Dodo Payments.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasActiveSub) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center relative">
+        <NetworkBackground />
+        <div className="relative z-10 flex flex-col items-center p-8 bg-card/85 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl max-w-md text-center">
+          <ShieldCheck className="h-8 w-8 text-emerald-500 mb-4" />
+          <p className="text-foreground font-bold text-lg">
+            You Already Have an Active Plan
+          </p>
+          <p className="text-muted-foreground text-sm mt-2 leading-relaxed">
+            To switch plans or change your billing interval, use the plan management option in your profile settings.
+          </p>
+          <Button
+            className="mt-6 font-bold"
+            onClick={() => router.push("/dashboard/profile")}
+          >
+            Go to Profile Settings
+          </Button>
         </div>
       </div>
     );
