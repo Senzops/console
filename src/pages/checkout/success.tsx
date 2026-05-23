@@ -36,27 +36,32 @@ export default function CheckoutOutcomePage() {
         setStatus(statusParam);
       } else {
         const urlParams = new URLSearchParams(window.location.search);
-        setStatus(urlParams.get("status") || "succeeded");
+        const urlStatus = urlParams.get("status");
+        setStatus(urlStatus || "unknown");
       }
     }
   }, [router.isReady, router.query]);
 
   useEffect(() => {
-    if (!isMounted || status === "failed" || status === "pending") return;
+    if (!isMounted) return;
+    if (status === "failed" || status === "pending" || status === "unknown") return;
 
-    // Automatic Redirect Logic for Success
     if (countdown <= 0) {
       router.push("/dashboard/profile");
       return;
     }
 
-    // Countdown Timer for Success
     const timer = setInterval(() => {
       setCountdown((prev) => prev - 1);
     }, 1000);
 
     return () => clearInterval(timer);
   }, [countdown, router, isMounted, status]);
+
+  useEffect(() => {
+    if (!isMounted || status !== "unknown") return;
+    router.replace("/dashboard/profile");
+  }, [isMounted, status, router]);
 
   if (!isMounted) {
     return (

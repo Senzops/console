@@ -556,12 +556,12 @@ export default function ProfilePage() {
                       "text-[10px] uppercase font-bold tracking-wider",
                       sub?.status === "active"
                         ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
-                        : sub?.status === "past_due"
+                        : sub?.status === "past_due" || sub?.status === "on_hold"
                           ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
                           : "text-destructive bg-destructive/10 border-destructive/20",
                     )}
                   >
-                    {sub?.status || "Unknown"}
+                    {sub?.status === "on_hold" ? "On Hold" : (sub?.status || "Unknown")}
                   </Badge>
                 </div>
 
@@ -587,6 +587,20 @@ export default function ProfilePage() {
                       : "N/A"}
                   </span>
                 </div>
+
+                {sub?.cancelEffectiveAt && (
+                  <div className="flex justify-between items-center border-b border-border/40 pb-3">
+                    <span className="text-sm text-muted-foreground flex items-center gap-2">
+                      <Clock className="w-4 h-4" /> Cancels On
+                    </span>
+                    <span className="text-sm font-semibold text-destructive">
+                      {new Date(sub.cancelEffectiveAt).toLocaleDateString(
+                        "en-US",
+                        { year: "numeric", month: "short", day: "numeric" },
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground flex items-center gap-2">
@@ -826,7 +840,7 @@ export default function ProfilePage() {
                 ) : (
                   txData.transactions.map((tx: any) => (
                     <tr
-                      key={tx.paddleTransactionId}
+                      key={tx.transactionId}
                       className="border-b border-border/40 hover:bg-muted/20 transition-colors"
                     >
                       <td className="px-6 py-4 text-foreground font-medium whitespace-nowrap">
@@ -851,7 +865,9 @@ export default function ProfilePage() {
                               ? "bg-emerald-500/10 text-emerald-500"
                               : tx.status === "refunded"
                                 ? "bg-amber-500/10 text-amber-500"
-                                : "bg-destructive/10 text-destructive",
+                                : tx.status === "disputed"
+                                  ? "bg-orange-500/10 text-orange-500"
+                                  : "bg-destructive/10 text-destructive",
                           )}
                         >
                           {tx.status}
@@ -860,12 +876,12 @@ export default function ProfilePage() {
                       <td className="px-6 py-4 text-right">
                         <button
                           onClick={() =>
-                            handleDownloadReceipt(tx.paddleTransactionId)
+                            handleDownloadReceipt(tx.transactionId)
                           }
-                          disabled={downloadingTx === tx.paddleTransactionId}
+                          disabled={downloadingTx === tx.transactionId}
                           className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors text-xs font-semibold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {downloadingTx === tx.paddleTransactionId ? (
+                          {downloadingTx === tx.transactionId ? (
                             <>
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />{" "}
                               Fetching...
