@@ -1083,6 +1083,37 @@ export const DashboardLayout = ({
   // APM Snippet State
   const [selectedFramework, setSelectedFramework] = useState("Express");
   const [selectedServerMethod, setSelectedServerMethod] = useState("Interactive");
+  const [selectedWebMethod, setSelectedWebMethod] = useState("CDN Script");
+  const [selectedRumMethod, setSelectedRumMethod] = useState("CDN Script");
+  const apmTabsRef = useRef<HTMLDivElement>(null);
+
+  const scrollApmTabs = (direction: "left" | "right") => {
+    if (!apmTabsRef.current) return;
+    const amount = 160;
+    apmTabsRef.current.scrollBy({ left: direction === "left" ? -amount : amount, behavior: "smooth" });
+  };
+
+  const getWebSnippet = (method: string, webId?: string) => {
+    switch (method) {
+      case "CDN Script":
+        return `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.init({ webId: "${webId}" });\n</script>`;
+      case "NPM Package":
+        return `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.init({\n  webId: "${webId}",\n});`;
+      default:
+        return "";
+    }
+  };
+
+  const getRumSnippet = (method: string, apiKey?: string) => {
+    switch (method) {
+      case "CDN Script":
+        return `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.initRum({\n    apiKey: "${apiKey}",\n    sampleRate: 1.0,\n    allowedOrigins: ["https://api.yourbackend.com"]\n  });\n</script>`;
+      case "NPM Package":
+        return `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.initRum({\n  apiKey: "${apiKey}",\n  sampleRate: 1.0,\n  allowedOrigins: ["https://api.yourbackend.com"],\n});`;
+      default:
+        return "";
+    }
+  };
 
   const getServerSnippet = (method: string, vpsId?: string, apiKey?: string) => {
     switch (method) {
@@ -2394,34 +2425,41 @@ export const DashboardLayout = ({
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Add to your &lt;head&gt;
-              </label>
+              <label className="text-sm font-medium">Install & Configure</label>
+              <div className="flex items-center border-b border-border/50">
+                {["CDN Script", "NPM Package"].map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setSelectedWebMethod(method)}
+                    className={cn(
+                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
+                      selectedWebMethod === method
+                        ? "border-blue-500 text-blue-500"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {method}
+                  </button>
+                ))}
+              </div>
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <p className="text-xs font-mono text-blue-300 break-all pr-8 leading-relaxed">
-                  &lt;script
-                  src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"&gt;&lt;/script&gt;
-                  <br />
-                  &lt;script&gt;window.Senzor.init(&#123; webId: "
-                  {newCreds.webId}" &#125;)&lt;/script&gt;
-                </p>
+                <pre className="text-xs font-mono text-blue-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
+                  {getWebSnippet(selectedWebMethod, newCreds.webId)}
+                </pre>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() =>
+                  onClick={() => {
                     navigator.clipboard.writeText(
-                      `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script><script>window.Senzor.init({ webId: "${newCreds.webId}" })</script>`,
-                    )
-                  }
+                      getWebSnippet(selectedWebMethod, newCreds.webId),
+                    );
+                    toast.success("Copied!");
+                  }}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
               </div>
-            </div>
-            <div className="bg-blue-500/10 border border-blue-500/20 text-blue-500 text-xs p-3 rounded-md">
-              Tip: You can also use our NPM package <code>@senzops/web</code>{" "}
-              for React/Vue apps.
             </div>
             <Button className="w-full" onClick={closeModal}>
               Done
@@ -2502,38 +2540,36 @@ export const DashboardLayout = ({
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Add to your frontend application
-              </label>
+              <label className="text-sm font-medium">Install & Configure</label>
+              <div className="flex items-center border-b border-border/50">
+                {["CDN Script", "NPM Package"].map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setSelectedRumMethod(method)}
+                    className={cn(
+                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
+                      selectedRumMethod === method
+                        ? "border-pink-500 text-pink-500"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {method}
+                  </button>
+                ))}
+              </div>
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <p className="text-xs font-mono text-pink-300 break-all pr-8 leading-relaxed">
-                  &lt;script
-                  src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"&gt;&lt;/script&gt;
-                  <br />
-                  &lt;script&gt;
-                  <br />
-                  &nbsp;&nbsp;window.Senzor.initRum(&#123;
-                  <br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;apiKey: "{newCreds.apiKey}",
-                  <br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;sampleRate: 1.0,
-                  <br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;allowedOrigins:
-                  ["https://api.yourbackend.com"]
-                  <br />
-                  &nbsp;&nbsp;&#125;);
-                  <br />
-                  &lt;/script&gt;
-                </p>
+                <pre className="text-xs font-mono text-pink-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
+                  {getRumSnippet(selectedRumMethod, newCreds.apiKey)}
+                </pre>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.initRum({\n    apiKey: "${newCreds.apiKey}",\n    sampleRate: 1.0,\n    allowedOrigins: ["https://api.yourbackend.com"]\n  });\n</script>`,
+                      getRumSnippet(selectedRumMethod, newCreds.apiKey),
                     );
-                    toast.success("Copied to clipboard!");
+                    toast.success("Copied!");
                   }}
                 >
                   <Copy className="h-3 w-3" />
@@ -2541,8 +2577,8 @@ export const DashboardLayout = ({
               </div>
             </div>
             <div className="bg-pink-500/10 border border-pink-500/20 text-pink-500 text-xs p-3 rounded-md">
-              Tip: Ensure `allowedOrigins` matches your backend API to enable
-              full Distributed Tracing!
+              Tip: Ensure allowedOrigins matches your backend API to enable
+              full Distributed Tracing.
             </div>
             <Button className="w-full" onClick={closeModal}>
               Done
@@ -2608,29 +2644,48 @@ export const DashboardLayout = ({
             {/* FRAMEWORK SELECTOR */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Install & Configure</label>
-              <div className="flex items-center border-b border-border/50 overflow-x-auto no-scrollbar">
-                {[
-                  "Express",
-                  "Next.js (App)",
-                  "Next.js (Pages)",
-                  "Fastify",
-                  "NestJS",
-                  "Nuxt / Nitro",
-                  "Nitro + CloudFlare worker",
-                ].map((fw) => (
-                  <button
-                    key={fw}
-                    onClick={() => setSelectedFramework(fw)}
-                    className={cn(
-                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
-                      selectedFramework === fw
-                        ? "border-orange-500 text-orange-500"
-                        : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {fw}
-                  </button>
-                ))}
+              <div className="relative flex items-center">
+                <button
+                  onClick={() => scrollApmTabs("left")}
+                  className="absolute left-0 z-10 h-full px-1 bg-gradient-to-r from-card via-card/80 to-transparent text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Scroll left"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <div
+                  ref={apmTabsRef}
+                  className="flex items-center border-b border-border/50 overflow-x-auto no-scrollbar px-6"
+                >
+                  {[
+                    "Express",
+                    "Next.js (App)",
+                    "Next.js (Pages)",
+                    "Fastify",
+                    "NestJS",
+                    "Nuxt / Nitro",
+                    "Nitro + CloudFlare worker",
+                  ].map((fw) => (
+                    <button
+                      key={fw}
+                      onClick={() => setSelectedFramework(fw)}
+                      className={cn(
+                        "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
+                        selectedFramework === fw
+                          ? "border-orange-500 text-orange-500"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {fw}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => scrollApmTabs("right")}
+                  className="absolute right-0 z-10 h-full px-1 bg-gradient-to-l from-card via-card/80 to-transparent text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Scroll right"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
               </div>
 
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">

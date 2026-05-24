@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Copy, Check, Terminal, AlertTriangle, Info } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Copy, Check, Terminal, AlertTriangle, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { InstallationSnippet } from "../../static/docsData";
 import { cn } from "../Core";
 
@@ -42,6 +42,8 @@ export const DocSection = ({
 export const CodeTabs = ({ snippets }: { snippets: InstallationSnippet[] }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const [copied, setCopied] = useState(false);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const showArrows = snippets.length > 3;
 
   const activeSnippet = snippets[activeIdx];
 
@@ -51,25 +53,56 @@ export const CodeTabs = ({ snippets }: { snippets: InstallationSnippet[] }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const scrollTabs = (direction: "left" | "right") => {
+    if (!tabsRef.current) return;
+    tabsRef.current.scrollBy({ left: direction === "left" ? -160 : 160, behavior: "smooth" });
+  };
+
   return (
     <div className="rounded-xl overflow-hidden border border-border/60 shadow-sm my-6 bg-[#0d1117]">
       {/* Tabs Header */}
       {snippets.length > 1 && (
-        <div className="flex items-center overflow-x-auto border-b border-white/10 bg-white/5 no-scrollbar">
-          {snippets.map((s, idx) => (
+        <div className="relative flex items-center bg-white/5">
+          {showArrows && (
             <button
-              key={idx}
-              onClick={() => setActiveIdx(idx)}
-              className={cn(
-                "px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2",
-                activeIdx === idx
-                  ? "border-emerald-500 text-emerald-400 bg-white/5"
-                  : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5",
-              )}
+              onClick={() => scrollTabs("left")}
+              className="absolute left-0 z-10 h-full px-1.5 bg-gradient-to-r from-[#0d1117] via-[#0d1117]/80 to-transparent text-slate-400 hover:text-slate-200 transition-colors"
+              aria-label="Scroll left"
             >
-              {s.framework}
+              <ChevronLeft className="h-3.5 w-3.5" />
             </button>
-          ))}
+          )}
+          <div
+            ref={tabsRef}
+            className={cn(
+              "flex items-center overflow-x-auto border-b border-white/10 no-scrollbar w-full",
+              showArrows && "px-6",
+            )}
+          >
+            {snippets.map((s, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveIdx(idx)}
+                className={cn(
+                  "px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2",
+                  activeIdx === idx
+                    ? "border-emerald-500 text-emerald-400 bg-white/5"
+                    : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5",
+                )}
+              >
+                {s.framework}
+              </button>
+            ))}
+          </div>
+          {showArrows && (
+            <button
+              onClick={() => scrollTabs("right")}
+              className="absolute right-0 z-10 h-full px-1.5 bg-gradient-to-l from-[#0d1117] via-[#0d1117]/80 to-transparent text-slate-400 hover:text-slate-200 transition-colors"
+              aria-label="Scroll right"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       )}
 

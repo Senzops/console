@@ -205,10 +205,16 @@ export const DOCS_DATA: DocsConfig = {
       ],
       installation: [
         {
-          framework: "HTML (CDN)",
+          framework: "CDN Script",
           language: "html",
           code: `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>window.Senzor.init({ webId: "<YOUR_WEB_ID>" })</script>`,
-          notes: "Place this script in your `<head>` tag to accurately track pageviews before the user navigates away."
+          notes: "Place this script in your <head> tag to accurately track pageviews before the user navigates away."
+        },
+        {
+          framework: "NPM Package",
+          language: "typescript",
+          code: `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.init({\n  webId: "<YOUR_WEB_ID>",\n});`,
+          notes: "Recommended for React, Vue, Svelte, and other SPA frameworks. Import and call init() as early as possible in your app entry point."
         }
       ]
     },
@@ -227,10 +233,16 @@ export const DOCS_DATA: DocsConfig = {
       ],
       installation: [
         {
-          framework: "React / Next.js / Vanilla JS",
+          framework: "CDN Script",
           language: "html",
           code: `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.initRum({\n    apiKey: "<YOUR_RUM_KEY>",\n    sampleRate: 1.0,\n    allowedOrigins: ["https://api.yourbackend.com"]\n  });\n</script>`,
-          notes: "Configuring `allowedOrigins` injects W3C Trace Context headers into outgoing fetch/XHR requests, bridging frontend RUM with backend APM traces."
+          notes: "Configuring allowedOrigins injects W3C Trace Context headers into outgoing fetch/XHR requests, bridging frontend RUM with backend APM traces."
+        },
+        {
+          framework: "NPM Package",
+          language: "typescript",
+          code: `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.initRum({\n  apiKey: "<YOUR_RUM_KEY>",\n  sampleRate: 1.0,\n  allowedOrigins: ["https://api.yourbackend.com"],\n});`,
+          notes: "Recommended for React, Vue, Svelte, and other SPA frameworks. Call initRum() in your app entry point alongside or instead of the CDN script."
         }
       ],
       troubleshooting: [

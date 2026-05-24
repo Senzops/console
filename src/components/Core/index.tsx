@@ -108,11 +108,11 @@ export const Dialog = ({ open, onClose, children, title }: { open: boolean; onCl
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg rounded-xl border bg-card text-card-foreground shadow-lg animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-border/50">
+      <div className="w-full max-w-lg max-h-[calc(100vh-2rem)] flex flex-col rounded-xl border bg-card text-card-foreground shadow-lg animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-border/50 shrink-0">
           <h3 className="font-semibold leading-none tracking-tight text-lg">{title}</h3>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto">{children}</div>
         <div className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground cursor-pointer" onClick={onClose}>
           ✕
         </div>
