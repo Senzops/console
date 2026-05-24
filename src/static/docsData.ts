@@ -139,16 +139,32 @@ export const DOCS_DATA: DocsConfig = {
       ],
       installation: [
         {
-          framework: "Linux (Bash / Systemd)",
+          framework: "Interactive (Recommended)",
           language: "bash",
-          code: `export SERVER_ID="<YOUR_SERVER_ID>"\nexport API_KEY="<YOUR_API_KEY>"\ncurl -sL https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh | sudo -E bash -`,
-          notes: "The installer automatically registers the agent with `systemctl` to ensure it restarts upon server reboot."
+          code: `curl -fsSLO https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh\nchmod +x install_agent.sh\nsudo bash install_agent.sh`,
+          notes: "The interactive installer guides you through configuration, validates inputs, and starts the agent as a Docker container with automatic restarts."
+        },
+        {
+          framework: "Non-Interactive (CI)",
+          language: "bash",
+          code: `export SERVER_ID="<YOUR_SERVER_ID>"\nexport API_KEY="<YOUR_API_KEY>"\nexport API_ENDPOINT="https://api.senzor.dev/api/ingest/stats"\n\ncurl -fsSL https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh | sudo -E bash -s -- --non-interactive`,
+          notes: "Ideal for automated deployments and CI/CD pipelines. All configuration is passed via environment variables."
+        },
+        {
+          framework: "Docker Compose",
+          language: "yaml",
+          code: `services:\n  senzor:\n    image: ghcr.io/senzops/server-agent:latest\n    container_name: senzor\n    restart: unless-stopped\n    network_mode: "host"\n    pid: "host"\n    volumes:\n      - /:/host/root:ro\n      - /sys:/host/sys:ro\n      - /proc:/host/proc:ro\n      - /etc/os-release:/etc/os-release:ro\n      - /etc/hostname:/etc/hostname:ro\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    environment:\n      # Required\n      - SERVER_ID=<YOUR_SERVER_ID>\n      - API_KEY=<YOUR_API_KEY>\n      - API_ENDPOINT=https://api.senzor.dev/api/ingest/stats\n      - INTERVAL=60\n      - LOG_LEVEL=info\n      # Nginx (set ENABLE_NGINX=true to activate)\n      - ENABLE_NGINX=false\n      - NGINX_STATUS_URL=http://127.0.0.1/nginx_status\n      # Traefik (set ENABLE_TRAEFIK=true to activate)\n      - ENABLE_TRAEFIK=false\n      - TRAEFIK_API_URL=http://127.0.0.1:8080\n      - TRAEFIK_USER=\n      - TRAEFIK_PASSWORD=\n      - TRAEFIK_INSECURE_SKIP_VERIFY=false\n      # Web Terminal (set ENABLE_TERMINAL=true to activate)\n      - ENABLE_TERMINAL=false\n      - ALLOW_HOST_ACCESS=false\n    deploy:\n      resources:\n        limits:\n          memory: 256M\n          cpus: "0.20"`,
+          notes: "Save as docker-compose.yml, replace the placeholder values, then run: docker compose up -d. Set any integration to 'true' to enable it."
         }
       ],
       troubleshooting: [
         {
           issue: "Agent installs but shows 'Offline' in dashboard.",
-          solution: "Check the systemd logs by running `sudo journalctl -u senzor-agent -f`. Ensure you do not have trailing spaces in your export variables."
+          solution: "Check the container logs by running `docker logs -f senzor`. Verify your SERVER_ID and API_KEY are correct and the API_ENDPOINT is reachable."
+        },
+        {
+          issue: "Install script fails with a syntax error.",
+          solution: "The script requires Unix (LF) line endings. If you downloaded it on Windows, run: sed -i 's/\\r$//' install_agent.sh"
         }
       ]
     },

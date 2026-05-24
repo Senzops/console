@@ -1082,6 +1082,20 @@ export const DashboardLayout = ({
 
   // APM Snippet State
   const [selectedFramework, setSelectedFramework] = useState("Express");
+  const [selectedServerMethod, setSelectedServerMethod] = useState("Interactive");
+
+  const getServerSnippet = (method: string, vpsId?: string, apiKey?: string) => {
+    switch (method) {
+      case "Quick Install":
+        return `export SERVER_ID="${vpsId}" && export API_KEY="${apiKey}" && \\\ncurl -fsSL https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh | sudo -E bash -`;
+      case "Interactive":
+        return `curl -fsSLO https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh\nchmod +x install_agent.sh\nsudo bash install_agent.sh\n\n# When prompted, enter:\n#   Server ID: ${vpsId}\n#   API Key:   ${apiKey}`;
+      case "Docker Compose":
+        return `services:\n  senzor:\n    image: ghcr.io/senzops/server-agent:latest\n    container_name: senzor\n    restart: unless-stopped\n    network_mode: "host"\n    pid: "host"\n    volumes:\n      - /:/host/root:ro\n      - /sys:/host/sys:ro\n      - /proc:/host/proc:ro\n      - /etc/os-release:/etc/os-release:ro\n      - /etc/hostname:/etc/hostname:ro\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    environment:\n      - SERVER_ID=${vpsId}\n      - API_KEY=${apiKey}\n      - API_ENDPOINT=https://api.senzor.dev/api/ingest/stats\n      - INTERVAL=60`;
+      default:
+        return "";
+    }
+  };
 
   const getApmSnippet = (framework: string, apiKey?: string) => {
     switch (framework) {
@@ -2252,7 +2266,6 @@ export const DashboardLayout = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* ... Creds Display ... */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -2271,33 +2284,47 @@ export const DashboardLayout = ({
                 </div>
               </div>
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Installation Command
-              </label>
+              <label className="text-sm font-medium">Install & Configure</label>
+              <div className="flex items-center border-b border-border/50 overflow-x-auto no-scrollbar">
+                {["Interactive", "Quick Install", "Docker Compose"].map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setSelectedServerMethod(method)}
+                    className={cn(
+                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
+                      selectedServerMethod === method
+                        ? "border-emerald-500 text-emerald-500"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {method}
+                  </button>
+                ))}
+              </div>
               <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <p className="text-xs font-mono text-emerald-400 break-all pr-8 leading-relaxed">
-                  export SERVER_ID="{newCreds.vpsId}" && export API_KEY="
-                  {newCreds.apiKey}" && curl -sL
-                  https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh
-                  | sudo -E bash -
-                </p>
+                <pre className="text-xs font-mono text-emerald-400 break-all pr-8 leading-relaxed whitespace-pre-wrap">
+                  {getServerSnippet(selectedServerMethod, newCreds.vpsId, newCreds.apiKey)}
+                </pre>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() =>
+                  onClick={() => {
                     navigator.clipboard.writeText(
-                      `export SERVER_ID="${newCreds.vpsId}" && export API_KEY="${newCreds.apiKey}" && curl -sL https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh | sudo -E bash -`,
-                    )
-                  }
+                      getServerSnippet(selectedServerMethod, newCreds.vpsId, newCreds.apiKey),
+                    );
+                    toast.success("Copied!");
+                  }}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
               </div>
             </div>
+
             <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs p-3 rounded-md">
-              <span className="font-bold">⚠ Important:</span> This API Key will
+              <span className="font-bold">Important:</span> This API Key will
               only be shown once. Please keep this window open until
               installation is complete.
             </div>
@@ -2581,7 +2608,7 @@ export const DashboardLayout = ({
             {/* FRAMEWORK SELECTOR */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Install & Configure</label>
-              <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
+              <div className="flex items-center border-b border-border/50 overflow-x-auto no-scrollbar">
                 {[
                   "Express",
                   "Next.js (App)",
@@ -2595,10 +2622,10 @@ export const DashboardLayout = ({
                     key={fw}
                     onClick={() => setSelectedFramework(fw)}
                     className={cn(
-                      "px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-all",
+                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
                       selectedFramework === fw
-                        ? "bg-orange-500 text-white border-orange-600"
-                        : "bg-muted border-border hover:bg-muted/80 text-muted-foreground",
+                        ? "border-orange-500 text-orange-500"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {fw}
