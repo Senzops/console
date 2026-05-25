@@ -299,7 +299,7 @@ export const DOCS_DATA: DocsConfig = {
         {
           framework: "Cloudflare Workers (Nitro)",
           language: "typescript",
-          code: `npm install @senzops/apm-worker\n\n// server/plugins/senzor.ts\nimport { Senzor } from "@senzops/apm-worker";\n\nexport default defineNitroPlugin((nitroApp) => {\n  Senzor.init({\n    apiKey: "<YOUR_APM_KEY>",\n  });\n\n  Senzor.nitroPlugin(nitroApp);\n});`
+          code: `npm install @senzops/apm-node\n\n// server/plugins/senzor.ts\nimport { Senzor } from "@senzops/apm-node";\n\nexport default defineNitroPlugin((nitroApp) => {\n  Senzor.init({\n    apiKey: "<YOUR_APM_KEY>",\n  });\n\n  Senzor.nitroPlugin(nitroApp);\n});`
         }
       ],
       troubleshooting: [
