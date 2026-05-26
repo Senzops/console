@@ -1144,6 +1144,12 @@ export const DashboardLayout = ({
         return `npm install @senzops/apm-node\n\n// server/middleware/senzor.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport default Senzor.wrapH3(defineEventHandler((event) => {\n  // Your logic\n}));`;
       case "Nitro + CloudFlare worker":
         return `npm install @senzops/apm-node\n\n// server/plugins/senzor.ts\nimport { Senzor } from "@senzops/apm-node";\n\nexport default defineNitroPlugin((nitroApp) => {\n  Senzor.init({\n    apiKey: "${apiKey}",\n  });\n\n  Senzor.nitroPlugin(nitroApp);\n});`;
+      case "Lambda (Layer)":
+        return `# Zero Code Changes — Senzor Lambda Extension Layer\n\n# 1. Create the layer\nmkdir -p senzor-layer/nodejs && cd senzor-layer/nodejs\nnpm init -y && npm install @senzops/apm-node\ncd .. && zip -r senzor-apm-layer.zip nodejs/\n\n# 2. Publish the layer\naws lambda publish-layer-version \\\n  --layer-name senzor-apm-node \\\n  --zip-file fileb://senzor-apm-layer.zip \\\n  --compatible-runtimes nodejs18.x nodejs20.x nodejs22.x\n\n# 3. Configure your Lambda function\naws lambda update-function-configuration \\\n  --function-name <YOUR_FUNCTION> \\\n  --layers <LAYER_ARN> \\\n  --handler @senzops/apm-node/dist/lambda-handler.handler \\\n  --environment Variables="{\\\n    SENZOR_API_KEY=${apiKey},\\\n    SENZOR_LAMBDA_HANDLER=index.handler,\\\n    NODE_OPTIONS=--require @senzops/apm-node/register\\\n  }"`;
+      case "Lambda (CDK)":
+        return `import * as lambda from 'aws-cdk-lib/aws-lambda';\nimport * as path from 'path';\n\nconst senzorLayer = new lambda.LayerVersion(this, 'SenzorApmLayer', {\n  code: lambda.Code.fromAsset(path.join(__dirname, 'senzor-layer')),\n  compatibleRuntimes: [\n    lambda.Runtime.NODEJS_18_X,\n    lambda.Runtime.NODEJS_20_X,\n  ],\n  description: 'Senzor APM Lambda Extension Layer',\n});\n\nconst fn = new lambda.Function(this, 'MyFunction', {\n  runtime: lambda.Runtime.NODEJS_20_X,\n  handler: '@senzops/apm-node/dist/lambda-handler.handler',\n  code: lambda.Code.fromAsset('lambda'),\n  layers: [senzorLayer],\n  environment: {\n    SENZOR_API_KEY: '${apiKey}',\n    SENZOR_LAMBDA_HANDLER: 'index.handler',\n    NODE_OPTIONS: '--require @senzops/apm-node/register',\n  },\n});`;
+      case "Lambda (Code)":
+        return `npm install @senzops/apm-node\n\n// handler.ts\nimport { Senzor } from '@senzops/apm-node';\n\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport const handler = Senzor.wrapLambda(async (event, context) => {\n  // Your Lambda logic\n  return { statusCode: 200, body: JSON.stringify({ ok: true }) };\n});`;
       default:
         return "";
     }
@@ -2664,6 +2670,9 @@ export const DashboardLayout = ({
                     "NestJS",
                     "Nuxt / Nitro",
                     "Nitro + CloudFlare worker",
+                    "Lambda (Layer)",
+                    "Lambda (CDK)",
+                    "Lambda (Code)",
                   ].map((fw) => (
                     <button
                       key={fw}

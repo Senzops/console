@@ -300,6 +300,42 @@ export const DOCS_DATA: DocsConfig = {
           framework: "Cloudflare Workers (Nitro)",
           language: "typescript",
           code: `npm install @senzops/apm-node\n\n// server/plugins/senzor.ts\nimport { Senzor } from "@senzops/apm-node";\n\nexport default defineNitroPlugin((nitroApp) => {\n  Senzor.init({\n    apiKey: "<YOUR_APM_KEY>",\n  });\n\n  Senzor.nitroPlugin(nitroApp);\n});`
+        },
+        {
+          framework: "AWS Lambda (Extension Layer)",
+          language: "bash",
+          code: `# -------------------------------------------------------\n# Zero Code Changes — Lambda Extension Layer\n# -------------------------------------------------------\n# 1. Create the Lambda Layer\nmkdir -p senzor-layer/nodejs && cd senzor-layer/nodejs\nnpm init -y && npm install @senzops/apm-node\ncd .. && zip -r senzor-apm-layer.zip nodejs/\n\n# 2. Publish the Layer\naws lambda publish-layer-version \\\\\n  --layer-name senzor-apm-node \\\\\n  --zip-file fileb://senzor-apm-layer.zip \\\\\n  --compatible-runtimes nodejs18.x nodejs20.x nodejs22.x\n\n# 3. Attach to your function + set env vars\naws lambda update-function-configuration \\\\\n  --function-name <YOUR_FUNCTION> \\\\\n  --layers <LAYER_ARN> \\\\\n  --environment Variables="{\\\\\n    SENZOR_API_KEY=<YOUR_APM_KEY>,\\\\\n    SENZOR_LAMBDA_HANDLER=index.handler,\\\\\n    NODE_OPTIONS=--require @senzops/apm-node/register\\\\\n  }"\n\n# 4. Update the function handler to point to Senzor's auto-wrapper\naws lambda update-function-configuration \\\\\n  --function-name <YOUR_FUNCTION> \\\\\n  --handler @senzops/apm-node/dist/lambda-handler.handler`,
+          notes: "The Extension Layer requires ZERO code changes to your Lambda function. Set SENZOR_LAMBDA_HANDLER to your original handler (e.g., 'index.handler'), and point the Lambda function's handler to '@senzops/apm-node/dist/lambda-handler.handler'. The layer auto-wraps your handler with full APM: cold start detection, trigger-type detection (API Gateway v1/v2, ALB, SQS, SNS, DynamoDB Streams, EventBridge, S3), Lambda context attributes, and forced telemetry flush. Works with all deployment tools: AWS Console, CDK, SAM, Serverless Framework, and Terraform."
+        },
+        {
+          framework: "AWS Lambda (CDK)",
+          language: "typescript",
+          code: `import * as lambda from 'aws-cdk-lib/aws-lambda';\nimport * as path from 'path';\n\n// Create the Senzor APM Layer\nconst senzorLayer = new lambda.LayerVersion(this, 'SenzorApmLayer', {\n  code: lambda.Code.fromAsset(path.join(__dirname, 'senzor-layer')),\n  compatibleRuntimes: [\n    lambda.Runtime.NODEJS_18_X,\n    lambda.Runtime.NODEJS_20_X,\n    lambda.Runtime.NODEJS_22_X,\n  ],\n  description: 'Senzor APM Node.js Lambda Extension Layer',\n});\n\n// Attach to your Lambda function\nconst fn = new lambda.Function(this, 'MyFunction', {\n  runtime: lambda.Runtime.NODEJS_20_X,\n  handler: '@senzops/apm-node/dist/lambda-handler.handler',\n  code: lambda.Code.fromAsset('lambda'),\n  layers: [senzorLayer],\n  environment: {\n    SENZOR_API_KEY: '<YOUR_APM_KEY>',\n    SENZOR_LAMBDA_HANDLER: 'index.handler',\n    NODE_OPTIONS: '--require @senzops/apm-node/register',\n  },\n});`,
+          notes: "Create the layer directory first: mkdir -p senzor-layer/nodejs && cd senzor-layer/nodejs && npm init -y && npm install @senzops/apm-node. The CDK LayerVersion points to the senzor-layer directory. Set handler to '@senzops/apm-node/dist/lambda-handler.handler' and SENZOR_LAMBDA_HANDLER to your original handler path."
+        },
+        {
+          framework: "AWS Lambda (SAM)",
+          language: "yaml",
+          code: `# template.yaml\nAWSTemplateFormatVersion: '2010-09-09'\nTransform: AWS::Serverless-2016-10-31\n\nGlobals:\n  Function:\n    Layers:\n      - !Ref SenzorApmLayer\n    Environment:\n      Variables:\n        SENZOR_API_KEY: !Ref SenzorApiKey\n        NODE_OPTIONS: '--require @senzops/apm-node/register'\n\nResources:\n  SenzorApmLayer:\n    Type: AWS::Serverless::LayerVersion\n    Properties:\n      LayerName: senzor-apm-node\n      ContentUri: senzor-layer/\n      CompatibleRuntimes:\n        - nodejs18.x\n        - nodejs20.x\n        - nodejs22.x\n\n  MyFunction:\n    Type: AWS::Serverless::Function\n    Properties:\n      Handler: '@senzops/apm-node/dist/lambda-handler.handler'\n      Runtime: nodejs20.x\n      CodeUri: src/\n      Environment:\n        Variables:\n          SENZOR_LAMBDA_HANDLER: index.handler`,
+          notes: "The SAM template defines the layer as a resource and attaches it globally. Set each function's Handler to the Senzor auto-wrapper and SENZOR_LAMBDA_HANDLER to the original handler. Build the layer: mkdir -p senzor-layer/nodejs && cd senzor-layer/nodejs && npm init -y && npm install @senzops/apm-node."
+        },
+        {
+          framework: "AWS Lambda (Serverless Framework)",
+          language: "yaml",
+          code: `# serverless.yml\nservice: my-service\n\nprovider:\n  name: aws\n  runtime: nodejs20.x\n  environment:\n    SENZOR_API_KEY: \${ssm:/senzor/api-key}\n    NODE_OPTIONS: '--require @senzops/apm-node/register'\n\nlayers:\n  senzorApm:\n    path: senzor-layer\n    compatibleRuntimes:\n      - nodejs18.x\n      - nodejs20.x\n      - nodejs22.x\n\nfunctions:\n  api:\n    handler: '@senzops/apm-node/dist/lambda-handler.handler'\n    layers:\n      - !Ref SenzorApmLambdaLayer\n    environment:\n      SENZOR_LAMBDA_HANDLER: src/handlers/api.handler`,
+          notes: "Create the layer directory: mkdir -p senzor-layer/nodejs && cd senzor-layer/nodejs && npm init -y && npm install @senzops/apm-node. The Serverless Framework auto-generates the layer ARN reference as {LayerName}LambdaLayer. Set each function's handler to the Senzor auto-wrapper."
+        },
+        {
+          framework: "AWS Lambda (Console)",
+          language: "bash",
+          code: `# Step 1: Build the layer zip locally\nmkdir -p senzor-layer/nodejs && cd senzor-layer/nodejs\nnpm init -y && npm install @senzops/apm-node\ncd .. && zip -r senzor-apm-layer.zip nodejs/\n\n# Step 2: In AWS Console\n# Go to Lambda > Layers > Create layer\n# Upload senzor-apm-layer.zip\n# Compatible runtimes: nodejs18.x, nodejs20.x, nodejs22.x\n\n# Step 3: Attach layer to your function\n# Go to your Lambda function > Layers > Add a layer\n# Choose "Custom layers" and select senzor-apm-node\n\n# Step 4: Update function configuration\n# Handler: @senzops/apm-node/dist/lambda-handler.handler\n# Environment variables:\n#   SENZOR_API_KEY         = <YOUR_APM_KEY>\n#   SENZOR_LAMBDA_HANDLER  = index.handler\n#   NODE_OPTIONS           = --require @senzops/apm-node/register`,
+          notes: "This guide walks through setting up the Senzor Lambda Extension Layer via the AWS Console. No code changes to your Lambda function are needed. The original handler is preserved in SENZOR_LAMBDA_HANDLER and Senzor's auto-wrapper handles instrumentation."
+        },
+        {
+          framework: "AWS Lambda (Code-Level)",
+          language: "typescript",
+          code: `npm install @senzops/apm-node\n\n// handler.ts\nimport { Senzor } from '@senzops/apm-node';\n\nSenzor.init({ apiKey: "<YOUR_APM_KEY>" });\n\nexport const handler = Senzor.wrapLambda(async (event, context) => {\n  // Your Lambda logic\n  return { statusCode: 200, body: JSON.stringify({ ok: true }) };\n});`,
+          notes: "Use this approach when you prefer code-level control or cannot use Lambda Layers. wrapLambda() provides the same features: cold start detection, trigger-type detection, Lambda context extraction, and forced flush. Install @senzops/apm-node as a dependency in your function's package.json."
         }
       ],
       troubleshooting: [

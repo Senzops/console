@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { SmartAnimatedValue } from '@/components/Tween';
+import RuntimeMetrics from './RuntimeMetrics';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -617,7 +618,10 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
            </ChartCard>
         </div>
 
-        {/* NEW 5. Recent Invocations (Trace List) */} 
+        {/* 5. Runtime Health Metrics */}
+        <RuntimeMetrics serviceId={serviceId} range={range} />
+
+        {/* 6. Recent Invocations (Trace List) */}
         <InvocationsList invocations={invocations} serviceId={serviceId} onRefresh={() => mutateInvocations()} isRefreshing={isValidatingInvocations} />
       </div>
 
