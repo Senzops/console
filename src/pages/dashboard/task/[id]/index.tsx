@@ -46,10 +46,12 @@ import {
   Search,
   Maximize,
   ChevronRight,
+  Pencil,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { formatDistanceToNow } from "date-fns";
 import { SmartAnimatedValue } from "@/components/Tween";
+import { toast } from "sonner";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -359,6 +361,10 @@ export default function TaskServiceDashboard() {
   const [range, setRange] = useState("1h");
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
 
   const endpoint = `/task/${id}/dashboard?range=${range}`;
   const { data, error, mutate, isValidating } = useSWR(
@@ -375,6 +381,29 @@ export default function TaskServiceDashboard() {
     } catch (e) {
       console.error(e);
       setIsDeleting(false);
+    }
+  };
+
+  const openEdit = () => {
+    if (!data?.service) return;
+    setEditName(data.service.name || '');
+    setEditError(null);
+    setIsEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editName.trim()) return;
+    setIsUpdating(true);
+    setEditError(null);
+    try {
+      await api.put(`/task/${id}`, { name: editName.trim() });
+      await mutate();
+      setIsEditOpen(false);
+      toast.success('Task service updated');
+    } catch (e: any) {
+      setEditError(e.response?.data?.error || 'Failed to update service');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -497,6 +526,13 @@ export default function TaskServiceDashboard() {
                 <RefreshCw
                   className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`}
                 />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={openEdit}
+              >
+                <Pencil className="h-4 w-4" />
               </Button>
               <Button
                 variant="destructive"
@@ -658,6 +694,36 @@ export default function TaskServiceDashboard() {
                 <Trash2 className="h-4 w-4 mr-2" />
               )}{" "}
               Confirm
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Task Service">
+        <div className="space-y-4">
+          {editError && (
+            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{editError}</span>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Service Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+              placeholder="Service name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              autoFocus
+              maxLength={50}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setIsEditOpen(false)} disabled={isUpdating}>Cancel</Button>
+            <Button onClick={handleUpdate} disabled={isUpdating || !editName.trim()}>
+              {isUpdating && <Spinner className="h-4 w-4 mr-2" />}
+              Update
             </Button>
           </div>
         </div>

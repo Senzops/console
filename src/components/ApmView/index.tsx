@@ -6,7 +6,7 @@ import { api, useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
-import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize, Filter } from 'lucide-react';
+import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize, Filter, Pencil } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { WorldMap } from '../WorldMap';
 import Link from 'next/link';
@@ -385,6 +385,11 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const [statusChartMode, setStatusChartMode] = useState<'errors'|'distribution'|'detailed'>('distribution');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editFramework, setEditFramework] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
 
   const endpoint = `/apm/${serviceId}/stats?range=${range}` + (route ? `&route=${encodeURIComponent(route)}` : '');
   const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
@@ -396,9 +401,33 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    try { await api.delete(`/apm/${serviceId}`); router.push('/dashboard'); } 
+    try { await api.delete(`/apm/${serviceId}`); router.push('/dashboard'); }
     catch (e) { console.error(e); setIsDeleting(false); }
   }
+
+  const openEdit = () => {
+    if (!data?.meta) return;
+    setEditName(data.meta.name || '');
+    setEditFramework(data.meta.framework || '');
+    setEditError(null);
+    setIsEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editName.trim()) return;
+    setIsUpdating(true);
+    setEditError(null);
+    try {
+      await api.put(`/apm/${serviceId}`, { name: editName.trim(), framework: editFramework.trim() || undefined });
+      await mutate();
+      setIsEditOpen(false);
+      toast.success('Service updated');
+    } catch (e: any) {
+      setEditError(e.response?.data?.error || 'Failed to update service');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const formattedGraph: any = useMemo(() => {
     if (!data?.graph) return [];
@@ -497,6 +526,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                     <option value="7d">Last 7 Days</option>
                 </Select>
                 <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}><RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} /></Button>
+                <Button variant="outline" size="icon" onClick={openEdit}><Pencil className="h-4 w-4" /></Button>
                 <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>
               </div>
            </div>
@@ -630,6 +660,45 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         <div className="space-y-4">
             <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3"><AlertTriangle className="h-5 w-5 shrink-0" /><div className="text-sm"><span className="font-bold block mb-1">Warning: Irreversible Action</span>This will delete <strong>{meta.name}</strong> and all traces.</div></div>
             <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>Cancel</Button><Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>{isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm</Button></div>
+        </div>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit APM Service">
+        <div className="space-y-4">
+          {editError && (
+            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{editError}</span>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Service Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none transition-all"
+              placeholder="Service name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              autoFocus
+              maxLength={50}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Framework <span className="text-muted-foreground font-normal">(Optional)</span></label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none transition-all"
+              placeholder="e.g. Express, Fastify, NestJS"
+              value={editFramework}
+              onChange={(e) => setEditFramework(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setIsEditOpen(false)} disabled={isUpdating}>Cancel</Button>
+            <Button onClick={handleUpdate} disabled={isUpdating || !editName.trim()}>
+              {isUpdating && <Spinner className="h-4 w-4 mr-2" />}
+              Update
+            </Button>
+          </div>
         </div>
       </Dialog>
     </>

@@ -67,7 +67,8 @@ import {
   ChevronRight,
   Zap,
   Info,
-  RotateCcw
+  RotateCcw,
+  Pencil
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -1389,6 +1390,13 @@ export default function CustomDashboardView() {
   const [isDeleteViewOpen, setIsDeleteViewOpen] = useState(false);
   const [isDeletingView, setIsDeletingView] = useState(false);
 
+  // Dashboard Edit
+  const [isEditViewOpen, setIsEditViewOpen] = useState(false);
+  const [isUpdatingView, setIsUpdatingView] = useState(false);
+  const [editViewName, setEditViewName] = useState('');
+  const [editViewDescription, setEditViewDescription] = useState('');
+  const [editViewError, setEditViewError] = useState<string | null>(null);
+
   // Layout & Resizing State
   const [localLayout, setLocalLayout] = useState<any[]>([]);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
@@ -1479,6 +1487,30 @@ export default function CustomDashboardView() {
     } catch (err) {
       toast.error("Failed to delete dashboard.");
       setIsDeletingView(false);
+    }
+  };
+
+  const openEditView = () => {
+    if (!data?.view) return;
+    setEditViewName(data.view.name || '');
+    setEditViewDescription(data.view.description || '');
+    setEditViewError(null);
+    setIsEditViewOpen(true);
+  };
+
+  const handleUpdateView = async () => {
+    if (!editViewName.trim()) return;
+    setIsUpdatingView(true);
+    setEditViewError(null);
+    try {
+      await api.put(`/views/${id}`, { name: editViewName.trim(), description: editViewDescription.trim() });
+      await mutate();
+      setIsEditViewOpen(false);
+      toast.success('Dashboard updated');
+    } catch (e: any) {
+      setEditViewError(e.response?.data?.error || 'Failed to update dashboard');
+    } finally {
+      setIsUpdatingView(false);
     }
   };
 
@@ -1706,11 +1738,17 @@ export default function CustomDashboardView() {
                 className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`}
               />
             </Button>
-            <div className="h-6 w-px bg-border mx-1 hidden md:block"></div>
             <Button
               variant="outline"
               size="icon"
-              className="h-9 w-9 text-destructive hover:bg-destructive/10 border-destructive/20 bg-background"
+              className="h-9 w-9"
+              onClick={openEditView}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="destructive" 
+              size="icon"
               onClick={() => setIsDeleteViewOpen(true)}
             >
               <Trash2 className="h-4 w-4" />
@@ -2191,6 +2229,45 @@ export default function CustomDashboardView() {
                 <Trash2 className="h-4 w-4 mr-2" />
               )}{" "}
               Delete Dashboard
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* --- MODAL: EDIT DASHBOARD --- */}
+      <Dialog open={isEditViewOpen} onClose={() => setIsEditViewOpen(false)} title="Edit Dashboard">
+        <div className="space-y-4">
+          {editViewError && (
+            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{editViewError}</span>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Dashboard Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none transition-all"
+              placeholder="e.g. Master Production Overview"
+              value={editViewName}
+              onChange={(e) => setEditViewName(e.target.value)}
+              autoFocus
+              maxLength={50}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(Optional)</span></label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none transition-all"
+              placeholder="Describe the purpose of this view..."
+              value={editViewDescription}
+              onChange={(e) => setEditViewDescription(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setIsEditViewOpen(false)} disabled={isUpdatingView}>Cancel</Button>
+            <Button onClick={handleUpdateView} disabled={isUpdatingView || !editViewName.trim()}>
+              {isUpdatingView && <Spinner className="h-4 w-4 mr-2" />}
+              Update
             </Button>
           </div>
         </div>
