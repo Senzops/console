@@ -100,29 +100,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const unsubscribe = onAuthStateChanged(auth, async (currUser) => {
       if (currUser) {
-        // 1. Get the secure token
         const t = await currUser.getIdToken();
-        
-        // 2. Attach token to global axios instance
         api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
         delete api.defaults.headers.common['x-demo-mode'];
 
-        // 3. JIT Background Synchronization
-        // Fire-and-forget request to ensure DB consistency.
-        // We do NOT await this, so the UI loads instantly without blocking the user.
         api.post('/user/sync').catch((err) => {
           console.warn('[Identity Sync] Background sync deferred:', err);
         });
 
-        // 4. Update React State
         setUser(currUser);
         setToken(t);
+        try { localStorage.setItem('has-session', '1'); } catch {}
       } else {
         if (!user?.isDemo) {
-          // Clear session securely
           setUser(null);
           setToken(null);
           delete api.defaults.headers.common['Authorization'];
+          try { localStorage.removeItem('has-session'); } catch {}
         }
       }
       setLoading(false);
@@ -190,6 +184,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
+    try { localStorage.removeItem('has-session'); } catch {}
     if (user?.isDemo) {
       setUser(null);
       setToken(null);

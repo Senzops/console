@@ -68,7 +68,7 @@ export const Navbar = ({
 }: {
   transparentOnTop?: boolean;
 }) => {
-  const { user, logout, loading } = useAuth();
+  const { user, loading } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
 
   // Smooth scroll detection for dynamic glassmorphic effect
@@ -116,26 +116,25 @@ export const Navbar = ({
           </span>
         </Link>
 
-        {/* Auth Buttons */}
-        <div className="flex items-center gap-4">
-          {loading ? (
-            <Button variant="ghost" disabled className="opacity-70">
-              <Spinner className="mr-2 h-4 w-4" /> Initializing...
+        {/* Auth */}
+        <div className="flex items-center">
+          <Link href={loading ? "#" : user ? "/dashboard" : "/login"}>
+            <Button
+              className={cn(
+                "min-w-[108px] justify-center",
+                loading ? "pointer-events-none" : ""
+              )}
+            >
+              <span
+                className={cn(
+                  "transition-opacity duration-500 ease-in-out",
+                  loading ? "opacity-0" : "opacity-100"
+                )}
+              >
+                {user ? "Dashboard" : "Sign In"}
+              </span>
             </Button>
-          ) : user ? (
-            <>
-              <Link href="/dashboard">
-                <Button variant="ghost">Dashboard</Button>
-              </Link>
-              <Button onClick={logout} variant="outline">
-                Sign Out
-              </Button>
-            </>
-          ) : (
-            <Link href="/login">
-              <Button>Sign In</Button>
-            </Link>
-          )}
+          </Link>
         </div>
       </div>
     </nav>

@@ -150,7 +150,7 @@ export default function Home() {
                   size="lg"
                   className="h-14 px-8 text-lg rounded-full shadow-primary/20 shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center"
                 >
-                  {user ? "Go to Dashboard" : "Start for free"}
+                  Get Started
                 </Button>
               </Link>
               <Link href="/demo" target="_blank">
@@ -274,7 +274,7 @@ export default function Home() {
                   size="lg"
                   className="h-14 px-10 font-bold text-base shadow-sm hover:scale-105 transition-transform duration-300"
                 >
-                  {user ? "Go to Dashboard" : "Start Monitoring Now"}{" "}
+                  Start Monitoring Now{" "}
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>

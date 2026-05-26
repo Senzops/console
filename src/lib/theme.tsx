@@ -25,31 +25,27 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType>({} as any);
 
+const readLocal = (key: string) => {
+  if (typeof window === "undefined") return null;
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  // Existing State
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [appearance, setAppearance] = useState<Appearance>("colorful");
-
-  // New State
-  const [sidebarMode, setSidebarModeState] =
-    useState<SidebarMode>("restricted");
-  const [defaultViewMode, setDefaultViewModeState] = useState<ViewMode>("list");
-  const [isSidebarMinimized, setIsSidebarMinimizedState] = useState<boolean>(false);
-
-  useEffect(() => {
-    // Load all settings from localStorage on mount
-    const savedTheme = localStorage.getItem("sys-theme") as Theme;
-    const savedApp = localStorage.getItem("sys-appearance") as Appearance;
-    const savedSidebar = localStorage.getItem("sys-sidebar") as SidebarMode;
-    const savedView = localStorage.getItem("sys-viewmode") as ViewMode;
-    const savedMinimized = localStorage.getItem("sys-sidebar-minimized") === "true";
-
-    if (savedTheme) setThemeState(savedTheme);
-    if (savedApp) setAppearance(savedApp);
-    if (savedSidebar) setSidebarModeState(savedSidebar);
-    if (savedView) setDefaultViewModeState(savedView);
-    if (savedMinimized) setIsSidebarMinimizedState(true);
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(
+    () => (readLocal("sys-theme") as Theme) || "dark"
+  );
+  const [appearance, setAppearance] = useState<Appearance>(
+    () => (readLocal("sys-appearance") as Appearance) || "colorful"
+  );
+  const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(
+    () => (readLocal("sys-sidebar") as SidebarMode) || "restricted"
+  );
+  const [defaultViewMode, setDefaultViewModeState] = useState<ViewMode>(
+    () => (readLocal("sys-viewmode") as ViewMode) || "list"
+  );
+  const [isSidebarMinimized, setIsSidebarMinimizedState] = useState<boolean>(
+    () => readLocal("sys-sidebar-minimized") === "true"
+  );
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
@@ -80,10 +76,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem("sys-sidebar-minimized", m ? "true" : "false");
   };
 
-  // Initial Theme Apply
   useEffect(() => {
     const root = window.document.documentElement;
     root.setAttribute("data-theme", theme);
+    if (theme === "light" || theme === "latte") root.classList.remove("dark");
+    else root.classList.add("dark");
   }, [theme]);
 
   return (
