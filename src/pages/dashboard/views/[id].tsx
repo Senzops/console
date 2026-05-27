@@ -19,6 +19,7 @@ import {
   DataError,
   cn,
 } from "../../../components/Core";
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import {
   AreaChart,
   Area,
@@ -402,14 +403,14 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
 };
 
 // --- Recharts Tooltip Formatting ---
-const formatAxisDate = (str: string, range: string) => {
+const formatAxisDate = (str: string, displayRange: string) => {
   if (!str) return "";
   const date = new Date(str);
   return date.toLocaleString(undefined, {
-    month: range === "1h" ? undefined : "short",
-    day: range === "1h" ? undefined : "numeric",
+    month: (displayRange === "30m" || displayRange === "1h") ? undefined : "short",
+    day: (displayRange === "30m" || displayRange === "1h") ? undefined : "numeric",
     hour: "numeric",
-    minute: range === "1h" ? "2-digit" : undefined,
+    minute:"2-digit",
   });
 };
 
@@ -1234,7 +1235,8 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
 const WidgetWrapper = ({
   widget,
   layoutNode,
-  range,
+  rangeQuery,
+  displayRange,
   isEditing,
   isMono,
   onEdit,
@@ -1249,7 +1251,7 @@ const WidgetWrapper = ({
   const headerActionsRef = useRef<HTMLDivElement>(null);
 
   const { data, error, isValidating } = useSWR(
-    `/views/widgets/${widget._id}/data?range=${range}`,
+    `/views/widgets/${widget._id}/data?${rangeQuery}`,
     fetcher,
     { refreshInterval: 60000 },
   );
@@ -1338,7 +1340,7 @@ const WidgetWrapper = ({
               data={data.data}
               config={widget.config}
               visualization={widget.visualization}
-              range={range}
+              range={displayRange}
               isMono={isMono}
               headerActionsRef={headerActionsRef}
               isParentHovered={isHovered}
@@ -1383,7 +1385,9 @@ export default function CustomDashboardView() {
   const { token } = useAuth();
   const { theme, isMono } = useTheme();
 
-  const [range, setRange] = useState("1h");
+  const [timeRange, setTimeRange] = usePersistedTimeRange(8);
+  const rangeQuery = buildTimeRangeQuery(timeRange);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -1573,7 +1577,9 @@ export default function CustomDashboardView() {
         query: parsedQuery,
         visualization: builderForm.visualization,
         config: builderForm.config,
-        range,
+        ...(timeRange.type === 'relative'
+          ? { range: timeRange.range }
+          : { start: timeRange.start, end: timeRange.end }),
       });
       setPreviewData(res);
     } catch (err: any) {
@@ -1675,7 +1681,7 @@ export default function CustomDashboardView() {
 
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-32 relative z-10">
         {/* --- Unified Enterprise Header (ALWAYS VISIBLE) --- */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border border-border/60 backdrop-blur-sm">
+        <div className="relative z-[301] flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border border-border/60 backdrop-blur-sm">
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -1694,16 +1700,7 @@ export default function CustomDashboardView() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <Select
-              className="w-32 bg-background h-9 text-xs"
-              value={range}
-              onChange={(e) => setRange(e.target.value)}
-            >
-              <option value="1h">Last 1 Hour</option>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </Select>
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
             <Button
               variant="outline"
               size="icon"
@@ -1762,7 +1759,8 @@ export default function CustomDashboardView() {
                 <WidgetWrapper
                   widget={widget}
                   layoutNode={node}
-                  range={range}
+                  rangeQuery={rangeQuery}
+                  displayRange={displayRange}
                   isEditing={isEditing}
                   isMono={isMono}
                   onEdit={openEditWidget}
@@ -1876,16 +1874,7 @@ export default function CustomDashboardView() {
                 </h2>
               </div>
               <div className="flex items-center gap-3">
-                <Select
-                  className="w-32 bg-background h-8 text-xs font-medium border-border/40 hidden sm:block"
-                  value={range}
-                  onChange={(e) => setRange(e.target.value)}
-                >
-                  <option value="1h">Last 1 Hour</option>
-                  <option value="24h">Last 24 Hours</option>
-                  <option value="7d">Last 7 Days</option>
-                  <option value="30d">Last 30 Days</option>
-                </Select>
+                <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
                 <Button
                   variant="outline"
                   onClick={runLivePreview}
@@ -2122,7 +2111,7 @@ export default function CustomDashboardView() {
                           data={previewData?.data}
                           config={builderForm.config}
                           visualization={builderForm.visualization}
-                          range={range}
+                          range={displayRange}
                           isMono={isMono}
                         />
                       </div>

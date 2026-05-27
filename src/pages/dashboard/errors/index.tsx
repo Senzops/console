@@ -10,11 +10,12 @@ import {
   CardTitle,
   Badge,
   Input,
-  Select,
   Button,
   Spinner,
   DataError,
+  Select,
 } from "../../../components/Core";
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import {
   AreaChart,
   Area,
@@ -160,7 +161,8 @@ export default function GlobalErrorsDashboard() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [range, setRange] = useState("24h");
+  const [timeRange, setTimeRange] = usePersistedTimeRange(30);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("unresolved");
   const [serviceFilter, setServiceFilter] = useState("all");
@@ -194,7 +196,7 @@ export default function GlobalErrorsDashboard() {
   }, [apmList, taskList, rumList]);
 
   // Fetch Global Errors
-  const endpoint = `/errors?range=${range}&page=${page}&limit=15&search=${search}&status=${statusFilter}${serviceFilter !== "all" ? `&serviceId=${serviceFilter}` : ""}`;
+  const endpoint = `/errors?${buildTimeRangeQuery(timeRange)}&page=${page}&limit=15&search=${search}&status=${statusFilter}${serviceFilter !== "all" ? `&serviceId=${serviceFilter}` : ""}`;
   const { data, error, isLoading } = useSWR(token ? endpoint : null, fetcher, {
     keepPreviousData: true,
   });
@@ -212,12 +214,12 @@ export default function GlobalErrorsDashboard() {
     return data?.trend.map((point: any) => {
       const d = new Date(point.time);
       let timeStr;
-      if (range === "7d" || range === "30d") {
+      if (displayRange === "7d" || displayRange === "30d") {
         timeStr = d.toLocaleDateString([], {
           month: "short",
           day: "numeric",
         });
-      } else if (range === "24h") {
+      } else if (displayRange === "24h") {
         timeStr = d.toLocaleDateString([], {
           month: "short",
           day: "numeric",
@@ -232,7 +234,7 @@ export default function GlobalErrorsDashboard() {
       }
       return { ...point, time: timeStr };
     });
-  }, [data?.trend, range]);
+  }, [data?.trend, displayRange]);
 
   if (!data && !error && isLoading)
     return (
@@ -278,19 +280,11 @@ export default function GlobalErrorsDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Select
-              className="w-36 bg-background rounded-md border-border/80"
-              value={range}
-              onChange={(e) => {
-                setRange(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="1h">Last 1 Hour</option>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </Select>
+            <TimeRangePicker
+              value={timeRange}
+              onChange={(val) => { setTimeRange(val); setPage(1); }}
+              maxRetentionDays={30}
+            />
           </div>
         </div>
 
@@ -299,7 +293,7 @@ export default function GlobalErrorsDashboard() {
           <StatCard
             title="Total Errors"
             value={data?.stats?.totalErrors?.toLocaleString() || 0}
-            subtext={`Events in last ${range}`}
+            subtext={`Events in last ${displayRange}`}
             icon={Activity}
             color="text-primary"
           />
@@ -321,15 +315,17 @@ export default function GlobalErrorsDashboard() {
             title="Error Velocity"
             value={(
               (data?.stats?.totalErrors || 0) /
-              (range === "1h"
+              (displayRange === "30m"
+                ? 30
+                : (displayRange === "1h")
                 ? 60
-                : range === "24h"
+                : displayRange === "24h"
                   ? 24
-                  : range === "7d"
+                  : displayRange === "7d"
                     ? 168
                     : 720)
             ).toFixed(1)}
-            subtext={range === "1h" ? "Errors per minute" : "Errors per hour"}
+            subtext={(displayRange === "30m" || displayRange === "1h") ? "Errors per minute" : "Errors per hour"}
             icon={Clock}
             color="text-purple-500"
           />

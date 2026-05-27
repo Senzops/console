@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError, Input } from '../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input } from '../../../components/Core';
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize, Search, Pencil } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -250,12 +251,13 @@ export default function DatabaseDetail() {
   const { isMono } = useTheme();
   
   const { openModal } = useServiceModal();
-  const [range, setRange] = useState('24h');
+  const [timeRange, setTimeRange] = usePersistedTimeRange(7);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/database/${id}/stats?range=${range}` : null, 
+    token && id ? `/database/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null, 
     fetcher,
     { refreshInterval: 60000 } 
   );
@@ -283,10 +285,10 @@ export default function DatabaseDetail() {
     return data.history.map((point: any) => ({
         ...point,
         time: new Date(point.time).toLocaleTimeString([], {
-          month: range === '1h' ? undefined : 'short',
-          day: range === '1h' ? undefined : 'numeric',
+          month: (displayRange === '30m' || displayRange === '1h') ? undefined : 'short',
+          day: (displayRange === '30m' || displayRange === '1h') ? undefined : 'numeric',
           hour: 'numeric',
-          minute: range !== '7d' ? '2-digit' : undefined,
+          minute: displayRange !== '7d' ? '2-digit' : undefined,
         }),
         // Convert network from Bytes/s to KB/s for chart
         netInKB: point.netIn ? point.netIn / 1024 : 0,
@@ -422,11 +424,7 @@ export default function DatabaseDetail() {
           </div>
           
           <div className="flex items-center gap-2">
-            <Select className="w-32 bg-background" value={range} onChange={(e) => setRange(e.target.value)}>
-                <option value="1h">Last 1 Hour</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-            </Select>
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={7} />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
                 <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>

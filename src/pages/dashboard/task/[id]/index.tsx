@@ -17,11 +17,11 @@ import {
   CardTitle,
   Badge,
   Button,
-  Select,
   Spinner,
   Dialog,
   DataError,
 } from "../../../../components/Core";
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
 import {
   AreaChart,
   Area,
@@ -358,12 +358,14 @@ export default function TaskServiceDashboard() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [range, setRange] = useState("1h");
+  const [timeRange, setTimeRange] = usePersistedTimeRange(30);
+  const rangeQuery = buildTimeRangeQuery(timeRange);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
 
-  const endpoint = `/task/${id}/dashboard?range=${range}`;
+  const endpoint = `/task/${id}/dashboard?${rangeQuery}`;
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? endpoint : null,
     fetcher,
@@ -402,13 +404,13 @@ export default function TaskServiceDashboard() {
       if (!str) return "";
       const date = new Date(str);
       return date.toLocaleString(undefined, {
-        month: range === "1h" ? undefined : "short",
-        day: range === "1h" ? undefined : "numeric",
+        month: (displayRange === "30m" || displayRange === "1h") ? undefined : "short",
+        day: (displayRange === "30m" || displayRange === "1h") ? undefined : "numeric",
         hour: "numeric",
-        minute: range === "1h" ? "2-digit" : undefined,
+        minute: (displayRange === "30m" || displayRange === "1h") ? "2-digit" : undefined,
       });
     },
-    [range],
+    [displayRange],
   );
 
   if (!data && !error)
@@ -487,15 +489,7 @@ export default function TaskServiceDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Select
-                className="w-32 bg-background"
-                value={range}
-                onChange={(e) => setRange(e.target.value)}
-              >
-                <option value="1h">Last 1 Hour</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-              </Select>
+              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={30} />
               <Button
                 variant="outline"
                 size="icon"

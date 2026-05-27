@@ -16,12 +16,12 @@ import {
   CardTitle,
   Badge,
   Input,
-  Select,
   Button,
   Spinner,
   DataError,
   Dialog,
 } from "../../../components/Core";
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import {
   AreaChart,
   Area,
@@ -214,7 +214,8 @@ export default function GlobalLogsDashboard() {
   const initSearch = router.query.search as string | undefined;
 
   // Local State
-  const [range, setRange] = useState("1h");
+  const [timeRange, setTimeRange] = usePersistedTimeRange(7);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState(initSearch || "");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -238,7 +239,7 @@ export default function GlobalLogsDashboard() {
   }, [searchInput, debouncedSearch]);
 
   // Main Table Fetch
-  const endpoint = `/logs?search=${encodeURIComponent(debouncedSearch)}&range=${range}&page=${page}&limit=100`;
+  const endpoint = `/logs?${buildTimeRangeQuery(timeRange)}&search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=100`;
   const { data, error, isLoading, mutate, isValidating } = useSWR(
     token ? endpoint : null,
     fetcher,
@@ -262,15 +263,17 @@ export default function GlobalLogsDashboard() {
   const logVelocity = useMemo(() => {
     if (!totalLogs) return 0;
     const mins =
-      range === "1h"
+      displayRange === "30m"
+        ? 30
+        : displayRange === "1h"
         ? 60
-        : range === "24h"
+        : displayRange === "24h"
           ? 1440
-          : range === "7d"
+          : displayRange === "7d"
             ? 10080
             : 43200;
     return (totalLogs / mins).toFixed(1);
-  }, [totalLogs, range]);
+  }, [totalLogs, displayRange]);
 
   const errorCount = useMemo(() => {
     if (!data?.logs) return 0;
@@ -303,13 +306,13 @@ export default function GlobalLogsDashboard() {
       if (!str) return "";
       const date = new Date(str);
       return date.toLocaleString(undefined, {
-        month: range === "1h" ? undefined : "short",
-        day: range === "1h" ? undefined : "numeric",
+        month: (displayRange === "30m" || displayRange === "1h") ? undefined : "short",
+        day: (displayRange === "30m" || displayRange === "1h") ? undefined : "numeric",
         hour: "numeric",
-        minute: range === "1h" ? "2-digit" : undefined,
+        minute: (displayRange === "30m" || displayRange === "1h") ? "2-digit" : undefined,
       });
     },
-    [range],
+    [displayRange],
   );
 
   // Drawer Management: Resolves from table data FIRST, falls back to direct API lookup
@@ -427,19 +430,7 @@ export default function GlobalLogsDashboard() {
             >
               <Key className="h-4 w-4 mr-2" /> Ingestion Key
             </Button>
-            <Select
-              className="w-36 bg-background rounded-md border-border/80 h-9"
-              value={range}
-              onChange={(e) => {
-                setRange(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="1h">Last 1 Hour</option>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </Select>
+            <TimeRangePicker value={timeRange} onChange={(val) => { setTimeRange(val); setPage(1); }} maxRetentionDays={7} />
             <Button
               variant="outline"
               size="icon"

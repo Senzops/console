@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, X, RefreshCw, Search, Maximize, ChartNoAxesCombined, Pencil } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -232,7 +233,8 @@ export default function WebDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [range, setRange] = useState('24h');
+  const [timeRange, setTimeRange] = usePersistedTimeRange(32);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
@@ -245,7 +247,7 @@ export default function WebDetail() {
   const [sourceMode, setSourceMode] = useState<'referrers' | 'channels'>('referrers');
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/web/${id}/stats?range=${range}` : null,
+    token && id ? `/web/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null,
     fetcher,
     { refreshInterval: 60000 }
   );
@@ -283,10 +285,10 @@ export default function WebDetail() {
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
-        minute: range === '24h' ? '2-digit' : undefined
+        minute: (displayRange === '3d' || displayRange === '7d') ? undefined : '2-digit'
       })
     }));
-  }, [data?.graph, range]);
+  }, [data?.graph, displayRange]);
 
   const localTrafficHours = useMemo(() => {
     if (!data?.traffic?.hours) return [];
@@ -331,11 +333,7 @@ export default function WebDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Select className="w-32 bg-background" value={range} onChange={(e) => setRange(e.target.value)}>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </Select>
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={32} />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>

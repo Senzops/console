@@ -4,7 +4,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../Core';
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../TimeRangePicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize, Filter, Pencil } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -380,7 +381,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const { token } = useAuth();
   const { isMono } = useTheme();
   
-  const [range, setRange] = useState('1h');
+  const [timeRange, setTimeRange] = usePersistedTimeRange(8);
   const [geoMode, setGeoMode] = useState<'map'|'countries'|'cities'>('map');
   const [sysMode, setSysMode] = useState<'browsers'|'os'|'devices'>('browsers');
   const [statusChartMode, setStatusChartMode] = useState<'errors'|'distribution'|'detailed'>('distribution');
@@ -388,11 +389,13 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
 
-  const endpoint = `/apm/${serviceId}/stats?range=${range}` + (route ? `&route=${encodeURIComponent(route)}` : '');
+  const rangeQuery = buildTimeRangeQuery(timeRange);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+
+  const endpoint = `/apm/${serviceId}/stats?${rangeQuery}` + (route ? `&route=${encodeURIComponent(route)}` : '');
   const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
 
-    // Fetch Invocations (List)
-   const invocationsEndpoint = `/apm/${serviceId}/invocations?range=${range}` + (route ? `&route=${encodeURIComponent(route)}` : '');
+   const invocationsEndpoint = `/apm/${serviceId}/invocations?${rangeQuery}` + (route ? `&route=${encodeURIComponent(route)}` : '');
   const { data: invocations, mutate: mutateInvocations, isValidating: isValidatingInvocations } = useSWR(token && serviceId ? invocationsEndpoint : null, fetcher, { refreshInterval: 30000 });
 
 
@@ -414,7 +417,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
     const allStatusCodes = new Set<string>();
     
     const processed = data.graph.map((point: any) => {
-      const interval = range === '1h' ? 60 : 3600;
+      const interval = (displayRange === '30m' || displayRange === '1h') ? 60 : 3600;
       
       // Flatten statusBreakdown for Recharts
       // Input: statusBreakdown: [{ code: 200, count: 5 }, { code: 404, count: 2 }]
@@ -439,7 +442,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
     // Sort codes for legend consistency
     const sortedCodes = Array.from(allStatusCodes).sort().map(c => parseInt(c));
     return { data: processed, codes: sortedCodes };
-  }, [data?.graph, range]);
+  }, [data?.graph, displayRange]);
 
   const formatAxisDate = useCallback(
     (str: string) => {
@@ -447,13 +450,13 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
       const date = new Date(str);
 
       return date.toLocaleString(undefined, {
-        month: range === '1h' ? undefined : 'short',
-        day: range === '1h' ? undefined : 'numeric',
+        month: (displayRange === '30m' || displayRange === '1h') ? undefined : 'short',
+        day: (displayRange === '30m' || displayRange === '1h') ? undefined : 'numeric',
         hour: 'numeric',
-        minute: range === '1h' ? '2-digit' : undefined,
+        minute: (displayRange === '30m' || displayRange === '1h') ? '2-digit' : undefined,
       });
     },
-    [range]
+    [displayRange]
   );
 
 
@@ -498,11 +501,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Select className="w-32 bg-background" value={range} onChange={(e) => setRange(e.target.value)}>
-                    <option value="1h">Last 1 Hour</option>
-                    <option value="24h">Last 24 Hours</option>
-                    <option value="7d">Last 7 Days</option>
-                </Select>
+                <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
                 <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}><RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} /></Button>
                 <Button variant="outline" size="icon" onClick={openEdit}><Pencil className="h-4 w-4" /></Button>
                 <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>
@@ -627,7 +626,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         </div>
 
         {/* 5. Runtime Health Metrics */}
-        <RuntimeMetrics serviceId={serviceId} range={range} />
+        <RuntimeMetrics serviceId={serviceId} range={rangeQuery} />
 
         {/* 6. Recent Invocations (Trace List) */}
         <InvocationsList invocations={invocations} serviceId={serviceId} onRefresh={() => mutateInvocations()} isRefreshing={isValidatingInvocations} />

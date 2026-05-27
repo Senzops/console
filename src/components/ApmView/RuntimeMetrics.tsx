@@ -75,7 +75,7 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
   const { isMono } = useTheme();
   const [chartMode, setChartMode] = useState<'eventloop' | 'memory' | 'gc' | 'cpu'>('eventloop');
 
-  const endpoint = `/apm/${serviceId}/runtime?range=${range}`;
+  const endpoint = `/apm/${serviceId}/runtime?${range}`;
   const { data, error } = useSWR(
     token && serviceId ? endpoint : null,
     fetcher,
@@ -86,12 +86,12 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
     (str: string) => {
       if (!str) return '';
       const date = new Date(str);
-      if (isNaN(date.getTime())) return str;
+
       return date.toLocaleString(undefined, {
-        month: range === '1h' ? undefined : 'short',
-        day: range === '1h' ? undefined : 'numeric',
+        month: (range === '30m' || range === '1h') ? undefined : 'short',
+        day: (range === '30m' || range === '1h') ? undefined : 'numeric',
         hour: 'numeric',
-        minute: range === '1h' ? '2-digit' : undefined,
+        minute: (range === '30m' || range === '1h') ? '2-digit' : undefined,
       });
     },
     [range],

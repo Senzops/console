@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../components/TimeRangePicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -235,13 +236,14 @@ export default function MonitorDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [range, setRange] = useState('24h');
+  const [timeRange, setTimeRange] = usePersistedTimeRange(7);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/uptime/${id}/stats?range=${range}` : null,
+    token && id ? `/uptime/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null,
     fetcher,
     { refreshInterval: 60000 } // Auto refresh every minute
   );
@@ -295,12 +297,7 @@ export default function MonitorDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Select className="w-32 bg-background" value={range} onChange={(e) => setRange(e.target.value)}>
-              <option value="24h">Last 24 Hours</option>
-              <option value="2d">Last 2 Days</option>
-              <option value="5d">Last 5 Days</option>
-              <option value="7d">Last 7 Days</option>
-            </Select>
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={7} />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>
@@ -318,7 +315,7 @@ export default function MonitorDetail() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard title={`Uptime(${range})`} value={`${stats.uptime.toFixed(2)}%`} sub={`Target: 99.9%`} icon={Activity} color="text-emerald-500" isMono={isMono} />
+          <StatCard title={`Uptime(${displayRange})`} value={`${stats.uptime.toFixed(2)}%`} sub={`Target: 99.9%`} icon={Activity} color="text-emerald-500" isMono={isMono} />
           <StatCard title={`Avg Latency`} value={`${Math.round(stats.avgLatency)}ms`} sub={`Global Average`} icon={Clock} color="text-blue-500" isMono={isMono} />
           <StatCard title={`Last Check`} value={`${stats.lastStatus}`} sub={`${new Date(stats.lastCheckTime).toLocaleTimeString(undefined, {
             hour: 'numeric',

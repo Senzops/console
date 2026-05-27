@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, cn, DataError } from '../../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, cn, DataError } from '../../../../components/Core';
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../../components/TimeRangePicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal, Layers, CloudLightning, ArrowRight, Route, Thermometer, Zap, Pencil } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -282,13 +283,13 @@ export default function ServerDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme(); // Get Monochromatic state
 
-  const [range, setRange] = useState('1h');
+  const [timeRange, setTimeRange] = usePersistedTimeRange(1);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/vps/${id}/stats?range=${range}` : null, 
+    token && id ? `/vps/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null, 
     fetcher, 
     { refreshInterval: 60000 }
   );
@@ -413,13 +414,7 @@ export default function ServerDetail() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Select className="w-36 bg-background" value={range} onChange={(e) => setRange(e.target.value)}>
-                <option value="1h">Last 1 Hour</option>
-                <option value="3h">Last 3 Hours</option>
-                <option value="6h">Last 6 Hours</option>
-                <option value="12h">Last 12 Hours</option>
-                <option value="24h">Last 24 Hours</option>
-            </Select>
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={1} />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>

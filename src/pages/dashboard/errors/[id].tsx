@@ -10,10 +10,10 @@ import {
   CardTitle,
   Badge,
   Button,
-  Select,
   Spinner,
   DataError,
 } from "../../../components/Core";
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import {
   AreaChart,
   Area,
@@ -181,11 +181,12 @@ export default function ErrorDetailPage() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [range, setRange] = useState("24h");
+  const [timeRange, setTimeRange] = usePersistedTimeRange(30);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [isUpdating, setIsUpdating] = useState(false);
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/errors/${id}?range=${range}` : null,
+    token && id ? `/errors/${id}?${buildTimeRangeQuery(timeRange)}` : null,
     fetcher,
   );
 
@@ -206,12 +207,12 @@ export default function ErrorDetailPage() {
     return data.trend.map((point: any) => {
       const d = new Date(point.time);
       let timeStr;
-      if (range === "7d" || range === "30d") {
+      if (displayRange === "7d" || displayRange === "30d") {
         timeStr = d.toLocaleDateString([], {
           month: "short",
           day: "numeric",
         });
-      } else if (range === "24h") {
+      } else if (displayRange === "24h") {
         timeStr = d.toLocaleDateString([], {
           month: "short",
           day: "numeric",
@@ -226,7 +227,7 @@ export default function ErrorDetailPage() {
       }
       return { ...point, time: timeStr };
     });
-  }, [data?.trend, range]);
+  }, [data?.trend, displayRange]);
 
   if (!data && !error)
     return (
@@ -323,17 +324,7 @@ export default function ErrorDetailPage() {
           <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto md:items-end mt-2 md:mt-0">
             {/* Time Range Selector */}
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <Select
-                className="w-full md:w-36 bg-background border-border/80 h-9 text-xs"
-                value={range}
-                onChange={(e) => setRange(e.target.value)}
-                disabled={isValidating}
-              >
-                <option value="1h">Last 1 Hour</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-              </Select>
+              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={30} />
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto">
@@ -410,7 +401,7 @@ export default function ErrorDetailPage() {
           <StatCard
             title="Events in Range"
             value={events.length.toLocaleString()}
-            subtext={`Occurrences in last ${range}`}
+            subtext={`Occurrences in last ${displayRange}`}
             icon={Activity}
             color="text-primary"
           />

@@ -17,11 +17,11 @@ import {
   CardTitle,
   Badge,
   Button,
-  Select,
   Spinner,
   Dialog,
   DataError,
 } from "../../../../components/Core";
+import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
 import {
   AreaChart,
   Area,
@@ -584,12 +584,14 @@ export default function RumDashboard() {
   const { isMono } = useTheme();
 
   const { openModal } = useServiceModal();
-  const [range, setRange] = useState("1h");
+  const [timeRange, setTimeRange] = usePersistedTimeRange(8);
+  const rangeQuery = buildTimeRangeQuery(timeRange);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const endpoint =
-    `/rum/${id}/dashboard?range=${range}` +
+    `/rum/${id}/dashboard?${rangeQuery}` +
     (pathFilter ? `&path=${encodeURIComponent(pathFilter)}` : "");
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? endpoint : null,
@@ -634,18 +636,18 @@ export default function RumDashboard() {
       const date = new Date(str);
       return date.toLocaleString(undefined, {
         month:
-          range === "24h" || range === "7d" || range === "30d"
+          displayRange === "24h" || displayRange === "7d" || displayRange === "30d"
             ? "short"
             : undefined,
         day:
-          range === "24h" || range === "7d" || range === "30d"
+          displayRange === "24h" || displayRange === "7d" || displayRange === "30d"
             ? "numeric"
             : undefined,
         hour: "numeric",
         minute: "2-digit",
       });
     },
-    [range],
+    [displayRange],
   );
 
   if (!data && !error)
@@ -755,15 +757,7 @@ export default function RumDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Select
-                className="w-32 bg-background"
-                value={range}
-                onChange={(e) => setRange(e.target.value)}
-              >
-                <option value="1h">Last 1 Hour</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-              </Select>
+              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
               <Button
                 variant="outline"
                 size="icon"
