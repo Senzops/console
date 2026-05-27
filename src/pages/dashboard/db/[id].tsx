@@ -9,6 +9,7 @@ import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, Refresh
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { toast } from 'sonner';
+import { useServiceModal } from '@/components/ServiceModals/context';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -248,16 +249,10 @@ export default function DatabaseDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme();
   
+  const { openModal } = useServiceModal();
   const [range, setRange] = useState('24h');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDbType, setEditDbType] = useState('mongodb');
-  const [editUri, setEditUri] = useState('');
-  const [editInterval, setEditInterval] = useState(5);
-  const [editError, setEditError] = useState<string | null>(null);
 
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? `/database/${id}/stats?range=${range}` : null, 
@@ -273,30 +268,13 @@ export default function DatabaseDetail() {
 
   const openEdit = () => {
     if (!data?.database) return;
-    setEditName(data.database.name || '');
-    setEditDbType(data.database.type || 'mongodb');
-    setEditUri('');
-    setEditInterval(data.database.interval || 5);
-    setEditError(null);
-    setIsEditOpen(true);
-  };
-
-  const handleUpdate = async () => {
-    if (!editName.trim()) return;
-    setIsUpdating(true);
-    setEditError(null);
-    try {
-      const payload: Record<string, any> = { name: editName.trim(), type: editDbType, interval: editInterval };
-      if (editUri.trim()) payload.uri = editUri.trim();
-      await api.put(`/database/${id}`, payload);
-      await mutate();
-      setIsEditOpen(false);
-      toast.success('Database updated');
-    } catch (e: any) {
-      setEditError(e.response?.data?.error || 'Failed to update database');
-    } finally {
-      setIsUpdating(false);
-    }
+    openModal('database', 'edit', {
+      id: id as string,
+      name: data.database.name,
+      dbType: data.database.type,
+      interval: String(data.database.interval),
+      onSuccess: () => mutate(),
+    });
   };
 
   // --- Format Chart Data ---
@@ -565,69 +543,6 @@ export default function DatabaseDetail() {
         </div>
       </Dialog>
 
-      {/* Edit Modal */}
-      <Dialog open={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Database">
-        <div className="space-y-4">
-          {editError && (
-            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{editError}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Database Name</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              placeholder="Database name"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              autoFocus
-              maxLength={50}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Database Type</label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              value={editDbType}
-              onChange={(e) => setEditDbType(e.target.value)}
-            >
-              <option value="mongodb">MongoDB</option>
-              <option value="postgresql">PostgreSQL</option>
-              <option value="mysql">MySQL</option>
-              <option value="redis">Redis</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Connection URI <span className="text-muted-foreground font-normal">(Leave blank to keep current)</span></label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono"
-              placeholder="mongodb://..."
-              value={editUri}
-              onChange={(e) => setEditUri(e.target.value)}
-              type="password"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Poll Interval (minutes)</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              type="number"
-              min={1}
-              max={60}
-              value={editInterval}
-              onChange={(e) => setEditInterval(Number(e.target.value))}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsEditOpen(false)} disabled={isUpdating}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={isUpdating || !editName.trim()}>
-              {isUpdating && <Spinner className="h-4 w-4 mr-2" />}
-              Update
-            </Button>
-          </div>
-        </div>
-      </Dialog>
     </>
   );
 }

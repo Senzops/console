@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth, api } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
@@ -50,9 +50,10 @@ import {
 import Link from "next/link";
 import useSWR from "swr";
 import md5 from "md5";
-import { extractErrorMessage } from "@/utils/axiosError";
 import { toast } from "sonner";
 import { FEATURES_DATA } from "@/static/featuresData";
+import { ServiceModalProvider, useServiceModal } from "../ServiceModals/context";
+import { ServiceModals } from "../ServiceModals";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -760,8 +761,47 @@ export const SidebarGroup = ({
   );
 };
 
-// --- Dashboard Layout ---
+// --- Dashboard Layout (public export wraps inner with ServiceModalProvider) ---
 export const DashboardLayout = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const { token } = useAuth();
+
+  // SWR list hooks must live at provider level so mutate fns can be passed down
+  const { mutate: mutateServers } = useSWR(token ? "/vps/list" : null, fetcher);
+  const { mutate: mutateWeb } = useSWR(token ? "/web/list" : null, fetcher);
+  const { mutate: mutateMonitors } = useSWR(token ? "/uptime/list" : null, fetcher);
+  const { mutate: mutateApm } = useSWR(token ? "/apm/list" : null, fetcher);
+  const { mutate: mutateDb } = useSWR(token ? "/database/list" : null, fetcher);
+  const { mutate: mutateTask } = useSWR(token ? "/task/list" : null, fetcher);
+  const { mutate: mutateRum } = useSWR(token ? "/rum/list" : null, fetcher);
+  const { mutate: mutateViews } = useSWR(token ? "/views" : null, fetcher);
+
+  const mutateFns = React.useMemo(
+    () => ({
+      server: mutateServers,
+      web: mutateWeb,
+      monitor: mutateMonitors,
+      apm: mutateApm,
+      database: mutateDb,
+      task: mutateTask,
+      rum: mutateRum,
+      view: mutateViews,
+    }),
+    [mutateServers, mutateWeb, mutateMonitors, mutateApm, mutateDb, mutateTask, mutateRum, mutateViews],
+  );
+
+  return (
+    <ServiceModalProvider mutateFns={mutateFns}>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </ServiceModalProvider>
+  );
+};
+
+// --- Dashboard Layout Inner (uses ServiceModalContext) ---
+const DashboardLayoutInner = ({
   children,
 }: {
   children: React.ReactNode;
@@ -956,39 +996,15 @@ export const DashboardLayout = ({
     setIsMobileSidebarOpen(false);
   }, [router.asPath]);
 
-  // Fetch Lists
-  const { data: serverList, mutate: mutateServers } = useSWR(
-    token ? "/vps/list" : null,
-    fetcher,
-  );
-  const { data: webList, mutate: mutateWeb } = useSWR(
-    token ? "/web/list" : null,
-    fetcher,
-  );
-  const { data: monitorList, mutate: mutateMonitors } = useSWR(
-    token ? "/uptime/list" : null,
-    fetcher,
-  );
-  const { data: apmList, mutate: mutateApm } = useSWR(
-    token ? "/apm/list" : null,
-    fetcher,
-  );
-  const { data: dbList, mutate: mutateDb } = useSWR(
-    token ? "/database/list" : null,
-    fetcher,
-  );
-  const { data: taskList, mutate: mutateTask } = useSWR(
-    token ? "/task/list" : null,
-    fetcher,
-  );
-  const { data: rumList, mutate: mutateRum } = useSWR(
-    token ? "/rum/list" : null,
-    fetcher,
-  );
-  const { data: viewsList, mutate: mutateViews } = useSWR(
-    token ? "/views" : null,
-    fetcher,
-  ); // SAVED VIEWS
+  // Fetch Lists (SWR deduplicates — same keys as outer DashboardLayout wrapper)
+  const { data: serverList } = useSWR(token ? "/vps/list" : null, fetcher);
+  const { data: webList } = useSWR(token ? "/web/list" : null, fetcher);
+  const { data: monitorList } = useSWR(token ? "/uptime/list" : null, fetcher);
+  const { data: apmList } = useSWR(token ? "/apm/list" : null, fetcher);
+  const { data: dbList } = useSWR(token ? "/database/list" : null, fetcher);
+  const { data: taskList } = useSWR(token ? "/task/list" : null, fetcher);
+  const { data: rumList } = useSWR(token ? "/rum/list" : null, fetcher);
+  const { data: viewsList } = useSWR(token ? "/views" : null, fetcher);
 
   // ENTERPRISE FIX: Hydrate scroll position instantly on mount and intercept scroll events
   useEffect(() => {
@@ -1034,130 +1050,12 @@ export const DashboardLayout = ({
     viewsList,
   ]);
 
-  // Modal States
-  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
-  const [isWebModalOpen, setIsWebModalOpen] = useState(false);
-  const [isMonitorModalOpen, setIsMonitorModalOpen] = useState(false);
-  const [isApmModalOpen, setIsApmModalOpen] = useState(false);
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [isDbModalOpen, setIsDbModalOpen] = useState(false);
-  const [isRumModalOpen, setIsRumModalOpen] = useState(false); // NEW
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false); // SAVED VIEWS
-  const [showUri, setShowUri] = useState(false);
-
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  // Loading States for Actions
-  const [isRegisteringServer, setIsRegisteringServer] = useState(false);
-  const [isRegisteringWeb, setIsRegisteringWeb] = useState(false);
-  const [isRegisteringMonitor, setIsRegisteringMonitor] = useState(false);
-  const [isRegisteringApm, setIsRegisteringApm] = useState(false);
-  const [isRegisteringTask, setIsRegisteringTask] = useState(false);
-  const [isRegisteringDb, setIsRegisteringDb] = useState(false);
-  const [isRegisteringRum, setIsRegisteringRum] = useState(false); // NEW
-  const [isRegisteringView, setIsRegisteringView] = useState(false); // SAVED VIEWS
-
-  // Error States
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [webError, setWebError] = useState<string | null>(null);
-  const [monitorError, setMonitorError] = useState<string | null>(null);
-  const [apmError, setApmError] = useState<string | null>(null);
-  const [taskError, setTaskError] = useState<string | null>(null);
-  const [dbError, setDbError] = useState<string | null>(null);
-  const [rumError, setRumError] = useState<string | null>(null); // NEW
-  const [viewError, setViewError] = useState<string | null>(null); // SAVED VIEWS
-
-  // Form State
-  const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] = useState(""); // Used for views
-  const [newDomain, setNewDomain] = useState("");
-  const [newDomains, setNewDomains] = useState("");
-  const [newUrl, setNewUrl] = useState("");
-  const [newInterval, setNewInterval] = useState("15");
-  const [newDbType, setNewDbType] = useState("mongodb");
-  const [newCreds, setNewCreds] = useState<any>(null);
-
-  // APM Snippet State
-  const [selectedFramework, setSelectedFramework] = useState("Express");
-  const [selectedServerMethod, setSelectedServerMethod] = useState("Interactive");
-  const [selectedWebMethod, setSelectedWebMethod] = useState("CDN Script");
-  const [selectedRumMethod, setSelectedRumMethod] = useState("CDN Script");
-  const apmTabsRef = useRef<HTMLDivElement>(null);
-
-  const scrollApmTabs = (direction: "left" | "right") => {
-    if (!apmTabsRef.current) return;
-    const amount = 160;
-    apmTabsRef.current.scrollBy({ left: direction === "left" ? -amount : amount, behavior: "smooth" });
-  };
-
-  const getWebSnippet = (method: string, webId?: string) => {
-    switch (method) {
-      case "CDN Script":
-        return `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.init({ webId: "${webId}" });\n</script>`;
-      case "NPM Package":
-        return `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.init({\n  webId: "${webId}",\n});`;
-      default:
-        return "";
-    }
-  };
-
-  const getRumSnippet = (method: string, apiKey?: string) => {
-    switch (method) {
-      case "CDN Script":
-        return `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.initRum({\n    apiKey: "${apiKey}",\n    sampleRate: 1.0,\n    allowedOrigins: ["https://api.yourbackend.com"]\n  });\n</script>`;
-      case "NPM Package":
-        return `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.initRum({\n  apiKey: "${apiKey}",\n  sampleRate: 1.0,\n  allowedOrigins: ["https://api.yourbackend.com"],\n});`;
-      default:
-        return "";
-    }
-  };
-
-  const getServerSnippet = (method: string, vpsId?: string, apiKey?: string) => {
-    switch (method) {
-      case "Quick Install":
-        return `export SERVER_ID="${vpsId}" && export API_KEY="${apiKey}" && \\\ncurl -fsSL https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh | sudo -E bash -`;
-      case "Interactive":
-        return `curl -fsSLO https://raw.githubusercontent.com/senzops/server-agent/main/install_agent.sh\nchmod +x install_agent.sh\nsudo bash install_agent.sh\n\n# When prompted, enter:\n#   Server ID: ${vpsId}\n#   API Key:   ${apiKey}`;
-      case "Docker Compose":
-        return `services:\n  senzor:\n    image: ghcr.io/senzops/server-agent:latest\n    container_name: senzor\n    restart: unless-stopped\n    network_mode: "host"\n    pid: "host"\n    volumes:\n      - /:/host/root:ro\n      - /sys:/host/sys:ro\n      - /proc:/host/proc:ro\n      - /etc/os-release:/etc/os-release:ro\n      - /etc/hostname:/etc/hostname:ro\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    environment:\n      - SERVER_ID=${vpsId}\n      - API_KEY=${apiKey}\n      - API_ENDPOINT=https://api.senzor.dev/api/ingest/stats\n      - INTERVAL=60`;
-      default:
-        return "";
-    }
-  };
-
-  const getApmSnippet = (framework: string, apiKey?: string) => {
-    switch (framework) {
-      case "Express":
-        return `npm install @senzops/apm-node\n\nconst senzor = require('@senzops/apm-node');\nsenzor.init({ apiKey: "${apiKey}" });\n\n// 1. Request Handler (First)\napp.use(senzor.requestHandler());\n\n// ... your routes ...\n\n// 2. Error Handler (Last)\napp.use(senzor.errorHandler());`;
-      case "Next.js (App)":
-        return `npm install @senzops/apm-node\n\n// app/api/route.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport const GET = Senzor.wrapNextRoute(async (req) => {\n  return Response.json({ ok: true });\n});`;
-      case "Next.js (Pages)":
-        return `npm install @senzops/apm-node\n\n// pages/api/hello.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nconst handler = (req, res) => res.json({ ok: true });\nexport default Senzor.wrapNextPages(handler);`;
-      case "Fastify":
-        return `npm install @senzops/apm-node\n\nimport {Senzor} from '@senzops/apm-node';\n\nfastify.register(Senzor.fastifyPlugin, {\n  apiKey: "${apiKey}"\n});`;
-      case "NestJS":
-        return `npm install @senzops/apm-node\n\n// main.ts\nimport {Senzor} from '@senzops/apm-node';\n\nasync function bootstrap() {\n  Senzor.init({ apiKey: "${apiKey}" });\n  const app = await NestFactory.create(AppModule);\n  app.use(Senzor.requestHandler());\n  await app.listen(3000);\n}`;
-      case "Nuxt / Nitro":
-        return `npm install @senzops/apm-node\n\n// server/middleware/senzor.ts\nimport {Senzor} from '@senzops/apm-node';\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport default Senzor.wrapH3(defineEventHandler((event) => {\n  // Your logic\n}));`;
-      case "Nitro + CloudFlare worker":
-        return `npm install @senzops/apm-node\n\n// server/plugins/senzor.ts\nimport { Senzor } from "@senzops/apm-node";\n\nexport default defineNitroPlugin((nitroApp) => {\n  Senzor.init({\n    apiKey: "${apiKey}",\n  });\n\n  Senzor.nitroPlugin(nitroApp);\n});`;
-      case "Lambda (Layer)":
-        return `# Zero Code Changes — Senzor Lambda Extension Layer\n\n# 1. Create the layer\nmkdir -p senzor-layer/nodejs && cd senzor-layer/nodejs\nnpm init -y && npm install @senzops/apm-node\ncd .. && zip -r senzor-apm-layer.zip nodejs/\n\n# 2. Publish the layer\naws lambda publish-layer-version \\\n  --layer-name senzor-apm-node \\\n  --zip-file fileb://senzor-apm-layer.zip \\\n  --compatible-runtimes nodejs18.x nodejs20.x nodejs22.x\n\n# 3. Configure your Lambda function\naws lambda update-function-configuration \\\n  --function-name <YOUR_FUNCTION> \\\n  --layers <LAYER_ARN> \\\n  --handler @senzops/apm-node/dist/lambda-handler.handler \\\n  --environment Variables="{\\\n    SENZOR_API_KEY=${apiKey},\\\n    SENZOR_LAMBDA_HANDLER=index.handler,\\\n    NODE_OPTIONS=--require @senzops/apm-node/register\\\n  }"`;
-      case "Lambda (CDK)":
-        return `import * as lambda from 'aws-cdk-lib/aws-lambda';\nimport * as path from 'path';\n\nconst senzorLayer = new lambda.LayerVersion(this, 'SenzorApmLayer', {\n  code: lambda.Code.fromAsset(path.join(__dirname, 'senzor-layer')),\n  compatibleRuntimes: [\n    lambda.Runtime.NODEJS_18_X,\n    lambda.Runtime.NODEJS_20_X,\n  ],\n  description: 'Senzor APM Lambda Extension Layer',\n});\n\nconst fn = new lambda.Function(this, 'MyFunction', {\n  runtime: lambda.Runtime.NODEJS_20_X,\n  handler: '@senzops/apm-node/dist/lambda-handler.handler',\n  code: lambda.Code.fromAsset('lambda'),\n  layers: [senzorLayer],\n  environment: {\n    SENZOR_API_KEY: '${apiKey}',\n    SENZOR_LAMBDA_HANDLER: 'index.handler',\n    NODE_OPTIONS: '--require @senzops/apm-node/register',\n  },\n});`;
-      case "Lambda (Code)":
-        return `npm install @senzops/apm-node\n\n// handler.ts\nimport { Senzor } from '@senzops/apm-node';\n\nSenzor.init({ apiKey: "${apiKey}" });\n\nexport const handler = Senzor.wrapLambda(async (event, context) => {\n  // Your Lambda logic\n  return { statusCode: 200, body: JSON.stringify({ ok: true }) };\n});`;
-      default:
-        return "";
-    }
-  };
-
-  // Task Snippet
-  const getTaskSnippet = (apiKey?: string) => {
-    return `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\n// Initialize as early as possible in your worker entry file\nSenzor.init({\n  apiKey: "${apiKey}"\n});\n\n// BullMQ and Node-Cron are now automatically instrumented!`;
-  };
+  // Service modals are now managed via ServiceModalContext
+  const { openModal } = useServiceModal();
 
   if (loading)
     return (
@@ -1173,180 +1071,6 @@ export const DashboardLayout = ({
     return null;
   }
 
-  // Handlers
-  const handleRegisterServer = async () => {
-    if (!newName) return;
-    setIsRegisteringServer(true);
-    setServerError(null);
-    try {
-      const res = await api.post("/vps/register", { name: newName });
-      setNewCreds(res.data);
-      setNewName("");
-      mutateServers();
-    } catch (e: any) {
-      setServerError(
-        extractErrorMessage(e, "Failed to register server. Please try again."),
-      );
-    } finally {
-      setIsRegisteringServer(false);
-    }
-  };
-
-  const handleRegisterWeb = async () => {
-    if (!newName || !newDomain) return;
-    setIsRegisteringWeb(true);
-    setWebError(null);
-    try {
-      const res = await api.post("/web/register", {
-        name: newName,
-        domain: newDomain,
-      });
-      setNewCreds(res.data);
-      setNewName("");
-      setNewDomain("");
-      mutateWeb();
-    } catch (e: any) {
-      setWebError(
-        extractErrorMessage(
-          e,
-          "Failed to register website. Check domain format.",
-        ),
-      );
-    } finally {
-      setIsRegisteringWeb(false);
-    }
-  };
-
-  const handleRegisterRum = async () => {
-    if (!newName || !newDomains) return;
-    setIsRegisteringRum(true);
-    setRumError(null);
-    try {
-      // Pass the comma-separated domains string directly to the backend
-      const res = await api.post("/rum/register", {
-        name: newName,
-        domains: newDomains,
-      });
-      setNewCreds(res.data);
-      setNewName("");
-      setNewDomains("");
-      mutateRum();
-    } catch (e: any) {
-      setRumError(
-        extractErrorMessage(e, "Failed to register RUM. Check domain format."),
-      );
-    } finally {
-      setIsRegisteringRum(false);
-    }
-  };
-
-  const handleRegisterMonitor = async () => {
-    if (!newName || !newUrl) return;
-    setIsRegisteringMonitor(true);
-    setMonitorError(null);
-    try {
-      await api.post("/uptime/register", {
-        name: newName,
-        url: newUrl,
-        interval: newInterval,
-      });
-      setNewName("");
-      setNewUrl("");
-      setIsMonitorModalOpen(false);
-      mutateMonitors();
-    } catch (e: any) {
-      setMonitorError(
-        extractErrorMessage(
-          e,
-          "Failed to create monitor. Ensure URL is valid.",
-        ),
-      );
-    } finally {
-      setIsRegisteringMonitor(false);
-    }
-  };
-
-  const handleRegisterApm = async () => {
-    if (!newName) return;
-    setIsRegisteringApm(true);
-    setApmError(null);
-    try {
-      const res = await api.post("/apm/register", { name: newName });
-      setNewCreds(res.data);
-      setNewName("");
-      mutateApm();
-    } catch (e: any) {
-      setApmError(e.response?.data?.error || "Failed");
-    } finally {
-      setIsRegisteringApm(false);
-    }
-  };
-
-  const handleRegisterTask = async () => {
-    if (!newName) return;
-    setIsRegisteringTask(true);
-    setTaskError(null);
-    try {
-      const res = await api.post("/task/register", { name: newName });
-      setNewCreds(res.data);
-      setNewName("");
-      mutateTask();
-      toast.success("Task Environment Registered!");
-    } catch (e: any) {
-      setTaskError(
-        e.response?.data?.error || "Failed to create task environment",
-      );
-    } finally {
-      setIsRegisteringTask(false);
-    }
-  };
-
-  const handleRegisterDb = async () => {
-    if (!newName || !newUrl) return;
-    setIsRegisteringDb(true);
-    setDbError(null);
-    try {
-      await api.post("/database/register", {
-        name: newName,
-        type: newDbType,
-        uri: newUrl,
-        interval: Number(newInterval),
-      });
-      setNewName("");
-      setNewUrl("");
-      setIsDbModalOpen(false);
-      mutateDb();
-      toast.success("Database Connected & Monitored!");
-    } catch (e: any) {
-      setDbError(e.response?.data?.error || "Connection Failed");
-    } finally {
-      setIsRegisteringDb(false);
-    }
-  };
-
-  // --- Saved View Handler ---
-  const handleRegisterView = async () => {
-    if (!newName) return;
-    setIsRegisteringView(true);
-    setViewError(null);
-    try {
-      const res = await api.post("/views", {
-        name: newName,
-        description: newDescription,
-      });
-      setNewName("");
-      setNewDescription("");
-      setIsViewModalOpen(false);
-      mutateViews();
-      toast.success("Dashboard created!");
-      router.push(`/dashboard/views/${res.data.view._id}`);
-    } catch (e: any) {
-      setViewError(e.response?.data?.error || "Failed to create view");
-    } finally {
-      setIsRegisteringView(false);
-    }
-  };
-
   const handleResendEmail = async () => {
     setIsResending(true);
     try {
@@ -1357,26 +1081,6 @@ export const DashboardLayout = ({
     } finally {
       setIsResending(false);
     }
-  };
-
-  const closeModal = () => {
-    setIsServerModalOpen(false);
-    setIsWebModalOpen(false);
-    setIsMonitorModalOpen(false);
-    setIsApmModalOpen(false);
-    setIsTaskModalOpen(false);
-    setIsDbModalOpen(false);
-    setIsRumModalOpen(false); // NEW
-    setIsViewModalOpen(false);
-    setNewCreds(null);
-    setNewName("");
-    setNewDescription("");
-    setNewDomain("");
-    setNewDomains("");
-    setNewUrl("");
-    setSelectedFramework("Express");
-    setNewDbType("mongodb");
-    setNewInterval("15");
   };
 
   return (
@@ -1462,7 +1166,7 @@ export const DashboardLayout = ({
                 items={viewsList?.views}
                 hrefPrefix="/dashboard/views"
                 linkPrefix="/dashboard/views"
-                onAdd={!user.isDemo ? () => setIsViewModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('view') : undefined}
                 icon={<LayoutTemplate className="h-3 w-3 text-teal-500 shrink-0" />}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
@@ -1471,7 +1175,7 @@ export const DashboardLayout = ({
                   items: viewsList?.views,
                   hrefPrefix: "/dashboard/views",
                   linkPrefix: "/dashboard/views",
-                  onAdd: !user.isDemo ? () => setIsViewModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('view') : undefined,
                   icon: <LayoutTemplate className="h-3.5 w-3.5 text-teal-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -1482,7 +1186,7 @@ export const DashboardLayout = ({
                 items={serverList}
                 hrefPrefix="/dashboard/server"
                 linkPrefix="/dashboard/server"
-                onAdd={!user.isDemo ? () => setIsServerModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('server') : undefined}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
                   id: "servers",
@@ -1490,7 +1194,7 @@ export const DashboardLayout = ({
                   items: serverList,
                   hrefPrefix: "/dashboard/server",
                   linkPrefix: "/dashboard/server",
-                  onAdd: !user.isDemo ? () => setIsServerModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('server') : undefined,
                   icon: <Server className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -1501,7 +1205,7 @@ export const DashboardLayout = ({
                 items={dbList}
                 hrefPrefix="/dashboard/db"
                 linkPrefix="/dashboard/db"
-                onAdd={!user.isDemo ? () => setIsDbModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('database') : undefined}
                 icon={<Database className="h-3 w-3 text-blue-500 shrink-0" />}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
@@ -1510,7 +1214,7 @@ export const DashboardLayout = ({
                   items: dbList,
                   hrefPrefix: "/dashboard/db",
                   linkPrefix: "/dashboard/db",
-                  onAdd: !user.isDemo ? () => setIsDbModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('database') : undefined,
                   icon: <Database className="h-3.5 w-3.5 text-blue-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -1522,7 +1226,7 @@ export const DashboardLayout = ({
                 items={webList}
                 hrefPrefix="/dashboard/web"
                 linkPrefix="/dashboard/web"
-                onAdd={!user.isDemo ? () => setIsWebModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('web') : undefined}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
                   id: "web",
@@ -1530,7 +1234,7 @@ export const DashboardLayout = ({
                   items: webList,
                   hrefPrefix: "/dashboard/web",
                   linkPrefix: "/dashboard/web",
-                  onAdd: !user.isDemo ? () => setIsWebModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('web') : undefined,
                   icon: <Globe className="h-3.5 w-3.5 text-sky-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -1543,7 +1247,7 @@ export const DashboardLayout = ({
                 items={rumList}
                 hrefPrefix="/dashboard/rum"
                 linkPrefix="/dashboard/rum"
-                onAdd={!user.isDemo ? () => setIsRumModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('rum') : undefined}
                 icon={
                   <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />
                 }
@@ -1554,7 +1258,7 @@ export const DashboardLayout = ({
                   items: rumList,
                   hrefPrefix: "/dashboard/rum",
                   linkPrefix: "/dashboard/rum",
-                  onAdd: !user.isDemo ? () => setIsRumModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('rum') : undefined,
                   icon: <MonitorSmartphone className="h-3.5 w-3.5 text-pink-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -1566,7 +1270,7 @@ export const DashboardLayout = ({
                 items={apmList}
                 hrefPrefix="/dashboard/apm"
                 linkPrefix="/dashboard/apm"
-                onAdd={!user.isDemo ? () => setIsApmModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('apm') : undefined}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
                   id: "apm",
@@ -1574,7 +1278,7 @@ export const DashboardLayout = ({
                   items: apmList,
                   hrefPrefix: "/dashboard/apm",
                   linkPrefix: "/dashboard/apm",
-                  onAdd: !user.isDemo ? () => setIsApmModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('apm') : undefined,
                   icon: <Box className="h-3.5 w-3.5 text-orange-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -1586,7 +1290,7 @@ export const DashboardLayout = ({
                 items={taskList}
                 hrefPrefix="/dashboard/task"
                 linkPrefix="/dashboard/task"
-                onAdd={!user.isDemo ? () => setIsTaskModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('task') : undefined}
                 icon={<Workflow className="h-3 w-3 text-indigo-500 shrink-0" />}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
@@ -1595,7 +1299,7 @@ export const DashboardLayout = ({
                   items: taskList,
                   hrefPrefix: "/dashboard/task",
                   linkPrefix: "/dashboard/task",
-                  onAdd: !user.isDemo ? () => setIsTaskModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('task') : undefined,
                   icon: <Workflow className="h-3.5 w-3.5 text-indigo-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -1731,7 +1435,7 @@ export const DashboardLayout = ({
                 items={monitorList}
                 hrefPrefix="/dashboard/monitor"
                 linkPrefix="/dashboard/monitor"
-                onAdd={!user.isDemo ? () => setIsMonitorModalOpen(true) : undefined}
+                onAdd={!user.isDemo ? () => openModal('monitor') : undefined}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
                   id: "uptime",
@@ -1739,7 +1443,7 @@ export const DashboardLayout = ({
                   items: monitorList,
                   hrefPrefix: "/dashboard/monitor",
                   linkPrefix: "/dashboard/monitor",
-                  onAdd: !user.isDemo ? () => setIsMonitorModalOpen(true) : undefined,
+                  onAdd: !user.isDemo ? () => openModal('monitor') : undefined,
                   icon: <Activity className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
@@ -2056,68 +1760,6 @@ export const DashboardLayout = ({
         </main>
       </div>
 
-      {/* --- SAVED VIEW MODAL --- */}
-      <Dialog
-        open={isViewModalOpen}
-        onClose={closeModal}
-        title="Create Custom Dashboard"
-      >
-        <div className="space-y-4">
-          {viewError && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{viewError}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Dashboard Name</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none transition-all"
-              placeholder="e.g. Master Production Overview"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Description{" "}
-              <span className="text-muted-foreground font-normal">
-                (Optional)
-              </span>
-            </label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none transition-all"
-              placeholder="Describe the purpose of this view..."
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="ghost"
-              onClick={closeModal}
-              disabled={isRegisteringView}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleRegisterView}
-              disabled={isRegisteringView}
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-            >
-              {isRegisteringView ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4" /> Creating...
-                </>
-              ) : (
-                "Create Canvas"
-              )}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
-
       {/* --- VERIFY EMAIL MODAL --- */}
       <Dialog
         open={isVerifyModalOpen}
@@ -2258,731 +1900,8 @@ export const DashboardLayout = ({
         </div>
       </Dialog>
 
-      {/* --- SERVER MODAL --- */}
-      <Dialog
-        open={isServerModalOpen}
-        onClose={closeModal}
-        title="Connect New Server"
-      >
-        {!newCreds ? (
-          <div className="space-y-4">
-            {serverError && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{serverError}</span>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Server Name</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="e.g. Production DB 01"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="ghost" onClick={closeModal}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleRegisterServer}
-                disabled={isRegisteringServer}
-              >
-                {isRegisteringServer ? (
-                  <>
-                    <Spinner className="mr-2 h-4 w-4" /> Generating...
-                  </>
-                ) : (
-                  "Generate Credentials"
-                )}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <Server className="h-3 w-3" /> Server ID
-                </label>
-                <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all">
-                  {newCreds.vpsId}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <Key className="h-3 w-3" /> API Key
-                </label>
-                <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all">
-                  {newCreds.apiKey}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Install & Configure</label>
-              <div className="flex items-center border-b border-border/50 overflow-x-auto no-scrollbar">
-                {["Interactive", "Quick Install", "Docker Compose"].map((method) => (
-                  <button
-                    key={method}
-                    onClick={() => setSelectedServerMethod(method)}
-                    className={cn(
-                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
-                      selectedServerMethod === method
-                        ? "border-emerald-500 text-emerald-500"
-                        : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {method}
-                  </button>
-                ))}
-              </div>
-              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <pre className="text-xs font-mono text-emerald-400 break-all pr-8 leading-relaxed whitespace-pre-wrap">
-                  {getServerSnippet(selectedServerMethod, newCreds.vpsId, newCreds.apiKey)}
-                </pre>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      getServerSnippet(selectedServerMethod, newCreds.vpsId, newCreds.apiKey),
-                    );
-                    toast.success("Copied!");
-                  }}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs p-3 rounded-md">
-              <span className="font-bold">Important:</span> This API Key will
-              only be shown once. Please keep this window open until
-              installation is complete.
-            </div>
-            <Button className="w-full" onClick={closeModal}>
-              I have completed installation
-            </Button>
-          </div>
-        )}
-      </Dialog>
-
-      {/* --- WEB MODAL --- */}
-      <Dialog
-        open={isWebModalOpen}
-        onClose={closeModal}
-        title="Track New Website"
-      >
-        {!newCreds ? (
-          <div className="space-y-4">
-            {webError && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{webError}</span>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Website Name</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="e.g. My Portfolio"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Domain</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="e.g. senzor.dev"
-                value={newDomain}
-                onChange={(e) => setNewDomain(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="ghost" onClick={closeModal}>
-                Cancel
-              </Button>
-              <Button onClick={handleRegisterWeb} disabled={isRegisteringWeb}>
-                {isRegisteringWeb ? (
-                  <>
-                    <Spinner className="mr-2 h-4 w-4" /> Creating...
-                  </>
-                ) : (
-                  "Get Snippet"
-                )}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Globe className="h-3 w-3" /> Web ID
-              </label>
-              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all">
-                {newCreds.webId}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Install & Configure</label>
-              <div className="flex items-center border-b border-border/50">
-                {["CDN Script", "NPM Package"].map((method) => (
-                  <button
-                    key={method}
-                    onClick={() => setSelectedWebMethod(method)}
-                    className={cn(
-                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
-                      selectedWebMethod === method
-                        ? "border-blue-500 text-blue-500"
-                        : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {method}
-                  </button>
-                ))}
-              </div>
-              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <pre className="text-xs font-mono text-blue-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
-                  {getWebSnippet(selectedWebMethod, newCreds.webId)}
-                </pre>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      getWebSnippet(selectedWebMethod, newCreds.webId),
-                    );
-                    toast.success("Copied!");
-                  }}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            <Button className="w-full" onClick={closeModal}>
-              Done
-            </Button>
-          </div>
-        )}
-      </Dialog>
-
-      {/* --- RUM MODAL (NEW) --- */}
-      <Dialog
-        open={isRumModalOpen}
-        onClose={closeModal}
-        title="Connect Web APM (RUM)"
-      >
-        {!newCreds ? (
-          <div className="space-y-4">
-            {rumError && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{rumError}</span>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Application Name</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none transition-all"
-                placeholder="e.g. Frontend - Production"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center justify-between">
-                Allowed Domains{" "}
-                <span className="text-[10px] text-muted-foreground font-normal">
-                  Comma separated
-                </span>
-              </label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none transition-all"
-                placeholder="e.g. senzor.dev, senzor.com"
-                value={newDomains}
-                onChange={(e) => setNewDomains(e.target.value)}
-              />
-              <p className="text-[10px] text-muted-foreground">
-                We strictly reject telemetry from unknown domains. Subdomains
-                are automatically included.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="ghost" onClick={closeModal}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleRegisterRum}
-                disabled={isRegisteringRum}
-                className="bg-pink-600 hover:bg-pink-700 text-white"
-              >
-                {isRegisteringRum ? (
-                  <>
-                    <Spinner className="mr-2 h-4 w-4" /> Creating...
-                  </>
-                ) : (
-                  "Generate SDK Key"
-                )}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Key className="h-3 w-3" /> RUM API Key
-              </label>
-              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all text-pink-500">
-                {newCreds.apiKey}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Install & Configure</label>
-              <div className="flex items-center border-b border-border/50">
-                {["CDN Script", "NPM Package"].map((method) => (
-                  <button
-                    key={method}
-                    onClick={() => setSelectedRumMethod(method)}
-                    className={cn(
-                      "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
-                      selectedRumMethod === method
-                        ? "border-pink-500 text-pink-500"
-                        : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {method}
-                  </button>
-                ))}
-              </div>
-              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <pre className="text-xs font-mono text-pink-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
-                  {getRumSnippet(selectedRumMethod, newCreds.apiKey)}
-                </pre>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      getRumSnippet(selectedRumMethod, newCreds.apiKey),
-                    );
-                    toast.success("Copied!");
-                  }}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            <div className="bg-pink-500/10 border border-pink-500/20 text-pink-500 text-xs p-3 rounded-md">
-              Tip: Ensure allowedOrigins matches your backend API to enable
-              full Distributed Tracing.
-            </div>
-            <Button className="w-full" onClick={closeModal}>
-              Done
-            </Button>
-          </div>
-        )}
-      </Dialog>
-
-      {/* APM MODAL */}
-      <Dialog
-        open={isApmModalOpen}
-        onClose={closeModal}
-        title="Connect API Service"
-      >
-        {!newCreds ? (
-          <div className="space-y-4">
-            {apmError && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{apmError}</span>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Service Name</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="e.g. Auth Microservice"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-                disabled={isRegisteringApm}
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="ghost"
-                onClick={closeModal}
-                disabled={isRegisteringApm}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleRegisterApm} disabled={isRegisteringApm}>
-                {isRegisteringApm ? (
-                  <>
-                    <Spinner className="mr-2 h-4 w-4" /> Generating...
-                  </>
-                ) : (
-                  "Generate Key"
-                )}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Key className="h-3 w-3" /> Service Key
-              </label>
-              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all text-orange-500">
-                {newCreds.apiKey}
-              </div>
-            </div>
-            {/* FRAMEWORK SELECTOR */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Install & Configure</label>
-              <div className="relative flex items-center">
-                <button
-                  onClick={() => scrollApmTabs("left")}
-                  className="absolute left-0 z-10 h-full px-1 bg-gradient-to-r from-card via-card/80 to-transparent text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Scroll left"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <div
-                  ref={apmTabsRef}
-                  className="flex items-center border-b border-border/50 overflow-x-auto no-scrollbar px-6"
-                >
-                  {[
-                    "Express",
-                    "Next.js (App)",
-                    "Next.js (Pages)",
-                    "Fastify",
-                    "NestJS",
-                    "Nuxt / Nitro",
-                    "Nitro + CloudFlare worker",
-                    "Lambda (Layer)",
-                    "Lambda (CDK)",
-                    "Lambda (Code)",
-                  ].map((fw) => (
-                    <button
-                      key={fw}
-                      onClick={() => setSelectedFramework(fw)}
-                      className={cn(
-                        "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
-                        selectedFramework === fw
-                          ? "border-orange-500 text-orange-500"
-                          : "border-transparent text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {fw}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => scrollApmTabs("right")}
-                  className="absolute right-0 z-10 h-full px-1 bg-gradient-to-l from-card via-card/80 to-transparent text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Scroll right"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <pre className="text-xs font-mono text-orange-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
-                  {getApmSnippet(selectedFramework, newCreds.apiKey)}
-                </pre>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      getApmSnippet(selectedFramework, newCreds.apiKey),
-                    );
-                    toast.success("Copied!");
-                  }}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            <Button className="w-full" onClick={closeModal} variant="outline">
-              Done
-            </Button>
-          </div>
-        )}
-      </Dialog>
-
-      {/* --- TASK MODAL --- */}
-      <Dialog
-        open={isTaskModalOpen}
-        onClose={closeModal}
-        title="Connect Background Tasks"
-      >
-        {!newCreds ? (
-          <div className="space-y-4">
-            {taskError && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{taskError}</span>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Service Name</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                placeholder="e.g. Production Background Workers"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-                disabled={isRegisteringTask}
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="ghost"
-                onClick={closeModal}
-                disabled={isRegisteringTask}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleRegisterTask}
-                disabled={isRegisteringTask}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                {isRegisteringTask ? (
-                  <>
-                    <Spinner className="mr-2 h-4 w-4" /> Generating...
-                  </>
-                ) : (
-                  "Generate Key"
-                )}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Key className="h-3 w-3" /> Service Key
-              </label>
-              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all text-indigo-500">
-                {newCreds.apiKey}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Install & Configure</label>
-              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
-                <pre className="text-xs font-mono text-indigo-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
-                  {getTaskSnippet(newCreds.apiKey)}
-                </pre>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      getTaskSnippet(newCreds.apiKey),
-                    );
-                    toast.success("Copied!");
-                  }}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            <Button className="w-full" onClick={closeModal} variant="outline">
-              Done
-            </Button>
-          </div>
-        )}
-      </Dialog>
-
-      {/* --- MONITOR MODAL --- */}
-      <Dialog
-        open={isMonitorModalOpen}
-        onClose={closeModal}
-        title="Add Uptime Monitor"
-      >
-        <div className="space-y-4">
-          {monitorError && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{monitorError}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Monitor Name</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              placeholder="e.g. API Health Check"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Target URL</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              placeholder="https://api.mysite.com/health"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Check Interval</label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              value={newInterval}
-              onChange={(e) => setNewInterval(e.target.value)}
-            >
-              <option value="15">Every 15 Minutes</option>
-              <option value="30">Every 30 Minutes</option>
-              <option value="60">Every 1 Hour</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" onClick={closeModal}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleRegisterMonitor}
-              disabled={isRegisteringMonitor}
-            >
-              {isRegisteringMonitor ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4" /> Creating...
-                </>
-              ) : (
-                "Start Monitoring"
-              )}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
-
-      {/* DATABASE MODAL */}
-      <Dialog
-        open={isDbModalOpen}
-        onClose={closeModal}
-        title="Connect Database"
-      >
-        <div className="space-y-4">
-          {dbError && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{dbError}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Database Engine</label>
-            <Select
-              value={newDbType}
-              onChange={(e) => setNewDbType(e.target.value)}
-              disabled={isRegisteringDb}
-            >
-              <option value="mongodb">MongoDB</option>
-              <option value="redis">Redis</option>
-              <option value="postgresql" disabled>
-                PostgreSQL (Coming Soon)
-              </option>
-              <option value="mysql" disabled>
-                MySQL (Coming Soon)
-              </option>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Display Name</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-              placeholder={
-                newDbType === "redis"
-                  ? "e.g. Production Cache"
-                  : "e.g. Production Cluster"
-              }
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              disabled={isRegisteringDb}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Connection URI</label>
-            <div className="relative">
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono pr-10"
-                placeholder={
-                  newDbType === "redis"
-                    ? "redis://:password@host:6379/0"
-                    : "mongodb+srv://user:pass@cluster.net"
-                }
-                value={newUrl}
-                onChange={(e) => setNewUrl(e.target.value)}
-                disabled={isRegisteringDb}
-                type={showUri ? "text" : "password"}
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
-                onClick={() => setShowUri(!showUri)}
-              >
-                {showUri ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Credentials are AES-256 encrypted safely in our secure vault.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Monitoring Interval</label>
-            <Select
-              value={newInterval}
-              onChange={(e) => setNewInterval(e.target.value)}
-              disabled={isRegisteringDb}
-            >
-              <option value="1">Every 1 minute (High Detail)</option>
-              <option value="5">Every 5 minutes (Standard)</option>
-              <option value="15">Every 15 minutes (Low Footprint)</option>
-            </Select>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="ghost"
-              onClick={closeModal}
-              disabled={isRegisteringDb}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleRegisterDb}
-              disabled={isRegisteringDb}
-              className="min-w-[140px]"
-            >
-              {isRegisteringDb ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4" /> Connecting...
-                </>
-              ) : (
-                "Connect & Save"
-              )}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+      {/* --- SERVICE MODALS (register + edit) --- */}
+      <ServiceModals />
     </div>
   );
 };

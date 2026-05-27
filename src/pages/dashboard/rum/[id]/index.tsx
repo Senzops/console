@@ -62,6 +62,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { SmartAnimatedValue } from "@/components/Tween";
+import { useServiceModal } from '@/components/ServiceModals/context';
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -582,14 +583,10 @@ export default function RumDashboard() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
+  const { openModal } = useServiceModal();
   const [range, setRange] = useState("1h");
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDomains, setEditDomains] = useState('');
-  const [editError, setEditError] = useState<string | null>(null);
 
   const endpoint =
     `/rum/${id}/dashboard?range=${range}` +
@@ -613,26 +610,12 @@ export default function RumDashboard() {
 
   const openEdit = () => {
     if (!data?.service) return;
-    setEditName(data.service.name || '');
-    setEditDomains(data.service.domains?.join(', ') || '');
-    setEditError(null);
-    setIsEditOpen(true);
-  };
-
-  const handleUpdate = async () => {
-    if (!editName.trim() || !editDomains.trim()) return;
-    setIsUpdating(true);
-    setEditError(null);
-    try {
-      await api.put(`/rum/${id}`, { name: editName.trim(), domains: editDomains.trim() });
-      await mutate();
-      setIsEditOpen(false);
-      toast.success('RUM service updated');
-    } catch (e: any) {
-      setEditError(e.response?.data?.error || 'Failed to update RUM service');
-    } finally {
-      setIsUpdating(false);
-    }
+    openModal('rum', 'edit', {
+      id: id as string,
+      name: data.service.name,
+      domains: data.service.domains?.join(', ') || '',
+      onSuccess: () => mutate(),
+    });
   };
 
   const chartData = useMemo(() => {
@@ -1147,44 +1130,6 @@ export default function RumDashboard() {
         </div>
       </Dialog>
 
-      {/* Edit Modal */}
-      <Dialog open={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit RUM Service">
-        <div className="space-y-4">
-          {editError && (
-            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{editError}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Service Name</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none transition-all"
-              placeholder="Service name"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              autoFocus
-              maxLength={50}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Allowed Domains <span className="text-muted-foreground font-normal">(Comma-separated)</span></label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none transition-all font-mono"
-              placeholder="example.com, app.example.com"
-              value={editDomains}
-              onChange={(e) => setEditDomains(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsEditOpen(false)} disabled={isUpdating}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={isUpdating || !editName.trim() || !editDomains.trim()}>
-              {isUpdating && <Spinner className="h-4 w-4 mr-2" />}
-              Update
-            </Button>
-          </div>
-        </div>
-      </Dialog>
     </>
   );
 }

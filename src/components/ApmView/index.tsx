@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { SmartAnimatedValue } from '@/components/Tween';
+import { useServiceModal } from '@/components/ServiceModals/context';
 import RuntimeMetrics from './RuntimeMetrics';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -385,11 +386,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const [statusChartMode, setStatusChartMode] = useState<'errors'|'distribution'|'detailed'>('distribution');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editFramework, setEditFramework] = useState('');
-  const [editError, setEditError] = useState<string | null>(null);
+  const { openModal } = useServiceModal();
 
   const endpoint = `/apm/${serviceId}/stats?range=${range}` + (route ? `&route=${encodeURIComponent(route)}` : '');
   const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
@@ -407,26 +404,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
 
   const openEdit = () => {
     if (!data?.meta) return;
-    setEditName(data.meta.name || '');
-    setEditFramework(data.meta.framework || '');
-    setEditError(null);
-    setIsEditOpen(true);
-  };
-
-  const handleUpdate = async () => {
-    if (!editName.trim()) return;
-    setIsUpdating(true);
-    setEditError(null);
-    try {
-      await api.put(`/apm/${serviceId}`, { name: editName.trim(), framework: editFramework.trim() || undefined });
-      await mutate();
-      setIsEditOpen(false);
-      toast.success('Service updated');
-    } catch (e: any) {
-      setEditError(e.response?.data?.error || 'Failed to update service');
-    } finally {
-      setIsUpdating(false);
-    }
+    openModal('apm', 'edit', { id: serviceId, name: data.meta.name, framework: data.meta.framework, onSuccess: () => mutate() });
   };
 
   const formattedGraph: any = useMemo(() => {
@@ -660,45 +638,6 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         <div className="space-y-4">
             <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3"><AlertTriangle className="h-5 w-5 shrink-0" /><div className="text-sm"><span className="font-bold block mb-1">Warning: Irreversible Action</span>This will delete <strong>{meta.name}</strong> and all traces.</div></div>
             <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>Cancel</Button><Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>{isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm</Button></div>
-        </div>
-      </Dialog>
-
-      {/* Edit Modal */}
-      <Dialog open={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit APM Service">
-        <div className="space-y-4">
-          {editError && (
-            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{editError}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Service Name</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none transition-all"
-              placeholder="Service name"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              autoFocus
-              maxLength={50}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Framework <span className="text-muted-foreground font-normal">(Optional)</span></label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none transition-all"
-              placeholder="e.g. Express, Fastify, NestJS"
-              value={editFramework}
-              onChange={(e) => setEditFramework(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsEditOpen(false)} disabled={isUpdating}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={isUpdating || !editName.trim()}>
-              {isUpdating && <Spinner className="h-4 w-4 mr-2" />}
-              Update
-            </Button>
-          </div>
         </div>
       </Dialog>
     </>

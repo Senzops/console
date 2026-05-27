@@ -6,6 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Select, Spinner, Dialog, DataError } from '../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil } from 'lucide-react';
+import { useServiceModal } from '@/components/ServiceModals/context';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { toast } from 'sonner';
@@ -237,12 +238,7 @@ export default function MonitorDetail() {
   const [range, setRange] = useState('24h');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editUrl, setEditUrl] = useState('');
-  const [editInterval, setEditInterval] = useState('15');
-  const [editError, setEditError] = useState<string | null>(null);
+  const { openModal } = useServiceModal();
 
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? `/uptime/${id}/stats?range=${range}` : null,
@@ -261,27 +257,7 @@ export default function MonitorDetail() {
 
   const openEdit = () => {
     if (!data?.monitor) return;
-    setEditName(data.monitor.name || '');
-    setEditUrl(data.monitor.url || '');
-    setEditInterval(String(data.monitor.interval || '15'));
-    setEditError(null);
-    setIsEditOpen(true);
-  };
-
-  const handleUpdate = async () => {
-    if (!editName.trim() || !editUrl.trim()) return;
-    setIsUpdating(true);
-    setEditError(null);
-    try {
-      await api.put(`/uptime/${id}`, { name: editName.trim(), url: editUrl.trim(), interval: editInterval });
-      await mutate();
-      setIsEditOpen(false);
-      toast.success('Monitor updated');
-    } catch (e) {
-      setEditError(extractErrorMessage(e, 'Failed to update monitor'));
-    } finally {
-      setIsUpdating(false);
-    }
+    openModal('monitor', 'edit', { id: id as string, name: data.monitor.name, url: data.monitor.url, interval: String(data.monitor.interval), onSuccess: () => mutate() });
   };
 
   // --- Process Chart Data (Reverse to Chronological) ---
@@ -379,56 +355,6 @@ export default function MonitorDetail() {
         </div>
       </Dialog>
 
-      {/* Edit Modal */}
-      <Dialog open={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Monitor">
-        <div className="space-y-4">
-          {editError && (
-            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{editError}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Monitor Name</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              placeholder="Monitor name"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              autoFocus
-              maxLength={50}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">URL</label>
-            <input
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono"
-              placeholder="https://example.com"
-              value={editUrl}
-              onChange={(e) => setEditUrl(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Check Interval</label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              value={editInterval}
-              onChange={(e) => setEditInterval(e.target.value)}
-            >
-              <option value="15">Every 15 minutes</option>
-              <option value="30">Every 30 minutes</option>
-              <option value="60">Every 60 minutes</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsEditOpen(false)} disabled={isUpdating}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={isUpdating || !editName.trim() || !editUrl.trim()}>
-              {isUpdating && <Spinner className="h-4 w-4 mr-2" />}
-              Update
-            </Button>
-          </div>
-        </div>
-      </Dialog>
     </>
   );
 }
