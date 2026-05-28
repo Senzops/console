@@ -97,7 +97,7 @@ function CalendarPickerButton({ inputRef, dark }: { inputRef: React.RefObject<HT
         try { inputRef.current?.showPicker(); } catch { inputRef.current?.focus(); }
       }}
       className={cn(
-        'flex items-center justify-center h-8 w-8 shrink-0 rounded-md border border-input bg-transparent transition-colors',
+        'hidden sm:flex items-center justify-center h-8 w-8 shrink-0 rounded-md border border-input bg-transparent transition-colors',
         'hover:bg-accent hover:text-accent-foreground',
         'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
       )}
@@ -235,12 +235,15 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
     align.vertical === 'bottom' ? 'top-full mt-1.5' : 'bottom-full mb-1.5',
   );
 
-  // Shared datetime input classes — hide native picker icon (replaced by CalendarPickerButton)
+  // Shared datetime input classes
+  // On sm+ the native picker icon is hidden (replaced by CalendarPickerButton).
+  // On mobile the CalendarPickerButton is hidden, so we keep the native indicator
+  // as the visual affordance for opening the picker.
   const dateInputCls = cn(
-    'flex h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm transition-colors',
+    'flex h-8 min-w-0 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm transition-colors',
     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
     'disabled:cursor-not-allowed disabled:opacity-50',
-    '[&::-webkit-calendar-picker-indicator]:hidden',
+    'sm:[&::-webkit-calendar-picker-indicator]:hidden',
   );
 
   return (
@@ -311,8 +314,8 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Custom Range</span>
             </div>
 
-            {/* Start / End — Single Row */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
+            {/* Start / End — Stacked on mobile, side-by-side on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
               <div>
                 <label className="text-[11px] font-medium text-muted-foreground mb-1 block">From</label>
                 <div className="flex items-center gap-1">
