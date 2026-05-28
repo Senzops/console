@@ -1412,6 +1412,12 @@ const DashboardLayoutInner = ({
                     icon: BellRing,
                     iconColor: "text-destructive",
                   },
+                  {
+                    href: "/dashboard/incidents",
+                    label: "Incidents",
+                    icon: AlertOctagon,
+                    iconColor: "text-orange-500",
+                  },
                 ]}
                 isMinimized={isActuallyMinimized}
                 onMouseEnter={(e: any) => handleSectionMouseEnter({
@@ -1423,6 +1429,12 @@ const DashboardLayoutInner = ({
                       label: "Alert Policies",
                       icon: BellRing,
                       iconColor: "text-destructive",
+                    },
+                    {
+                      href: "/dashboard/incidents",
+                      label: "Incidents",
+                      icon: AlertOctagon,
+                      iconColor: "text-orange-500",
                     },
                   ],
                   type: "group"

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, createContext, useContext } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
 import {
@@ -33,6 +33,9 @@ import {
   Trash2,
   Edit2,
   Check,
+  VolumeX,
+  Clock,
+  Shield,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -48,6 +51,8 @@ const getChannelIcon = (type: string) => {
       return <Hash className="h-4 w-4 text-emerald-500" />;
     case "discord":
       return <Webhook className="h-4 w-4 text-indigo-500" />;
+    case "webhook":
+      return <Box className="h-4 w-4 text-orange-500" />;
     default:
       return <BellRing className="h-4 w-4 text-muted-foreground" />;
   }
@@ -432,6 +437,202 @@ const ChannelsTable = ({
   );
 };
 
+// --- Silence Windows Table ---
+const SilencesTable = ({
+  silences,
+  onDelete,
+  isValidating,
+  mutate,
+}: any) => {
+  const [isMaximized, setIsMaximized] = useState(false);
+  const toggle = () => setIsMaximized(!isMaximized);
+
+  const limit = isMaximized ? silences.length : 5;
+  const visible = silences.slice(0, limit);
+  const hiddenCount = silences.length - limit;
+
+  const now = new Date();
+
+  const getStatus = (s: any) => {
+    const start = new Date(s.startsAt);
+    const end = new Date(s.endsAt);
+    if (now < start) return "scheduled";
+    if (now >= start && now < end) return "active";
+    return "expired";
+  };
+
+  const Header = (
+    <CardHeader className="p-4 border-b border-border/40 flex flex-row items-center justify-between h-14 shrink-0 bg-card/50">
+      <CardTitle className="text-sm font-medium flex items-center gap-2">
+        <VolumeX className="h-4 w-4 text-foreground" /> Silence Windows
+      </CardTitle>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={() => mutate()}
+          disabled={isValidating}
+        >
+          <RefreshCw
+            className={`h-3 w-3 ${isValidating ? "animate-spin" : ""}`}
+          />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={toggle}
+        >
+          {isMaximized ? (
+            <X className="h-3 w-3" />
+          ) : (
+            <Maximize className="h-3 w-3" />
+          )}
+        </Button>
+      </div>
+    </CardHeader>
+  );
+
+  const Content = (
+    <Card
+      className={`flex flex-col border-border/60 shadow-sm transition-all duration-300 overflow-hidden ${isMaximized ? "fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl bg-card" : "w-full h-auto"}`}
+    >
+      {Header}
+      <CardContent className="p-0 flex-1 overflow-auto bg-card">
+        <table className="w-full text-sm text-left border-collapse whitespace-nowrap">
+          <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
+            <tr>
+              <th className="px-6 py-3 font-medium w-24">Status</th>
+              <th className="px-6 py-3 font-medium w-full">Name</th>
+              <th className="px-6 py-3 font-medium w-48">Scope</th>
+              <th className="px-6 py-3 font-medium w-40">Starts</th>
+              <th className="px-6 py-3 font-medium w-40">Ends</th>
+              <th className="px-6 py-3 text-right font-medium w-24">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/40">
+            {visible.map((silence: any) => {
+              const status = getStatus(silence);
+              const scopeParts: string[] = [];
+              if (silence.scope?.policyIds?.length) scopeParts.push(`${silence.scope.policyIds.length} policies`);
+              if (silence.scope?.conditionIds?.length) scopeParts.push(`${silence.scope.conditionIds.length} conditions`);
+              if (silence.scope?.targets?.length) scopeParts.push(silence.scope.targets.join(", "));
+              if (silence.scope?.labels?.length) scopeParts.push(silence.scope.labels.join(", "));
+              const scopeLabel = scopeParts.length > 0 ? scopeParts.join(" · ") : "Global (all alerts)";
+
+              return (
+                <tr
+                  key={silence._id}
+                  className={`hover:bg-muted/20 group transition-colors ${status === "expired" ? "opacity-50" : ""}`}
+                >
+                  <td className="px-6 py-4">
+                    {status === "active" ? (
+                      <Badge
+                        variant="outline"
+                        className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] uppercase font-bold tracking-wider"
+                      >
+                        <span className="relative flex h-1.5 w-1.5 mr-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+                        </span>
+                        ACTIVE
+                      </Badge>
+                    ) : status === "scheduled" ? (
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[10px] uppercase font-bold tracking-wider"
+                      >
+                        SCHEDULED
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="bg-muted/50 text-muted-foreground border-border/60 text-[10px] uppercase font-bold tracking-wider"
+                      >
+                        EXPIRED
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="font-semibold text-foreground">{silence.name}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-sm">
+                      {silence.reason}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs text-muted-foreground">{scopeLabel}</span>
+                  </td>
+                  <td className="px-6 py-4 text-xs font-mono text-muted-foreground">
+                    {format(new Date(silence.startsAt), "MMM d, HH:mm")}
+                  </td>
+                  <td className="px-6 py-4 text-xs font-mono text-muted-foreground">
+                    {format(new Date(silence.endsAt), "MMM d, HH:mm")}
+                    {status === "active" && (
+                      <span className="block text-[10px] text-amber-500 mt-0.5">
+                        {formatDistanceToNow(new Date(silence.endsAt))} left
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {status !== "expired" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-destructive hover:bg-destructive/10"
+                        onClick={() => onDelete(silence)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {!isMaximized && hiddenCount > 0 && (
+              <tr
+                className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group"
+                onClick={toggle}
+              >
+                <td
+                  colSpan={6}
+                  className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors"
+                >
+                  Show {hiddenCount} more...
+                </td>
+              </tr>
+            )}
+            {visible.length === 0 && (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="py-12 text-center text-muted-foreground"
+                >
+                  No silence windows configured.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <>
+      {isMaximized &&
+        createPortal(
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+            onClick={() => setIsMaximized(false)}
+          />,
+          document.body,
+        )}
+      {isMaximized ? createPortal(Content, document.body) : Content}
+    </>
+  );
+};
+
 export default function AlertsDashboard() {
   const router = useRouter();
   const { token } = useAuth();
@@ -440,8 +641,9 @@ export default function AlertsDashboard() {
   // --- Modals State ---
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
+  const [isSilenceModalOpen, setIsSilenceModalOpen] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{
-    type: "policy" | "channel";
+    type: "policy" | "channel" | "silence";
     id: string;
     name: string;
   } | null>(null);
@@ -459,6 +661,14 @@ export default function AlertsDashboard() {
     name: "",
     type: "email",
     configValue: "",
+  });
+  const [silenceForm, setSilenceForm] = useState({
+    name: "",
+    reason: "",
+    startsAt: "",
+    endsAt: "",
+    scopeType: "global" as "global" | "targets" | "labels",
+    scopeValue: "",
   });
 
   // --- Data Fetching (Auto-Refresh every 15s) ---
@@ -478,12 +688,21 @@ export default function AlertsDashboard() {
   } = useSWR(token ? "/alerts/destinations" : null, fetcher, {
     refreshInterval: 15000,
   });
+  const {
+    data: silencesData,
+    error: silencesError,
+    mutate: mutateSilences,
+    isValidating: silencesValidating,
+  } = useSWR(token ? "/alerts/silences" : null, fetcher, {
+    refreshInterval: 15000,
+  });
 
   const isLoading =
     !policiesData && !policiesError && !channelsData && !channelsError;
-  const isRefreshing = policiesValidating || channelsValidating;
+  const isRefreshing = policiesValidating || channelsValidating || silencesValidating;
   const policies = policiesData?.policies || [];
   const channels = channelsData?.destinations || [];
+  const silences = silencesData?.silences || [];
 
   // --- Form Handlers ---
   const openCreatePolicy = () => {
@@ -567,6 +786,54 @@ export default function AlertsDashboard() {
     }
   };
 
+  const openCreateSilence = () => {
+    const now = new Date();
+    const defaultEnd = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+    const toLocal = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    setSilenceForm({
+      name: "",
+      reason: "",
+      startsAt: toLocal(now),
+      endsAt: toLocal(defaultEnd),
+      scopeType: "global",
+      scopeValue: "",
+    });
+    setIsSilenceModalOpen(true);
+  };
+
+  const handleSaveSilence = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!silenceForm.name || !silenceForm.reason || !silenceForm.startsAt || !silenceForm.endsAt) return;
+
+    setIsSubmitting(true);
+    try {
+      const scope: Record<string, string[]> = {};
+      if (silenceForm.scopeType === "targets" && silenceForm.scopeValue.trim()) {
+        scope.targets = silenceForm.scopeValue.split(",").map((s) => s.trim()).filter(Boolean);
+      } else if (silenceForm.scopeType === "labels" && silenceForm.scopeValue.trim()) {
+        scope.labels = silenceForm.scopeValue.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+
+      await api.post("/alerts/silences", {
+        name: silenceForm.name,
+        reason: silenceForm.reason,
+        startsAt: new Date(silenceForm.startsAt).toISOString(),
+        endsAt: new Date(silenceForm.endsAt).toISOString(),
+        scope,
+      });
+      toast.success("Silence window created!");
+      setIsSilenceModalOpen(false);
+      mutateSilences();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to create silence window");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteModal) return;
     setIsSubmitting(true);
@@ -574,13 +841,15 @@ export default function AlertsDashboard() {
       if (deleteModal.type === "policy") {
         await api.delete(`/alerts/policies/${deleteModal.id}`);
         mutatePolicies();
-      } else {
+      } else if (deleteModal.type === "channel") {
         await api.delete(`/alerts/destinations/${deleteModal.id}`);
         mutateChannels();
+      } else {
+        await api.delete(`/alerts/silences/${deleteModal.id}`);
+        mutateSilences();
       }
-      toast.success(
-        `${deleteModal.type === "policy" ? "Policy" : "Channel"} deleted.`,
-      );
+      const label = deleteModal.type === "policy" ? "Policy" : deleteModal.type === "channel" ? "Channel" : "Silence window";
+      toast.success(`${label} deleted.`);
       setDeleteModal(null);
     } catch (err) {
       toast.error("Failed to delete item.");
@@ -598,7 +867,7 @@ export default function AlertsDashboard() {
         </div>
       </>
     );
-  if (policiesError || channelsError)
+  if (policiesError || channelsError || silencesError)
     return (
       <>
         <div className="h-full flex items-center justify-center p-8">
@@ -606,6 +875,7 @@ export default function AlertsDashboard() {
             onRetry={() => {
               mutatePolicies();
               mutateChannels();
+              mutateSilences();
             }}
           />
         </div>
@@ -641,6 +911,13 @@ export default function AlertsDashboard() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
+              onClick={openCreateSilence}
+              variant="outline"
+              className="bg-background shadow-sm h-9"
+            >
+              <VolumeX className="h-4 w-4 mr-2" /> Add Silence
+            </Button>
+            <Button
               onClick={openCreateChannel}
               variant="outline"
               className="bg-background shadow-sm h-9"
@@ -659,6 +936,7 @@ export default function AlertsDashboard() {
               onClick={() => {
                 mutatePolicies();
                 mutateChannels();
+                mutateSilences();
               }}
               disabled={isRefreshing}
               className="h-9 w-9"
@@ -689,6 +967,14 @@ export default function AlertsDashboard() {
             }
             isValidating={channelsValidating}
             mutate={mutateChannels}
+          />
+          <SilencesTable
+            silences={silences}
+            onDelete={(s: any) =>
+              setDeleteModal({ type: "silence", id: s._id, name: s.name })
+            }
+            isValidating={silencesValidating}
+            mutate={mutateSilences}
           />
         </div>
       </div>
@@ -845,6 +1131,7 @@ export default function AlertsDashboard() {
               <option value="email">Email Dispatch</option>
               <option value="slack">Slack Webhook</option>
               <option value="discord">Discord Webhook</option>
+              <option value="webhook">Generic Webhook</option>
             </Select>
           </div>
           <div className="space-y-2 pt-2 border-t border-border/40">
@@ -904,11 +1191,137 @@ export default function AlertsDashboard() {
         </form>
       </Dialog>
 
+      {/* --- MODAL: SILENCE WINDOW FORM --- */}
+      <Dialog
+        open={isSilenceModalOpen}
+        onClose={() => setIsSilenceModalOpen(false)}
+        title="Create Silence Window"
+      >
+        <form onSubmit={handleSaveSilence} className="space-y-4">
+          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-3 rounded-lg flex items-start gap-2 text-xs">
+            <Shield className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              Silence windows suppress alert notifications during scheduled
+              maintenance or known incidents. Conditions still evaluate, but no
+              notifications fire.
+            </span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name</label>
+            <Input
+              placeholder="e.g., Database maintenance window"
+              value={silenceForm.name}
+              onChange={(e) =>
+                setSilenceForm({ ...silenceForm, name: e.target.value })
+              }
+              disabled={isSubmitting}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Reason</label>
+            <Input
+              placeholder="e.g., Scheduled DB migration"
+              value={silenceForm.reason}
+              onChange={(e) =>
+                setSilenceForm({ ...silenceForm, reason: e.target.value })
+              }
+              disabled={isSubmitting}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Starts At</label>
+              <Input
+                type="datetime-local"
+                value={silenceForm.startsAt}
+                onChange={(e) =>
+                  setSilenceForm({ ...silenceForm, startsAt: e.target.value })
+                }
+                disabled={isSubmitting}
+                required
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ends At</label>
+              <Input
+                type="datetime-local"
+                value={silenceForm.endsAt}
+                onChange={(e) =>
+                  setSilenceForm({ ...silenceForm, endsAt: e.target.value })
+                }
+                disabled={isSubmitting}
+                required
+                className="font-mono text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-3 pt-2 border-t border-border/40">
+            <label className="text-sm font-medium">Scope</label>
+            <Select
+              value={silenceForm.scopeType}
+              onChange={(e) =>
+                setSilenceForm({
+                  ...silenceForm,
+                  scopeType: e.target.value as "global" | "targets" | "labels",
+                  scopeValue: "",
+                })
+              }
+              disabled={isSubmitting}
+            >
+              <option value="global">Global — Silence all alerts</option>
+              <option value="targets">By Target — Specific telemetry sources</option>
+              <option value="labels">By Labels — Matching condition labels</option>
+            </Select>
+            {silenceForm.scopeType !== "global" && (
+              <Input
+                placeholder={
+                  silenceForm.scopeType === "targets"
+                    ? "e.g., apm, database, vps"
+                    : "e.g., production, api, critical-path"
+                }
+                value={silenceForm.scopeValue}
+                onChange={(e) =>
+                  setSilenceForm({ ...silenceForm, scopeValue: e.target.value })
+                }
+                disabled={isSubmitting}
+                className="text-xs"
+              />
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsSilenceModalOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-primary min-w-[120px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" /> Creating...
+                </>
+              ) : (
+                "Create Silence"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
       {/* --- MODAL: DELETE CONFIRMATION --- */}
       <Dialog
         open={!!deleteModal}
         onClose={() => setDeleteModal(null)}
-        title={`Delete ${deleteModal?.type === "policy" ? "Policy" : "Channel"}?`}
+        title={`Delete ${deleteModal?.type === "policy" ? "Policy" : deleteModal?.type === "channel" ? "Channel" : "Silence Window"}?`}
       >
         <div className="space-y-4">
           <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3">
@@ -917,11 +1330,13 @@ export default function AlertsDashboard() {
               <span className="font-bold block mb-1">
                 Warning: Irreversible Action
               </span>
-              This will permanently delete the {deleteModal?.type}{" "}
+              This will permanently delete the {deleteModal?.type === "silence" ? "silence window" : deleteModal?.type}{" "}
               <strong>{deleteModal?.name}</strong>.{" "}
               {deleteModal?.type === "policy"
                 ? "All associated conditions will also be deleted."
-                : "Any policies using this channel will no longer send notifications here."}
+                : deleteModal?.type === "channel"
+                  ? "Any policies using this channel will no longer send notifications here."
+                  : "Alert notifications will resume immediately for the affected scope."}
             </div>
           </div>
           <div className="flex justify-end gap-2">

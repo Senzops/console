@@ -40,6 +40,12 @@ import {
   Edit2,
   BookOpen,
   ChevronRight,
+  VolumeX,
+  Volume2,
+  TestTube,
+  Bug,
+  Cpu,
+  Globe,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -56,6 +62,9 @@ const DEFAULT_ALERT_QUERIES: Record<string, string> = {
   uptime: '[\n  { "$match": {\n    "status": "down"\n  } }\n]',
   rum: '[\n  { "$match": {\n    "vitals.lcp": { "$gt": 2500 }\n  } }\n]',
   task: '[\n  { "$match": {\n    "status": "failed"\n  } }\n]',
+  errors: '[\n  { "$match": {\n    "status": "unresolved"\n  } }\n]',
+  runtime: '[\n  { "$match": {\n    "eventLoopLagMs": { "$gt": 100 }\n  } }\n]',
+  web: '[\n  { "$match": {\n    "path": "/"\n  } }\n]',
 };
 
 const getTargetIcon = (target: string) => {
@@ -72,6 +81,12 @@ const getTargetIcon = (target: string) => {
       return <Server className="h-4 w-4 text-emerald-500" />;
     case "database":
       return <Database className="h-4 w-4 text-blue-400" />;
+    case "errors":
+      return <Bug className="h-4 w-4 text-red-500" />;
+    case "runtime":
+      return <Cpu className="h-4 w-4 text-violet-500" />;
+    case "web":
+      return <Globe className="h-4 w-4 text-cyan-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -237,11 +252,21 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
   );
 };
 
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "text-red-500 bg-red-500/10 border-red-500/20",
+  high: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+  medium: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  low: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+  info: "text-gray-500 bg-gray-500/10 border-gray-500/20",
+};
+
 // --- Conditions Table ---
 const ConditionsTable = ({
   conditions,
   onEdit,
   onDelete,
+  onMute,
+  onUnmute,
   isValidating,
   mutate,
 }: any) => {
@@ -295,75 +320,85 @@ const ConditionsTable = ({
           <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
             <tr>
               <th className="px-6 py-3 font-medium w-full">Condition Name</th>
+              <th className="px-6 py-3 font-medium w-24">Severity</th>
               <th className="px-6 py-3 font-medium w-32">Target</th>
               <th className="px-6 py-3 font-medium w-48">Trigger Logic</th>
               <th className="px-6 py-3 font-medium w-32">Frequency</th>
-              <th className="px-6 py-3 text-right font-medium w-24">Actions</th>
+              <th className="px-6 py-3 text-right font-medium w-32">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40">
-            {visible.map((cond: any) => (
-              <tr
-                key={cond._id}
-                className="hover:bg-muted/20 group transition-colors"
-              >
-                <td className="px-6 py-4 font-semibold text-foreground">
-                  {cond.name}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2 capitalize text-xs">
-                    {getTargetIcon(cond.target)} {cond.target}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-xs font-mono text-muted-foreground">
-                  COUNT{" "}
-                  {cond.threshold.operator === "gt"
-                    ? ">"
-                    : cond.threshold.operator === "lt"
-                      ? "<"
-                      : "=="}{" "}
-                  {cond.threshold.value}{" "}
-                  <span className="opacity-50">
-                    in {cond.threshold.windowMins}m
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] uppercase tracking-wider"
-                  >
-                    {cond.frequency}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-muted-foreground hover:text-foreground"
-                      onClick={() => onEdit(cond)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-destructive hover:bg-destructive/10"
-                      onClick={() => onDelete(cond)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {visible.map((cond: any) => {
+              const isMuted = cond.muteUntil && new Date(cond.muteUntil) > new Date();
+              const sevStyle = SEVERITY_COLORS[cond.severity] || SEVERITY_COLORS.high;
+              return (
+                <tr
+                  key={cond._id}
+                  className={cn("hover:bg-muted/20 group transition-colors", isMuted ? "opacity-60" : "")}
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">{cond.name}</span>
+                      {isMuted && (
+                        <Badge variant="outline" className="text-[9px] bg-muted/50 text-muted-foreground border-border/60">
+                          <VolumeX className="h-3 w-3 mr-1" /> MUTED
+                        </Badge>
+                      )}
+                    </div>
+                    {cond.description && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-sm">{cond.description}</p>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider ${sevStyle}`}>
+                      {(cond.severity || "high").toUpperCase()}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 capitalize text-xs">
+                      {getTargetIcon(cond.target)} {cond.target}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-xs font-mono text-muted-foreground">
+                    COUNT{" "}
+                    {({ gt: ">", lt: "<", eq: "==", gte: ">=", lte: "<=", neq: "!=" } as any)[cond.threshold.operator] || cond.threshold.operator}{" "}
+                    {cond.threshold.value}{" "}
+                    <span className="opacity-50">in {cond.threshold.windowMins}m</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                      {cond.frequency}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-1">
+                      {isMuted ? (
+                        <Button size="sm" variant="ghost" className="h-8 text-muted-foreground hover:text-foreground" onClick={() => onUnmute(cond._id)} title="Unmute">
+                          <Volume2 className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="h-8 text-muted-foreground hover:text-foreground" onClick={() => onMute(cond._id, 60)} title="Mute for 1 hour">
+                          <VolumeX className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-8 text-muted-foreground hover:text-foreground" onClick={() => onEdit(cond)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-destructive hover:bg-destructive/10" onClick={() => onDelete(cond)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {!isMaximized && hiddenCount > 0 && (
               <tr
                 className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group"
                 onClick={toggle}
               >
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors"
                 >
                   Show {hiddenCount} more...
@@ -373,7 +408,7 @@ const ConditionsTable = ({
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-muted-foreground"
                 >
                   No conditions set. Add one to begin monitoring.
@@ -407,6 +442,7 @@ const IncidentsTable = ({
   onUpdateStatus,
   isValidating,
   mutate,
+  onNavigateIncident,
 }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const toggle = () => setIsMaximized(!isMaximized);
@@ -457,116 +493,90 @@ const IncidentsTable = ({
         <table className="w-full text-sm text-left border-collapse whitespace-nowrap">
           <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
             <tr>
-              <th className="px-6 py-3 font-medium w-32">Status</th>
+              <th className="px-6 py-3 font-medium w-28">Status</th>
+              <th className="px-6 py-3 font-medium w-24">Severity</th>
+              <th className="px-6 py-3 font-medium w-28">Incident</th>
               <th className="px-6 py-3 font-medium w-full">Origin Condition</th>
-              <th className="px-6 py-3 text-right font-medium">
-                Trigger Value
-              </th>
+              <th className="px-6 py-3 text-right font-medium">Value</th>
               <th className="px-6 py-3 text-right font-medium">Opened</th>
-              <th className="px-6 py-3 text-right font-medium">Actions</th>
+              <th className="px-6 py-3 text-right font-medium w-28">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40">
-            {visible.map((incident: any) => (
-              <tr
-                key={incident._id}
-                className={`hover:bg-muted/20 group transition-colors ${incident.status === "open" ? "bg-destructive/5" : ""}`}
-              >
-                <td className="px-6 py-4">
-                  {incident.status === "open" ? (
-                    <Badge
-                      variant="outline"
-                      className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] uppercase animate-pulse"
-                    >
-                      FIRED
-                    </Badge>
-                  ) : incident.status === "acknowledged" ? (
-                    <Badge
-                      variant="outline"
-                      className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] uppercase"
-                    >
-                      ACKED
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] uppercase"
-                    >
-                      RESOLVED
-                    </Badge>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    {incident.conditionId?.target ? (
-                      getTargetIcon(incident.conditionId.target)
-                    ) : (
-                      <Activity className="h-4 w-4" />
-                    )}
-                    <span className="font-medium text-foreground">
-                      {incident.conditionId?.name || "Deleted Condition"}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right font-mono text-xs font-bold">
-                  {incident.triggerValue}
-                </td>
-                <td
-                  className="px-6 py-4 text-right text-xs text-muted-foreground font-mono"
-                  title={format(new Date(incident.openedAt), "PPpp")}
+            {visible.map((incident: any) => {
+              const sevStyle = SEVERITY_COLORS[incident.severity || (incident.conditionId?.severity) || "high"] || SEVERITY_COLORS.high;
+              return (
+                <tr
+                  key={incident._id}
+                  className={`hover:bg-muted/20 group transition-colors cursor-pointer ${incident.status === "open" ? "bg-destructive/[0.03]" : ""}`}
                 >
-                  {formatDistanceToNow(new Date(incident.openedAt))} ago
-                </td>
-                <td className="px-6 py-4 text-right">
-                  {incident.status === "open" && (
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          onUpdateStatus(incident._id, "acknowledged")
-                        }
-                        className="h-7 text-[10px] border-amber-500/50 hover:bg-amber-500/10 text-amber-500"
-                      >
-                        ACK
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onUpdateStatus(incident._id, "resolved")}
-                        className="h-7 text-[10px] border-emerald-500/50 hover:bg-emerald-500/10 text-emerald-500"
-                      >
-                        RESOLVE
-                      </Button>
+                  <td className="px-6 py-4" onClick={() => onNavigateIncident(incident._id)}>
+                    {incident.status === "open" ? (
+                      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] uppercase font-bold tracking-wider">
+                        <span className="relative flex h-1.5 w-1.5 mr-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-destructive" />
+                        </span>
+                        FIRING
+                      </Badge>
+                    ) : incident.status === "acknowledged" ? (
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] uppercase font-bold tracking-wider">ACKED</Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] uppercase font-bold tracking-wider">RESOLVED</Badge>
+                    )}
+                  </td>
+                  <td className="px-6 py-4" onClick={() => onNavigateIncident(incident._id)}>
+                    <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider ${sevStyle}`}>
+                      {(incident.severity || incident.conditionId?.severity || "high").toUpperCase()}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 font-mono text-xs text-primary font-bold" onClick={() => onNavigateIncident(incident._id)}>
+                    {incident.incidentNumber ? `INC-${String(incident.incidentNumber).padStart(4, "0")}` : "—"}
+                  </td>
+                  <td className="px-6 py-4" onClick={() => onNavigateIncident(incident._id)}>
+                    <div className="flex items-center gap-2">
+                      {incident.conditionId?.target ? getTargetIcon(incident.conditionId.target) : <Activity className="h-4 w-4" />}
+                      <span className="font-medium text-foreground group-hover:text-primary transition-colors">
+                        {incident.conditionId?.name || "Deleted Condition"}
+                      </span>
                     </div>
-                  )}
-                  {incident.status === "acknowledged" && (
-                    <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onUpdateStatus(incident._id, "resolved")}
-                        className="h-7 text-[10px] border-emerald-500/50 hover:bg-emerald-500/10 text-emerald-500"
-                      >
-                        RESOLVE
-                      </Button>
-                    </div>
-                  )}
-                  {incident.status === "resolved" && (
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {format(new Date(incident.resolvedAt), "MMM d, HH:mm")}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-6 py-4 text-right font-mono text-xs font-bold" onClick={() => onNavigateIncident(incident._id)}>
+                    {incident.triggerValue}
+                  </td>
+                  <td
+                    className="px-6 py-4 text-right text-xs text-muted-foreground font-mono"
+                    title={format(new Date(incident.openedAt), "PPpp")}
+                    onClick={() => onNavigateIncident(incident._id)}
+                  >
+                    {formatDistanceToNow(new Date(incident.openedAt))} ago
+                  </td>
+                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    {incident.status === "open" && (
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="sm" variant="outline" onClick={() => onUpdateStatus(incident._id, "acknowledged")} className="h-7 text-[10px] border-amber-500/50 hover:bg-amber-500/10 text-amber-500">ACK</Button>
+                        <Button size="sm" variant="outline" onClick={() => onUpdateStatus(incident._id, "resolved")} className="h-7 text-[10px] border-emerald-500/50 hover:bg-emerald-500/10 text-emerald-500">RESOLVE</Button>
+                      </div>
+                    )}
+                    {incident.status === "acknowledged" && (
+                      <Button size="sm" variant="outline" onClick={() => onUpdateStatus(incident._id, "resolved")} className="h-7 text-[10px] border-emerald-500/50 hover:bg-emerald-500/10 text-emerald-500">RESOLVE</Button>
+                    )}
+                    {incident.status === "resolved" && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {incident.resolvedAt ? format(new Date(incident.resolvedAt), "MMM d, HH:mm") : "—"}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
             {!isMaximized && hiddenCount > 0 && (
               <tr
                 className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group"
                 onClick={toggle}
               >
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors"
                 >
                   Show {hiddenCount} more...
@@ -576,7 +586,7 @@ const IncidentsTable = ({
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="py-16 text-center text-muted-foreground font-medium"
                 >
                   <CheckCircle className="h-8 w-8 text-emerald-500/50 mx-auto mb-3" />
@@ -624,13 +634,18 @@ export default function AlertPolicyDetail() {
   // --- Form State ---
   const [conditionForm, setConditionForm] = useState({
     name: "",
+    description: "",
     target: "apm",
     queryStr: DEFAULT_ALERT_QUERIES["apm"],
     operator: "gt",
     value: 10,
     windowMins: 5,
     frequency: "once",
+    severity: "high",
+    labels: "",
   });
+  const [testResult, setTestResult] = useState<any>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   // --- Data Fetching ---
   const { data, error, mutate, isValidating } = useSWR(
@@ -655,28 +670,36 @@ export default function AlertPolicyDetail() {
   // --- Form Handlers ---
   const openCreateCondition = () => {
     setEditingId(null);
+    setTestResult(null);
     setConditionForm({
       name: "",
+      description: "",
       target: "apm",
       queryStr: DEFAULT_ALERT_QUERIES["apm"],
       operator: "gt",
       value: 10,
       windowMins: 5,
       frequency: "once",
+      severity: "high",
+      labels: "",
     });
     setIsConditionModalOpen(true);
   };
 
   const openEditCondition = (c: any) => {
     setEditingId(c._id);
+    setTestResult(null);
     setConditionForm({
       name: c.name,
+      description: c.description || "",
       target: c.target,
       queryStr: JSON.stringify(c.query, null, 2),
       operator: c.threshold.operator,
       value: c.threshold.value,
       windowMins: c.threshold.windowMins,
       frequency: c.frequency,
+      severity: c.severity || "high",
+      labels: (c.labels || []).join(", "),
     });
     setIsConditionModalOpen(true);
   };
@@ -698,6 +721,7 @@ export default function AlertPolicyDetail() {
       const payload = {
         policyId: id,
         name: conditionForm.name,
+        description: conditionForm.description,
         target: conditionForm.target,
         query: parsedQuery,
         threshold: {
@@ -706,6 +730,11 @@ export default function AlertPolicyDetail() {
           windowMins: Number(conditionForm.windowMins),
         },
         frequency: conditionForm.frequency,
+        severity: conditionForm.severity,
+        labels: conditionForm.labels
+          .split(",")
+          .map((l) => l.trim())
+          .filter(Boolean),
       };
 
       if (editingId) {
@@ -721,6 +750,55 @@ export default function AlertPolicyDetail() {
       toast.error(err.response?.data?.error || "Failed to save condition");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleTestCondition = async () => {
+    let parsedQuery;
+    try {
+      parsedQuery = JSON.parse(conditionForm.queryStr);
+    } catch {
+      toast.error("Invalid JSON MQL. Please check syntax.");
+      return;
+    }
+
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const { data } = await api.post("/alerts/conditions/test", {
+        target: conditionForm.target,
+        query: parsedQuery,
+        threshold: {
+          operator: conditionForm.operator,
+          value: Number(conditionForm.value),
+          windowMins: Number(conditionForm.windowMins),
+        },
+      });
+      setTestResult(data);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Test failed");
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleMuteCondition = async (conditionId: string, durationMins: number) => {
+    try {
+      await api.post(`/alerts/conditions/${conditionId}/mute`, { durationMins });
+      mutate();
+      toast.success(`Condition muted for ${durationMins} minutes.`);
+    } catch {
+      toast.error("Failed to mute condition.");
+    }
+  };
+
+  const handleUnmuteCondition = async (conditionId: string) => {
+    try {
+      await api.post(`/alerts/conditions/${conditionId}/unmute`);
+      mutate();
+      toast.success("Condition unmuted.");
+    } catch {
+      toast.error("Failed to unmute condition.");
     }
   };
 
@@ -833,12 +911,15 @@ export default function AlertPolicyDetail() {
             conditions={conditions}
             onEdit={openEditCondition}
             onDelete={(c: any) => setDeleteModal({ id: c._id, name: c.name })}
+            onMute={handleMuteCondition}
+            onUnmute={handleUnmuteCondition}
             isValidating={isValidating}
             mutate={mutate}
           />
           <IncidentsTable
             incidents={incidents}
             onUpdateStatus={handleUpdateIncident}
+            onNavigateIncident={(incidentId: string) => router.push(`/dashboard/incidents/${incidentId}`)}
             isValidating={isValidating}
             mutate={mutate}
           />
@@ -891,49 +972,112 @@ export default function AlertPolicyDetail() {
               {/* Left Panel: Scrollable Configuration & Editor */}
               <div className="w-full md:w-2/3 flex flex-col border-r border-border/40 h-full shrink-0 md:shrink overflow-y-auto bg-background">
                 {/* Control Row */}
-                <div className="p-4 border-b border-border/40 flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-muted/10 shrink-0">
-                  <div className="space-y-1 w-full sm:flex-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Condition Name
-                    </label>
-                    <Input
-                      placeholder="e.g., High APM Latency Spike"
-                      value={conditionForm.name}
-                      onChange={(e) =>
-                        setConditionForm({
-                          ...conditionForm,
-                          name: e.target.value,
-                        })
-                      }
-                      disabled={isSubmitting}
-                      className="h-9 text-sm bg-background border-border/60 shadow-sm"
-                    />
+                <div className="p-4 border-b border-border/40 space-y-4 bg-muted/10 shrink-0">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="space-y-1 w-full sm:flex-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Condition Name
+                      </label>
+                      <Input
+                        placeholder="e.g., High APM Latency Spike"
+                        value={conditionForm.name}
+                        onChange={(e) =>
+                          setConditionForm({
+                            ...conditionForm,
+                            name: e.target.value,
+                          })
+                        }
+                        disabled={isSubmitting}
+                        className="h-9 text-sm bg-background border-border/60 shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-1 w-full sm:w-48">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Target Telemetry
+                      </label>
+                      <Select
+                        value={conditionForm.target}
+                        onChange={(e) =>
+                          setConditionForm({
+                            ...conditionForm,
+                            target: e.target.value,
+                            queryStr:
+                              DEFAULT_ALERT_QUERIES[e.target.value] || "[]",
+                          })
+                        }
+                        disabled={isSubmitting}
+                        className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm"
+                      >
+                        <option value="apm">Backend APM</option>
+                        <option value="logs">Logs</option>
+                        <option value="database">Database</option>
+                        <option value="vps">VPS Infra</option>
+                        <option value="task">Tasks</option>
+                        <option value="rum">Web RUM</option>
+                        <option value="uptime">Uptime</option>
+                        <option value="errors">Errors</option>
+                        <option value="runtime">Runtime Metrics</option>
+                        <option value="web">Web Analytics</option>
+                      </Select>
+                    </div>
+                    <div className="space-y-1 w-full sm:w-36">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Severity
+                      </label>
+                      <Select
+                        value={conditionForm.severity}
+                        onChange={(e) =>
+                          setConditionForm({
+                            ...conditionForm,
+                            severity: e.target.value,
+                          })
+                        }
+                        disabled={isSubmitting}
+                        className="h-9 text-sm bg-background border-border/60 shadow-sm"
+                      >
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="info">Info</option>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-1 w-full sm:flex-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Target Telemetry
-                    </label>
-                    <Select
-                      value={conditionForm.target}
-                      onChange={(e) =>
-                        setConditionForm({
-                          ...conditionForm,
-                          target: e.target.value,
-                          queryStr:
-                            DEFAULT_ALERT_QUERIES[e.target.value] || "[]",
-                        })
-                      }
-                      disabled={isSubmitting}
-                      className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm"
-                    >
-                      <option value="apm">Backend APM</option>
-                      <option value="logs">Logs</option>
-                      <option value="database">Database</option>
-                      <option value="vps">VPS Infra</option>
-                      <option value="task">Tasks</option>
-                      <option value="rum">Web RUM</option>
-                      <option value="uptime">Uptime</option>
-                    </Select>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="space-y-1 w-full sm:flex-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Description <span className="font-normal opacity-60">(Optional)</span>
+                      </label>
+                      <Input
+                        placeholder="What does this condition monitor?"
+                        value={conditionForm.description}
+                        onChange={(e) =>
+                          setConditionForm({
+                            ...conditionForm,
+                            description: e.target.value,
+                          })
+                        }
+                        disabled={isSubmitting}
+                        className="h-9 text-sm bg-background border-border/60 shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-1 w-full sm:w-64">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Labels <span className="font-normal opacity-60">(Comma-separated)</span>
+                      </label>
+                      <Input
+                        placeholder="e.g., production, api, critical-path"
+                        value={conditionForm.labels}
+                        onChange={(e) =>
+                          setConditionForm({
+                            ...conditionForm,
+                            labels: e.target.value,
+                          })
+                        }
+                        disabled={isSubmitting}
+                        className="h-9 text-sm bg-background border-border/60 shadow-sm"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1020,9 +1164,12 @@ export default function AlertPolicyDetail() {
                           disabled={isSubmitting}
                           className="bg-background shadow-sm"
                         >
-                          <option value="gt">Is Greater Than (&gt;)</option>
-                          <option value="lt">Is Less Than (&lt;)</option>
-                          <option value="eq">Is Exactly (==)</option>
+                          <option value="gt">Greater Than (&gt;)</option>
+                          <option value="gte">Greater or Equal (&gt;=)</option>
+                          <option value="lt">Less Than (&lt;)</option>
+                          <option value="lte">Less or Equal (&lt;=)</option>
+                          <option value="eq">Exactly (==)</option>
+                          <option value="neq">Not Equal (!=)</option>
                         </Select>
                       </div>
                       <div className="space-y-2">
@@ -1083,6 +1230,39 @@ export default function AlertPolicyDetail() {
                           <option value="always">Notify Always</option>
                         </Select>
                       </div>
+                    </div>
+
+                    {/* Test & Result Row */}
+                    <div className="flex items-center gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleTestCondition}
+                        disabled={isTesting}
+                        className="h-8 text-xs"
+                      >
+                        {isTesting ? <Spinner className="h-3 w-3 mr-1.5" /> : <TestTube className="h-3.5 w-3.5 mr-1.5" />}
+                        Test Condition
+                      </Button>
+                      {testResult && (
+                        <div className={cn(
+                          "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium",
+                          testResult.breached
+                            ? "bg-destructive/10 text-destructive border-destructive/20"
+                            : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                        )}>
+                          {testResult.breached ? (
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          ) : (
+                            <CheckCircle className="h-3.5 w-3.5" />
+                          )}
+                          Count: <span className="font-mono font-bold">{testResult.count}</span>
+                          {" — "}
+                          {testResult.breached ? "Would fire" : "Would not fire"}
+                          {testResult.error && <span className="text-destructive"> ({testResult.error})</span>}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
