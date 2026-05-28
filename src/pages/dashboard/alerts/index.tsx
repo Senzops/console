@@ -16,6 +16,10 @@ import {
   Input,
   DataError,
   Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "../../../components/Core";
 import {
   BellRing,
@@ -1119,19 +1123,24 @@ export default function AlertsDashboard() {
             <label className="text-sm font-medium">Integration Type</label>
             <Select
               value={channelForm.type}
-              onChange={(e) =>
+              onValueChange={(v) =>
                 setChannelForm({
                   ...channelForm,
-                  type: e.target.value,
+                  type: v,
                   configValue: "",
                 })
               }
               disabled={isSubmitting || !!editingId}
             >
-              <option value="email">Email Dispatch</option>
-              <option value="slack">Slack Webhook</option>
-              <option value="discord">Discord Webhook</option>
-              <option value="webhook">Generic Webhook</option>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="email">Email Dispatch</SelectItem>
+                <SelectItem value="slack">Slack Webhook</SelectItem>
+                <SelectItem value="discord">Discord Webhook</SelectItem>
+                <SelectItem value="webhook">Generic Webhook</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-2 pt-2 border-t border-border/40">
@@ -1262,18 +1271,23 @@ export default function AlertsDashboard() {
             <label className="text-sm font-medium">Scope</label>
             <Select
               value={silenceForm.scopeType}
-              onChange={(e) =>
+              onValueChange={(v) =>
                 setSilenceForm({
                   ...silenceForm,
-                  scopeType: e.target.value as "global" | "targets" | "labels",
+                  scopeType: v as "global" | "targets" | "labels",
                   scopeValue: "",
                 })
               }
               disabled={isSubmitting}
             >
-              <option value="global">Global — Silence all alerts</option>
-              <option value="targets">By Target — Specific telemetry sources</option>
-              <option value="labels">By Labels — Matching condition labels</option>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="global">Global — Silence all alerts</SelectItem>
+                <SelectItem value="targets">By Target — Specific telemetry sources</SelectItem>
+                <SelectItem value="labels">By Labels — Matching condition labels</SelectItem>
+              </SelectContent>
             </Select>
             {silenceForm.scopeType !== "global" && (
               <Input

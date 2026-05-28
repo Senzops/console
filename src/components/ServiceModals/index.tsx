@@ -2,7 +2,7 @@
 import React, { useRef } from "react";
 import { useRouter } from "next/router";
 import { api } from "../../lib/auth";
-import { Button, Dialog, Spinner, Select } from "../Core";
+import { Button, Dialog, Spinner, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../Core";
 import {
   Copy,
   Key,
@@ -1066,15 +1066,16 @@ export const ServiceModals: React.FC = () => {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Check Interval</label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-              value={interval}
-              onChange={(e) => setInterval(e.target.value)}
-            >
-              <option value="15">Every 15 Minutes</option>
-              <option value="30">Every 30 Minutes</option>
-              <option value="60">Every 1 Hour</option>
-            </select>
+            <Select value={interval} onValueChange={(v) => setInterval(v)}>
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">Every 15 Minutes</SelectItem>
+                <SelectItem value="30">Every 30 Minutes</SelectItem>
+                <SelectItem value="60">Every 1 Hour</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="ghost" onClick={closeModal} disabled={loading}>
@@ -1111,19 +1112,16 @@ export const ServiceModals: React.FC = () => {
           <ErrorBanner />
           <div className="space-y-2">
             <label className="text-sm font-medium">Database Engine</label>
-            <Select
-              value={dbType}
-              onChange={(e) => setDbType(e.target.value)}
-              disabled={loading}
-            >
-              <option value="mongodb">MongoDB</option>
-              <option value="redis">Redis</option>
-              <option value="postgresql" disabled>
-                PostgreSQL (Coming Soon)
-              </option>
-              <option value="mysql" disabled>
-                MySQL (Coming Soon)
-              </option>
+            <Select value={dbType} onValueChange={(v) => setDbType(v)} disabled={loading}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mongodb">MongoDB</SelectItem>
+                <SelectItem value="redis">Redis</SelectItem>
+                <SelectItem value="postgresql" disabled>PostgreSQL (Coming Soon)</SelectItem>
+                <SelectItem value="mysql" disabled>MySQL (Coming Soon)</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
@@ -1185,14 +1183,15 @@ export const ServiceModals: React.FC = () => {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Monitoring Interval</label>
-            <Select
-              value={interval}
-              onChange={(e) => setInterval(e.target.value)}
-              disabled={loading}
-            >
-              <option value="1">Every 1 minute (High Detail)</option>
-              <option value="5">Every 5 minutes (Standard)</option>
-              <option value="15">Every 15 minutes (Low Footprint)</option>
+            <Select value={interval} onValueChange={(v) => setInterval(v)} disabled={loading}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Every 1 minute (High Detail)</SelectItem>
+                <SelectItem value="5">Every 5 minutes (Standard)</SelectItem>
+                <SelectItem value="15">Every 15 minutes (Low Footprint)</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="flex justify-end gap-2 pt-4">

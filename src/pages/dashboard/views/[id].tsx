@@ -16,6 +16,10 @@ import {
   Dialog,
   Input,
   Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
   DataError,
   cn,
 } from "../../../components/Core";
@@ -2014,8 +2018,7 @@ export default function CustomDashboardView() {
                     </label>
                     <Select
                       value={builderForm.target}
-                      onChange={(e) => {
-                        const newTarget = e.target.value;
+                      onValueChange={(newTarget) => {
                         setBuilderForm((prev) => ({
                           ...prev,
                           target: newTarget,
@@ -2031,18 +2034,22 @@ export default function CustomDashboardView() {
                         );
                         setPreviewData(null);
                       }}
-                      className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm"
                     >
-                      <option value="apm">Backend APM</option>
-                      <option value="logs">Logs</option>
-                      <option value="database">Database</option>
-                      <option value="vps">VPS Infra</option>
-                      <option value="task">Tasks</option>
-                      <option value="rum">Web RUM</option>
-                      <option value="uptime">Uptime</option>
-                      <option value="errors">Error Tracking</option>
-                      <option value="runtime">Runtime Metrics</option>
-                      <option value="web">Web Analytics</option>
+                      <SelectTrigger className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="apm">Backend APM</SelectItem>
+                        <SelectItem value="logs">Logs</SelectItem>
+                        <SelectItem value="database">Database</SelectItem>
+                        <SelectItem value="vps">VPS Infra</SelectItem>
+                        <SelectItem value="task">Tasks</SelectItem>
+                        <SelectItem value="rum">Web RUM</SelectItem>
+                        <SelectItem value="uptime">Uptime</SelectItem>
+                        <SelectItem value="errors">Error Tracking</SelectItem>
+                        <SelectItem value="runtime">Runtime Metrics</SelectItem>
+                        <SelectItem value="web">Web Analytics</SelectItem>
+                      </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1 w-full sm:flex-1">
@@ -2051,24 +2058,28 @@ export default function CustomDashboardView() {
                     </label>
                     <Select
                       value={builderForm.visualization}
-                      onChange={(e) =>
+                      onValueChange={(v) =>
                         setBuilderForm({
                           ...builderForm,
-                          visualization: e.target.value,
+                          visualization: v,
                         })
                       }
-                      className="h-9 text-sm bg-background border-border/60 shadow-sm"
                     >
-                      <option value="line">Line Chart</option>
-                      <option value="area">Area Chart</option>
-                      <option value="bar">Bar Chart</option>
-                      <option value="pie">Pie Chart</option>
-                      <option value="billboard">Billboard Number</option>
-                      <option value="gauge">Metric Gauge</option>
-                      <option value="radar">Insight Radar</option>
-                      <option value="map">Geospatial Map</option>
-                      <option value="table">Data Table</option>
-                      <option value="json">Raw JSON</option>
+                      <SelectTrigger className="h-9 text-sm bg-background border-border/60 shadow-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="line">Line Chart</SelectItem>
+                        <SelectItem value="area">Area Chart</SelectItem>
+                        <SelectItem value="bar">Bar Chart</SelectItem>
+                        <SelectItem value="pie">Pie Chart</SelectItem>
+                        <SelectItem value="billboard">Billboard Number</SelectItem>
+                        <SelectItem value="gauge">Metric Gauge</SelectItem>
+                        <SelectItem value="radar">Insight Radar</SelectItem>
+                        <SelectItem value="map">Geospatial Map</SelectItem>
+                        <SelectItem value="table">Data Table</SelectItem>
+                        <SelectItem value="json">Raw JSON</SelectItem>
+                      </SelectContent>
                     </Select>
                   </div>
                 </div>

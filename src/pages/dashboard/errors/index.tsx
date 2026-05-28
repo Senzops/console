@@ -14,6 +14,10 @@ import {
   Spinner,
   DataError,
   Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import {
@@ -407,34 +411,42 @@ export default function GlobalErrorsDashboard() {
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
               {/* Dynamic Service Filter */}
               <Select
-                className="w-full sm:w-[220px] h-9 bg-background border-border/80"
                 value={serviceFilter}
-                onChange={(e) => {
-                  setServiceFilter(e.target.value);
+                onValueChange={(v) => {
+                  setServiceFilter(v);
                   setPage(1);
                 }}
               >
-                <option value="all">All Services</option>
-                {allServices.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name} ({s.type.toUpperCase()})
-                  </option>
-                ))}
+                <SelectTrigger className="w-full sm:w-[220px] h-9 bg-background border-border/80">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Services</SelectItem>
+                  {allServices.map((s) => (
+                    <SelectItem key={s._id} value={s._id}>
+                      {s.name} ({s.type.toUpperCase()})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
 
               {/* Status Filter */}
               <Select
-                className="w-full sm:w-[180px] h-9 bg-background border-border/80"
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
+                onValueChange={(v) => {
+                  setStatusFilter(v);
                   setPage(1);
                 }}
               >
-                <option value="unresolved">Status: Unresolved</option>
-                <option value="resolved">Status: Resolved</option>
-                <option value="ignored">Status: Ignored</option>
-                <option value="all">Status: All</option>
+                <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background border-border/80">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unresolved">Status: Unresolved</SelectItem>
+                  <SelectItem value="resolved">Status: Resolved</SelectItem>
+                  <SelectItem value="ignored">Status: Ignored</SelectItem>
+                  <SelectItem value="all">Status: All</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </CardHeader>

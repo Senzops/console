@@ -13,6 +13,10 @@ import {
   Spinner,
   DataError,
   Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "../../../components/Core";
 import {
   AlertOctagon,
@@ -617,17 +621,18 @@ export default function IncidentsDashboard() {
 
           <div className="ml-auto flex items-center gap-2">
             <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-            <Select
-              value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              className="h-8 text-xs w-36"
-            >
-              <option value="all">All Severities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-              <option value="info">Info</option>
+            <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v)}>
+              <SelectTrigger className="h-8 text-xs w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Severities</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+              </SelectContent>
             </Select>
           </div>
         </div>

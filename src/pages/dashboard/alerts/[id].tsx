@@ -18,6 +18,10 @@ import {
   Input,
   DataError,
   Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
   cn,
 } from "../../../components/Core";
 import {
@@ -997,27 +1001,31 @@ export default function AlertPolicyDetail() {
                       </label>
                       <Select
                         value={conditionForm.target}
-                        onChange={(e) =>
+                        onValueChange={(v) =>
                           setConditionForm({
                             ...conditionForm,
-                            target: e.target.value,
+                            target: v,
                             queryStr:
-                              DEFAULT_ALERT_QUERIES[e.target.value] || "[]",
+                              DEFAULT_ALERT_QUERIES[v] || "[]",
                           })
                         }
                         disabled={isSubmitting}
-                        className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm"
                       >
-                        <option value="apm">Backend APM</option>
-                        <option value="logs">Logs</option>
-                        <option value="database">Database</option>
-                        <option value="vps">VPS Infra</option>
-                        <option value="task">Tasks</option>
-                        <option value="rum">Web RUM</option>
-                        <option value="uptime">Uptime</option>
-                        <option value="errors">Errors</option>
-                        <option value="runtime">Runtime Metrics</option>
-                        <option value="web">Web Analytics</option>
+                        <SelectTrigger className="capitalize h-9 text-sm bg-background border-border/60 shadow-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="apm">Backend APM</SelectItem>
+                          <SelectItem value="logs">Logs</SelectItem>
+                          <SelectItem value="database">Database</SelectItem>
+                          <SelectItem value="vps">VPS Infra</SelectItem>
+                          <SelectItem value="task">Tasks</SelectItem>
+                          <SelectItem value="rum">Web RUM</SelectItem>
+                          <SelectItem value="uptime">Uptime</SelectItem>
+                          <SelectItem value="errors">Errors</SelectItem>
+                          <SelectItem value="runtime">Runtime Metrics</SelectItem>
+                          <SelectItem value="web">Web Analytics</SelectItem>
+                        </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1 w-full sm:w-36">
@@ -1026,20 +1034,24 @@ export default function AlertPolicyDetail() {
                       </label>
                       <Select
                         value={conditionForm.severity}
-                        onChange={(e) =>
+                        onValueChange={(v) =>
                           setConditionForm({
                             ...conditionForm,
-                            severity: e.target.value,
+                            severity: v,
                           })
                         }
                         disabled={isSubmitting}
-                        className="h-9 text-sm bg-background border-border/60 shadow-sm"
                       >
-                        <option value="critical">Critical</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                        <option value="info">Info</option>
+                        <SelectTrigger className="h-9 text-sm bg-background border-border/60 shadow-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="critical">Critical</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="info">Info</SelectItem>
+                        </SelectContent>
                       </Select>
                     </div>
                   </div>
@@ -1155,21 +1167,25 @@ export default function AlertPolicyDetail() {
                         </label>
                         <Select
                           value={conditionForm.operator}
-                          onChange={(e) =>
+                          onValueChange={(v) =>
                             setConditionForm({
                               ...conditionForm,
-                              operator: e.target.value,
+                              operator: v,
                             })
                           }
                           disabled={isSubmitting}
-                          className="bg-background shadow-sm"
                         >
-                          <option value="gt">Greater Than (&gt;)</option>
-                          <option value="gte">Greater or Equal (&gt;=)</option>
-                          <option value="lt">Less Than (&lt;)</option>
-                          <option value="lte">Less or Equal (&lt;=)</option>
-                          <option value="eq">Exactly (==)</option>
-                          <option value="neq">Not Equal (!=)</option>
+                          <SelectTrigger className="bg-background shadow-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gt">Greater Than (&gt;)</SelectItem>
+                            <SelectItem value="gte">Greater or Equal (&gt;=)</SelectItem>
+                            <SelectItem value="lt">Less Than (&lt;)</SelectItem>
+                            <SelectItem value="lte">Less or Equal (&lt;=)</SelectItem>
+                            <SelectItem value="eq">Exactly (==)</SelectItem>
+                            <SelectItem value="neq">Not Equal (!=)</SelectItem>
+                          </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
@@ -1195,20 +1211,24 @@ export default function AlertPolicyDetail() {
                           Evaluation Window
                         </label>
                         <Select
-                          value={conditionForm.windowMins}
-                          onChange={(e) =>
+                          value={String(conditionForm.windowMins)}
+                          onValueChange={(v) =>
                             setConditionForm({
                               ...conditionForm,
-                              windowMins: Number(e.target.value),
+                              windowMins: Number(v),
                             })
                           }
                           disabled={isSubmitting}
-                          className="bg-background shadow-sm"
                         >
-                          <option value="1">Last 1 Minute</option>
-                          <option value="5">Last 5 Minutes</option>
-                          <option value="15">Last 15 Minutes</option>
-                          <option value="60">Last 1 Hour</option>
+                          <SelectTrigger className="bg-background shadow-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Last 1 Minute</SelectItem>
+                            <SelectItem value="5">Last 5 Minutes</SelectItem>
+                            <SelectItem value="15">Last 15 Minutes</SelectItem>
+                            <SelectItem value="60">Last 1 Hour</SelectItem>
+                          </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
@@ -1217,17 +1237,21 @@ export default function AlertPolicyDetail() {
                         </label>
                         <Select
                           value={conditionForm.frequency}
-                          onChange={(e) =>
+                          onValueChange={(v) =>
                             setConditionForm({
                               ...conditionForm,
-                              frequency: e.target.value,
+                              frequency: v,
                             })
                           }
                           disabled={isSubmitting}
-                          className="bg-background shadow-sm"
                         >
-                          <option value="once">Notify Once</option>
-                          <option value="always">Notify Always</option>
+                          <SelectTrigger className="bg-background shadow-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="once">Notify Once</SelectItem>
+                            <SelectItem value="always">Notify Always</SelectItem>
+                          </SelectContent>
                         </Select>
                       </div>
                     </div>

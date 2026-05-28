@@ -13,6 +13,12 @@ import {
   Button,
   Spinner,
   Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  SelectGroup,
+  SelectLabel,
   Input,
   cn,
 } from "../../../components/Core";
@@ -4443,27 +4449,29 @@ export default function AiAssistantPage() {
                             </label>
                             <Select
                               value={selectedModel}
-                              onChange={(e) => setSelectedModel(e.target.value)}
-                              className="h-8 text-xs bg-background shadow-sm"
+                              onValueChange={(v) => setSelectedModel(v)}
                             >
-                              {TIER_ORDER.map((tier) => {
-                                const tierModels = LOCAL_MODELS.filter(
-                                  (m) => m.tier === tier,
-                                );
-                                if (tierModels.length === 0) return null;
-                                return (
-                                  <optgroup
-                                    key={tier}
-                                    label={TIER_LABELS[tier]}
-                                  >
-                                    {tierModels.map((m) => (
-                                      <option key={m.id} value={m.id}>
-                                        {m.name} · {m.vramReq}GB VRAM
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                );
-                              })}
+                              <SelectTrigger className="h-8 text-xs bg-background shadow-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIER_ORDER.map((tier) => {
+                                  const tierModels = LOCAL_MODELS.filter(
+                                    (m) => m.tier === tier,
+                                  );
+                                  if (tierModels.length === 0) return null;
+                                  return (
+                                    <SelectGroup key={tier}>
+                                      <SelectLabel>{TIER_LABELS[tier]}</SelectLabel>
+                                      {tierModels.map((m) => (
+                                        <SelectItem key={m.id} value={m.id}>
+                                          {m.name} · {m.vramReq}GB VRAM
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  );
+                                })}
+                              </SelectContent>
                             </Select>
                             {selectedModelData && (
                               <div className="flex flex-col gap-1.5 mt-1">

@@ -15,6 +15,10 @@ import {
   Dialog,
   DataError,
   Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
   cn,
 } from "../../../components/Core";
 import {
@@ -731,15 +735,17 @@ export default function IncidentDetailPage() {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Severity Level</label>
-            <Select
-              value={newSeverity}
-              onChange={(e) => setNewSeverity(e.target.value)}
-            >
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-              <option value="info">Info</option>
+            <Select value={newSeverity} onValueChange={(v) => setNewSeverity(v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="flex justify-end gap-2">
