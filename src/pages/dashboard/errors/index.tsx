@@ -38,6 +38,7 @@ import {
   Maximize,
   Workflow,
   MonitorSmartphone,
+  RefreshCw,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { SmartAnimatedValue } from "@/components/Tween";
@@ -197,7 +198,7 @@ export default function GlobalErrorsDashboard() {
 
   // Fetch Global Errors
   const endpoint = `/errors?${buildTimeRangeQuery(timeRange)}&page=${page}&limit=15&search=${search}&status=${statusFilter}${serviceFilter !== "all" ? `&serviceId=${serviceFilter}` : ""}`;
-  const { data, error, isLoading } = useSWR(token ? endpoint : null, fetcher, {
+  const { data, error, isLoading, mutate, isValidating } = useSWR(token ? endpoint : null, fetcher, {
     keepPreviousData: true,
   });
 
@@ -285,6 +286,9 @@ export default function GlobalErrorsDashboard() {
               onChange={(val) => { setTimeRange(val); setPage(1); }}
               maxRetentionDays={30}
             />
+            <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
+              <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 

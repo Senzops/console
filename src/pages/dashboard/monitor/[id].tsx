@@ -83,7 +83,7 @@ const DistributionCard = ({ title, children, actions }: any) => {
   const toggle = () => setIsMaximized(!isMaximized);
 
   const Header = (
-    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
+    <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between space-y-0 h-16 shrink-0">
       <div className="flex items-center gap-3">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{title}</CardTitle>
         {actions}
@@ -96,13 +96,10 @@ const DistributionCard = ({ title, children, actions }: any) => {
 
   const Content = (
     <DistributionContext.Provider value={{ isMaximized, toggle }}>
-      <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : 'h-[400px]'}`}>
+      <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-auto min-h-[300px]'}`}>
         {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
-          {/* Container for content ensuring it fills space */}
-          <div className="w-full h-full relative">
-            {children}
-          </div>
+        <CardContent className="p-0 flex-1 overflow-auto bg-card">
+          {children}
         </CardContent>
       </Card>
     </DistributionContext.Provider>
@@ -123,12 +120,12 @@ const DistributionTable = ({ data }: { data: any[] }) => {
   }, [data]);
   if (!data?.length) return null;
 
-  const limit = isMaximized ? filteredData.length : 5;
+  const limit = isMaximized ? filteredData.length : 10;
   const visibleData = filteredData.slice(0, limit);
   const hiddenCount = filteredData.length - limit;
 
   return (
-    <div className="w-full h-full overflow-auto">
+    <div className="w-full overflow-auto">
       <table className="w-full text-sm text-left border-collapse">
         <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
           <tr><th className="px-6 py-3">Time</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Code</th><th className="px-6 py-3 text-right">Latency</th></tr>
