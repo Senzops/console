@@ -110,17 +110,53 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
     );
   }
 
-  if (error || !data) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-center text-muted-foreground text-sm">
-          Runtime metrics not available yet. They appear once your SDK sends data.
-        </CardContent>
-      </Card>
-    );
-  }
+  if (error || !data) return null;
 
-  const { timeSeries } = data;
+  // -------------------------------------------------------------------------
+  // Guard: Only render when real runtime metrics data exists.
+  //
+  // The backend zero-fills timeSeries via fillTimeGaps(), so even a service
+  // with no runtime metrics returns a full array of zero-valued buckets.
+  // Rendering that is pure noise — flat lines at zero.
+  //
+  // Two-layer check:
+  //   1. `current === null` → no RuntimeMetric document exists at all
+  //   2. timeSeries has no bucket with any meaningful non-zero value
+  //      (defense-in-depth against edge cases)
+  // -------------------------------------------------------------------------
+  const { current, timeSeries } = data;
+
+  const hasRealData = (() => {
+    // Primary check: backend sets `current` only when ≥1 real snapshot exists
+    if (current != null) return true;
+
+    // Secondary check: scan timeSeries for any non-zero signal
+    if (!timeSeries || timeSeries.length === 0) return false;
+
+    // Key metrics that indicate real runtime data was collected.
+    // We check a representative subset rather than every field — any one
+    // non-zero value means the SDK has sent actual metrics.
+    const signalKeys = [
+      'eventLoopLagMs',
+      'eventLoopLagP99Ms',
+      'eventLoopUtilizationPercent',
+      'heapUsedBytes',
+      'rssBytes',
+      'gcTotalCount',
+      'cpuUserUs',
+      'cpuSystemUs',
+      'uptimeSeconds',
+    ] as const;
+
+    return timeSeries.some((point: any) =>
+      signalKeys.some((key) => {
+        const v = point[key];
+        return typeof v === 'number' && v > 0;
+      }),
+    );
+  })();
+
+  if (!hasRealData) return null;
 
   // Process time series for charts
   const chartData = timeSeries?.map((point: any) => ({
