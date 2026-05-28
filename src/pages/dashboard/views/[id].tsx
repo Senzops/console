@@ -69,7 +69,10 @@ import {
   Zap,
   Info,
   RotateCcw,
-  Pencil
+  Pencil,
+  Bug,
+  Cpu,
+  Globe
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -101,6 +104,14 @@ const getTargetIcon = (target: string) => {
       return <Server className="h-4 w-4 text-emerald-500" />;
     case "database":
       return <Database className="h-4 w-4 text-blue-400" />;
+    case "uptime":
+      return <Activity className="h-4 w-4 text-teal-500" />;
+    case "errors":
+      return <Bug className="h-4 w-4 text-red-500" />;
+    case "runtime":
+      return <Cpu className="h-4 w-4 text-violet-500" />;
+    case "web":
+      return <Globe className="h-4 w-4 text-cyan-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -178,6 +189,9 @@ const DEFAULT_QUERIES: Record<string, string> = {
   uptime: '[\n  { "$match": { "status": "down" } },\n  { "$project": { "time": "$createdAt", "url": "$service.url", "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   rum: '[\n  { "$match": { "vitals.lcp": { "$gt": 2500 } } },\n  { "$project": { "time": "$createdAt", "browser": 1, "lcp": "$vitals.lcp", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   task: '[\n  { "$match": { "status": "failed" } },\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  errors: '[\n  { "$match": { "status": "unresolved" } },\n  { "$project": { "time": "$lastSeen", "errorClass": 1, "message": 1, "totalCount": 1, "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  runtime: '[\n  { "$match": { "eventLoopLagMs": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "eventLoopLagMs": 1, "heapUsedPercent": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  web: '[\n  { "$match": { "type": "pageview" } },\n  { "$project": { "time": "$createdAt", "path": 1, "browser": 1, "country": 1, "device": 1, "duration": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
 // Universal Pipeline Templates
@@ -274,6 +288,62 @@ const QUICK_TEMPLATES: Record<string, any[]> = {
       label: "Slow Tasks (Table)",
       config: { viz: "table" },
       query: `[\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "duration": -1 } },\n  { "$limit": 100 }\n]`
+    }
+  ],
+  errors: [
+    {
+      label: "Unresolved by Class (Bar)",
+      config: { viz: "bar" },
+      query: `[\n  { "$match": { "status": "unresolved" } },\n  { "$group": { "_id": "$errorClass", "value": { "$sum": "$totalCount" } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "value": -1 } }\n]`
+    },
+    {
+      label: "Error Status (Pie)",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": { "_id": "$status", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
+    },
+    {
+      label: "Recent Errors (Table)",
+      config: { viz: "table" },
+      query: `[\n  { "$project": { "time": "$lastSeen", "errorClass": 1, "message": 1, "totalCount": 1, "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`
+    }
+  ],
+  runtime: [
+    {
+      label: "Event Loop Lag (Area)",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Lag": { "$avg": "$eventLoopLagMs" },\n    "P99": { "$avg": "$eventLoopLagP99Ms" }\n  }},\n  { "$project": { "time": "$_id", "Lag": 1, "P99": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    },
+    {
+      label: "Heap Usage (Line)",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "HeapUsed": { "$avg": "$heapUsedPercent" }\n  }},\n  { "$project": { "time": "$_id", "HeapUsed": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    },
+    {
+      label: "GC Pressure (Bar)",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "GC Duration": { "$sum": "$gcTotalDurationMs" },\n    "Major GCs": { "$sum": "$gcMajorCount" }\n  }},\n  { "$project": { "time": "$_id", "GC Duration": 1, "Major GCs": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    }
+  ],
+  web: [
+    {
+      label: "Page Views Trend (Area)",
+      config: { viz: "area" },
+      query: `[\n  { "$match": { "type": "pageview" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "Views": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "Views": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    },
+    {
+      label: "Top Pages (Bar)",
+      config: { viz: "bar" },
+      query: `[\n  { "$match": { "type": "pageview" } },\n  { "$group": { "_id": "$path", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "value": -1 } },\n  { "$limit": 20 }\n]`
+    },
+    {
+      label: "Devices (Pie)",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": { "_id": "$device", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
+    },
+    {
+      label: "Traffic by Country (Map)",
+      config: { viz: "map" },
+      query: `[\n  { "$group": { "_id": "$country", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "value": -1 } }\n]`
     }
   ]
 };
@@ -1970,6 +2040,9 @@ export default function CustomDashboardView() {
                       <option value="task">Tasks</option>
                       <option value="rum">Web RUM</option>
                       <option value="uptime">Uptime</option>
+                      <option value="errors">Error Tracking</option>
+                      <option value="runtime">Runtime Metrics</option>
+                      <option value="web">Web Analytics</option>
                     </Select>
                   </div>
                   <div className="space-y-1 w-full sm:flex-1">
