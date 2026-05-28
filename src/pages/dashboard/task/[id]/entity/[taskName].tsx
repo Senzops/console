@@ -2,6 +2,8 @@
 import React, {
   useState,
   useMemo,
+  useRef,
+  useEffect,
   createContext,
   useContext,
   useCallback,
@@ -44,7 +46,7 @@ import {
   Filter,
   ArrowLeft,
   CalendarClock,
-  AlertTriangle,
+  Info,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -64,6 +66,118 @@ const formatDuration = (ms: number) => {
   if (ms < 1000) return `${Math.round(ms)}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(2)}s`;
   return `${(ms / 60000).toFixed(2)}m`;
+};
+
+const getHealthBadgeColor = (state: string) => {
+  switch (state) {
+    case "missing": return "text-destructive border-destructive/20 bg-destructive/10";
+    case "failing": return "text-yellow-500 border-yellow-500/20 bg-yellow-500/10";
+    default: return "text-emerald-500 border-emerald-500/20 bg-emerald-500/10";
+  }
+};
+
+const getHealthLabel = (state: string) => {
+  switch (state) {
+    case "missing": return "Missing";
+    case "failing": return "Failing";
+    default: return "Healthy";
+  }
+};
+
+const buildHealthTooltipLines = (sig: any) => {
+  const state = sig?.healthState || "healthy";
+  const lines: { label: string; value: string }[] = [];
+
+  lines.push({ label: "Status", value: getHealthLabel(state) });
+
+  if (state === "healthy") {
+    lines.push({ label: "Condition", value: "No threshold breaches detected" });
+    lines.push({ label: "Evaluation interval", value: "120s (every sweep cycle)" });
+  } else if (state === "missing") {
+    lines.push({ label: "Condition", value: "lastRunAt < expectedPreviousRun - 5s jitter" });
+    if (sig.consecutiveMisses > 0) lines.push({ label: "Consecutive misses", value: String(sig.consecutiveMisses) });
+    if (sig.scheduleExpression) lines.push({ label: "Cron expression", value: sig.scheduleExpression });
+    lines.push({ label: "Grace period", value: `${((sig.gracePeriodMs || 120000) / 1000).toFixed(0)}s after expected run` });
+    lines.push({ label: "Recovery condition", value: "Run completes within next schedule window" });
+  } else if (state === "failing") {
+    const threshold = sig.failureRateThreshold || 0.5;
+    lines.push({ label: "Condition", value: `failureRate ≥ ${(threshold * 100).toFixed(0)}% over 10m window` });
+    lines.push({ label: "Min sample size", value: "3 runs required to evaluate" });
+    if (sig.consecutiveFailures > 0) lines.push({ label: "Consecutive evaluations", value: `${sig.consecutiveFailures} sweep cycles` });
+    lines.push({ label: "Recovery condition", value: `failureRate < ${(threshold * 50).toFixed(0)}% (hysteresis)` });
+  }
+
+  if (sig?.lastHealthTransition && state !== "healthy") {
+    lines.push({ label: "In this state since", value: formatDistanceToNow(new Date(sig.lastHealthTransition)) + " ago" });
+  }
+
+  return lines;
+};
+
+const FloatingTooltip = ({ children, content }: { children: React.ReactNode; content: React.ReactNode }) => {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [style, setStyle] = useState<React.CSSProperties>({ position: "fixed", opacity: 0, pointerEvents: "none" });
+  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const recompute = useCallback(() => {
+    const trigger = triggerRef.current;
+    const panel = contentRef.current;
+    if (!trigger || !panel) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const panelHeight = panel.scrollHeight;
+    const panelWidth = panel.scrollWidth;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const gap = 6;
+
+    const spaceBelow = vh - rect.bottom - gap;
+    const placeAbove = spaceBelow < panelHeight && rect.top - gap > spaceBelow;
+
+    let top = placeAbove ? rect.top - gap - panelHeight : rect.bottom + gap;
+    let left = rect.left;
+
+    if (left + panelWidth > vw - 8) left = vw - panelWidth - 8;
+    if (left < 8) left = 8;
+    top = Math.max(8, Math.min(top, vh - panelHeight - 8));
+
+    setStyle({ position: "fixed", top, left, opacity: 1, pointerEvents: "auto", zIndex: 9999 });
+  }, []);
+
+  useEffect(() => {
+    if (visible) recompute();
+  }, [visible, recompute]);
+
+  const show = useCallback(() => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    setVisible(true);
+  }, []);
+
+  const hide = useCallback(() => {
+    hideTimeout.current = setTimeout(() => setVisible(false), 100);
+  }, []);
+
+  const keepOpen = useCallback(() => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+  }, []);
+
+  useEffect(() => () => { if (hideTimeout.current) clearTimeout(hideTimeout.current); }, []);
+
+  return (
+    <>
+      <div ref={triggerRef} onMouseEnter={show} onMouseLeave={hide}>
+        {children}
+      </div>
+      {visible && createPortal(
+        <div ref={contentRef} style={style} onMouseEnter={keepOpen} onMouseLeave={hide} className="transition-opacity duration-150">
+          {content}
+        </div>,
+        document.body
+      )}
+    </>
+  );
 };
 
 // --- COMPONENTS ---
@@ -449,42 +563,39 @@ export default function TaskEntityDetail() {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Service
           </Button>
 
-          {/* Watchdog Anomaly Banner */}
-          {signature?.healthState === "missing" && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex items-start gap-4">
-              <div className="p-2 bg-destructive/20 text-destructive rounded-full">
-                <AlertTriangle className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-destructive font-bold text-lg">
-                  Watchdog Alert: Missing Execution
-                </h3>
-                <p className="text-destructive/80 text-sm mt-1">
-                  This job has missed its scheduled execution window according
-                  to its cron profile. It may be deadlocked, out of memory, or
-                  the worker node is offline.
-                </p>
-              </div>
-            </div>
-          )}
-
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
             <div className="min-w-0">
               <div className="flex items-center gap-3 mb-1">
-                <Workflow className="h-6 w-6 text-indigo-500 shrink-0" />
                 <h1
                   className="text-2xl font-bold tracking-tight truncate max-w-[60vw]"
                   title={decodedTaskName}
                 >
                   {decodedTaskName}
                 </h1>
+                {signature?.healthState && (
+                  <FloatingTooltip content={
+                    <div className="bg-popover border border-border rounded-lg shadow-xl p-3 min-w-[240px] max-w-[340px] text-xs">
+                      {buildHealthTooltipLines(signature).map((line, i) => (
+                        <div key={i} className={`flex justify-between gap-4 ${i > 0 ? "mt-1.5 pt-1.5 border-t border-border/40" : ""}`}>
+                          <span className="text-muted-foreground whitespace-nowrap">{line.label}</span>
+                          <span className="font-mono text-foreground text-right">{line.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  }>
+                    <Badge variant="outline" className={`animate-pulse cursor-help ${getHealthBadgeColor(signature.healthState)}`}>
+                      {getHealthLabel(signature.healthState)}
+                      <Info className="w-3 h-3 ml-1 opacity-50" />
+                    </Badge>
+                  </FloatingTooltip>
+                )}
               </div>
-              <div className="flex items-center gap-3 pl-9">
+              <div className="flex items-center gap-2 text-xs flex-wrap">
                 <Badge
                   variant="outline"
                   className="font-mono text-[10px] bg-muted/50 capitalize"
                 >
-                  {signature?.taskType || "Task Entity Signature Profile"}
+                  {signature?.taskType || "task"}
                 </Badge>
                 {signature?.scheduleExpression && (
                   <Badge
@@ -494,6 +605,11 @@ export default function TaskEntityDetail() {
                     <CalendarClock className="h-3 w-3" />{" "}
                     {signature.scheduleExpression}
                   </Badge>
+                )}
+                {signature?.lastRunAt && (
+                  <span className="text-muted-foreground font-mono ml-1">
+                    Last run {formatDistanceToNow(new Date(signature.lastRunAt))} ago
+                  </span>
                 )}
               </div>
             </div>

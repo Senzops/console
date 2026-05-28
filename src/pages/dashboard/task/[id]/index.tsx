@@ -2,6 +2,8 @@
 import React, {
   useState,
   useMemo,
+  useRef,
+  useEffect,
   createContext,
   useContext,
   useCallback,
@@ -47,6 +49,8 @@ import {
   Maximize,
   ChevronRight,
   Pencil,
+  HeartPulse,
+  Info,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -185,6 +189,146 @@ const StatCard = ({ title, value, sub, icon: Icon, color, isMono }: any) => {
   );
 };
 
+const getHealthBadge = (state: string) => {
+  switch (state) {
+    case "missing":
+      return { label: "Missing", color: "text-destructive border-destructive/20 bg-destructive/10" };
+    case "failing":
+      return { label: "Failing", color: "text-yellow-500 border-yellow-500/20 bg-yellow-500/10" };
+    default:
+      return { label: "Healthy", color: "text-emerald-500 border-emerald-500/20 bg-emerald-500/10" };
+  }
+};
+
+const getServiceHealthBadge = (summary: any) => {
+  if (!summary || summary.total === 0) return { label: "No Tasks", color: "text-muted-foreground border-border bg-muted/50" };
+  if (summary.missing > 0) return { label: "Critical", color: "text-destructive border-destructive/20 bg-destructive/10" };
+  if (summary.failing > 0) return { label: "Degraded", color: "text-yellow-500 border-yellow-500/20 bg-yellow-500/10" };
+  return { label: "Healthy", color: "text-emerald-500 border-emerald-500/20 bg-emerald-500/10" };
+};
+
+const buildHealthTooltip = (task: any) => {
+  const state = task.healthState || "healthy";
+  const lines: { label: string; value: string }[] = [];
+
+  lines.push({ label: "Status", value: state.charAt(0).toUpperCase() + state.slice(1) });
+
+  if (state === "healthy") {
+    lines.push({ label: "Condition", value: "No threshold breaches detected" });
+    lines.push({ label: "Evaluation interval", value: "120s (every sweep cycle)" });
+  } else if (state === "missing") {
+    lines.push({ label: "Condition", value: "lastRunAt < expectedPreviousRun - 5s jitter" });
+    if (task.consecutiveMisses > 0) lines.push({ label: "Consecutive misses", value: String(task.consecutiveMisses) });
+    if (task.scheduleExpression) lines.push({ label: "Cron expression", value: task.scheduleExpression });
+    lines.push({ label: "Grace period", value: `${((task.gracePeriodMs || 120000) / 1000).toFixed(0)}s after expected run` });
+    lines.push({ label: "Recovery condition", value: "Run completes within next schedule window" });
+  } else if (state === "failing") {
+    const threshold = task.failureRateThreshold || 0.5;
+    lines.push({ label: "Condition", value: `failureRate ≥ ${(threshold * 100).toFixed(0)}% over 10m window` });
+    lines.push({ label: "Min sample size", value: "3 runs required to evaluate" });
+    if (task.consecutiveFailures > 0) lines.push({ label: "Consecutive evaluations", value: `${task.consecutiveFailures} sweep cycles` });
+    lines.push({ label: "Recovery condition", value: `failureRate < ${(threshold * 50).toFixed(0)}% (hysteresis)` });
+  }
+
+  if (task.lastHealthTransition && state !== "healthy") {
+    lines.push({ label: "In this state since", value: formatDistanceToNow(new Date(task.lastHealthTransition)) + " ago" });
+  }
+
+  return lines;
+};
+
+const FloatingTooltip = ({ children, content }: { children: React.ReactNode; content: React.ReactNode }) => {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [style, setStyle] = useState<React.CSSProperties>({ position: "fixed", opacity: 0, pointerEvents: "none" });
+  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const recompute = useCallback(() => {
+    const trigger = triggerRef.current;
+    const panel = contentRef.current;
+    if (!trigger || !panel) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const panelHeight = panel.scrollHeight;
+    const panelWidth = panel.scrollWidth;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const gap = 6;
+
+    const spaceBelow = vh - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    const placeAbove = spaceBelow < panelHeight && spaceAbove > spaceBelow;
+
+    let top = placeAbove ? rect.top - gap - panelHeight : rect.bottom + gap;
+    let left = rect.left;
+
+    if (left + panelWidth > vw - 8) left = vw - panelWidth - 8;
+    if (left < 8) left = 8;
+    top = Math.max(8, Math.min(top, vh - panelHeight - 8));
+
+    setStyle({ position: "fixed", top, left, opacity: 1, pointerEvents: "auto", zIndex: 9999 });
+  }, []);
+
+  useEffect(() => {
+    if (visible) recompute();
+  }, [visible, recompute]);
+
+  const show = useCallback(() => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    setVisible(true);
+  }, []);
+
+  const hide = useCallback(() => {
+    hideTimeout.current = setTimeout(() => setVisible(false), 100);
+  }, []);
+
+  const keepOpen = useCallback(() => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+  }, []);
+
+  useEffect(() => () => { if (hideTimeout.current) clearTimeout(hideTimeout.current); }, []);
+
+  return (
+    <>
+      <div ref={triggerRef} onMouseEnter={show} onMouseLeave={hide}>
+        {children}
+      </div>
+      {visible && createPortal(
+        <div ref={contentRef} style={style} onMouseEnter={keepOpen} onMouseLeave={hide} className="transition-opacity duration-150">
+          {content}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
+const HealthTooltipContent = ({ lines }: { lines: { label: string; value: string }[] }) => (
+  <div className="bg-popover border border-border rounded-lg shadow-xl p-3 min-w-[240px] max-w-[340px] text-xs">
+    {lines.map((line, i) => (
+      <div key={i} className={`flex justify-between gap-6 ${i > 0 ? "mt-1.5 pt-1.5 border-t border-border/40" : ""}`}>
+        <span className="text-muted-foreground whitespace-nowrap">{line.label}</span>
+        <span className="font-mono text-foreground text-right">{line.value}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const HealthBadgeWithTooltip = ({ task }: { task: any }) => {
+  const badge = getHealthBadge(task.healthState || "healthy");
+  const lines = buildHealthTooltip(task);
+
+  return (
+    <FloatingTooltip content={<HealthTooltipContent lines={lines} />}>
+      <Badge variant="outline" className={`font-mono text-[10px] cursor-help ${badge.color}`}>
+        {badge.label}
+        <Info className="w-2.5 h-2.5 ml-0.5 opacity-40" />
+      </Badge>
+    </FloatingTooltip>
+  );
+};
+
 // 4. Tasks Table (Dedicated Component modeled after EndpointsTable)
 const TasksTable = ({ tasks, router, serviceId }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -245,6 +389,7 @@ const TasksTable = ({ tasks, router, serviceId }: any) => {
               <th className="px-6 py-3 text-left font-medium">
                 Name / Signature
               </th>
+              <th className="px-6 py-3 font-medium">Health</th>
               <th className="px-6 py-3 text-right font-medium">Runs</th>
               <th className="px-6 py-3 text-right font-medium">Failure Rate</th>
               <th className="px-6 py-3 text-right font-medium">Avg Duration</th>
@@ -271,18 +416,21 @@ const TasksTable = ({ tasks, router, serviceId }: any) => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`p-1.5 rounded-md transition-colors ${hasHighFailure ? "bg-destructive/10 text-destructive" : "bg-indigo-500/10 text-indigo-500"}`}
+                        className={`p-1.5 rounded-md transition-colors ${hasHighFailure || (t.healthState && t.healthState !== "healthy") ? "bg-destructive/10 text-destructive" : "bg-indigo-500/10 text-indigo-500"}`}
                       >
-                        {hasHighFailure ? (
+                        {hasHighFailure || (t.healthState && t.healthState !== "healthy") ? (
                           <AlertOctagon className="h-2 w-2" />
                         ) : (
                           <Workflow className="h-2 w-2" />
                         )}
                       </div>
-                      <span className="font-mono text-xs text-foreground truncate max-w-[350px]">
+                      <span className="font-mono text-xs text-foreground truncate max-w-[300px]">
                         {t._id}
                       </span>
                     </div>
+                  </td>
+                  <td className="px-6 py-3">
+                    <HealthBadgeWithTooltip task={t} />
                   </td>
                   <td className="px-6 py-3 text-right font-mono text-xs">
                     <SmartAnimatedValue value={formatNumber(t.totalRuns)} />
@@ -313,7 +461,7 @@ const TasksTable = ({ tasks, router, serviceId }: any) => {
                 onClick={() => setIsMaximized(true)}
               >
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors"
                 >
                   Show {hiddenCount} more...
@@ -323,7 +471,7 @@ const TasksTable = ({ tasks, router, serviceId }: any) => {
             {visibleTasks.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="py-8 text-center text-muted-foreground text-xs"
                 >
                   No tasks found
@@ -441,7 +589,7 @@ export default function TaskServiceDashboard() {
       </>
     );
 
-  const { service, stats, tasksTable } = data;
+  const { service, stats, tasksTable, watchdogSummary } = data;
   const getColor = (defaultColor: string) =>
     isMono ? "hsl(var(--chart-mono))" : defaultColor;
 
@@ -467,6 +615,30 @@ export default function TaskServiceDashboard() {
                 <h1 className="text-2xl font-bold tracking-tight">
                   {service.name}
                 </h1>
+                {watchdogSummary && watchdogSummary.total > 0 && (
+                  <FloatingTooltip content={
+                    <div className="bg-popover border border-border rounded-lg shadow-xl p-3 min-w-[200px] text-xs">
+                      {[
+                        { label: "Healthy", value: watchdogSummary.healthy, color: "text-emerald-500" },
+                        { label: "Missing", value: watchdogSummary.missing, color: "text-destructive" },
+                        { label: "Failing", value: watchdogSummary.failing, color: "text-yellow-500" },
+                      ].map((item, i) => (
+                        <div key={i} className={`flex justify-between gap-4 ${i > 0 ? "mt-1.5 pt-1.5 border-t border-border/40" : ""}`}>
+                          <span className="text-muted-foreground">{item.label}</span>
+                          <span className={`font-mono font-bold ${item.value > 0 ? item.color : "text-muted-foreground"}`}>{item.value}</span>
+                        </div>
+                      ))}
+                      <div className="mt-2 pt-2 border-t border-border/40 text-muted-foreground">
+                        {watchdogSummary.total} tasks evaluated every 120s
+                      </div>
+                    </div>
+                  }>
+                    <Badge variant="outline" className={`animate-pulse cursor-help ${getServiceHealthBadge(watchdogSummary).color}`}>
+                      {getServiceHealthBadge(watchdogSummary).label}
+                      <Info className="w-3 h-3 ml-1 opacity-50" />
+                    </Badge>
+                  </FloatingTooltip>
+                )}
               </div>
               <div className="flex items-center gap-2 text-xs">
                 {isActive ? (
@@ -545,11 +717,13 @@ export default function TaskServiceDashboard() {
             isMono={isMono}
           />
           <StatCard
-            title="Active Tasks"
-            value={stats.uniqueTasks?.length || 0}
-            sub="Unique signatures"
-            icon={Box}
-            color="text-emerald-500"
+            title="Task Health"
+            value={`${watchdogSummary?.healthy || 0}/${watchdogSummary?.total || stats.uniqueTasks?.length || 0}`}
+            sub={watchdogSummary && (watchdogSummary.missing + watchdogSummary.failing) > 0
+              ? `${watchdogSummary.missing + watchdogSummary.failing} unhealthy`
+              : "All tasks healthy"}
+            icon={HeartPulse}
+            color={watchdogSummary && (watchdogSummary.missing + watchdogSummary.failing) > 0 ? "text-destructive" : "text-emerald-500"}
             isMono={isMono}
           />
         </div>
