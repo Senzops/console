@@ -936,29 +936,52 @@ const DiagramErrors = () => (
       </span>
     </div>
 
-    {/* Stack trace — uses muted theme bg, not hardcoded dark */}
-    <div className="p-4 bg-muted/30 flex-1 overflow-hidden border-t border-border/20">
-      <div className="text-[11px] font-mono leading-loose">
-        <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.1s" }}>
+    {/* Stack trace — real-world Node.js/Express trace, theme-aware */}
+    <div className="p-3.5 bg-muted/30 flex-1 overflow-hidden border-t border-border/20">
+      <div className="text-[10px] font-mono leading-relaxed flex flex-col gap-0.5">
+        <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.05s" }}>
           at <span className="text-purple-500 dark:text-purple-400">processData</span>{" "}
-          (/src/services/data.ts:
-          <span className="text-blue-500 dark:text-blue-400">42</span>:
-          <span className="text-blue-500 dark:text-blue-400">15</span>)
+          (/src/services/data.ts:<span className="text-blue-500 dark:text-blue-400">42</span>:<span className="text-blue-500 dark:text-blue-400">15</span>)
         </div>
-        <div className="text-red-600 dark:text-red-400 font-bold bg-red-500/10 px-1.5 -mx-1.5 rounded border-l-2 border-red-500 dark:border-red-400 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.2s" }}>
+        <div className="text-red-600 dark:text-red-400 font-bold bg-red-500/10 px-1.5 -mx-1.5 rounded border-l-2 border-red-500 dark:border-red-400 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.1s" }}>
           at <span className="text-purple-500 dark:text-purple-400">UserController.get</span>{" "}
-          (/src/controllers/user.ts:
-          <span className="text-blue-500 dark:text-blue-400">18</span>:
-          <span className="text-blue-500 dark:text-blue-400">22</span>)
+          (/src/controllers/user.ts:<span className="text-blue-500 dark:text-blue-400">18</span>:<span className="text-blue-500 dark:text-blue-400">22</span>)
         </div>
-        <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
+        <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.15s" }}>
+          at <span className="text-purple-500 dark:text-purple-400">asyncHandler</span>{" "}
+          (/src/middleware/async.ts:<span className="text-blue-500 dark:text-blue-400">8</span>:<span className="text-blue-500 dark:text-blue-400">5</span>)
+        </div>
+        <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.2s" }}>
           at <span className="text-purple-500 dark:text-purple-400">Layer.handle</span>{" "}
-          (/node_modules/express/lib/router/layer.js:
-          <span className="text-blue-500 dark:text-blue-400">95</span>:
-          <span className="text-blue-500 dark:text-blue-400">5</span>)
+          (/node_modules/express/lib/router/layer.js:<span className="text-blue-500 dark:text-blue-400">95</span>:<span className="text-blue-500 dark:text-blue-400">5</span>)
         </div>
-        <div className="text-muted-foreground/60 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.4s" }}>
-          at next (/node_modules/express/lib/router/route.js:144:13)
+        <div className="text-muted-foreground/70 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.25s" }}>
+          at next (/node_modules/express/lib/router/route.js:<span className="text-blue-500/70 dark:text-blue-400/70">144</span>:<span className="text-blue-500/70 dark:text-blue-400/70">13</span>)
+        </div>
+        <div className="text-muted-foreground/70 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
+          at <span className="text-purple-500/70 dark:text-purple-400/70">Route.dispatch</span>{" "}
+          (/node_modules/express/lib/router/route.js:<span className="text-blue-500/70 dark:text-blue-400/70">114</span>:<span className="text-blue-500/70 dark:text-blue-400/70">3</span>)
+        </div>
+        <div className="text-muted-foreground/50 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.35s" }}>
+          at <span className="text-purple-500/50 dark:text-purple-400/50">Function.process_params</span>{" "}
+          (/node_modules/express/lib/router/index.js:<span className="text-blue-500/50 dark:text-blue-400/50">346</span>:<span className="text-blue-500/50 dark:text-blue-400/50">12</span>)
+        </div>
+        <div className="text-muted-foreground/40 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.4s" }}>
+          at /node_modules/express/lib/router/index.js:<span className="text-blue-500/40 dark:text-blue-400/40">280</span>:<span className="text-blue-500/40 dark:text-blue-400/40">7</span>
+        </div>
+        <div className="text-muted-foreground/40 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.43s" }}>
+          at <span className="text-purple-500/40 dark:text-purple-400/40">Function.handle</span>{" "}
+          (/node_modules/express/lib/router/index.js:<span className="text-blue-500/40 dark:text-blue-400/40">175</span>:<span className="text-blue-500/40 dark:text-blue-400/40">3</span>)
+        </div>
+        <div className="text-muted-foreground/30 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.46s" }}>
+          at router (/node_modules/express/lib/router/index.js:<span className="text-blue-500/30 dark:text-blue-400/30">47</span>:<span className="text-blue-500/30 dark:text-blue-400/30">12</span>)
+        </div>
+        <div className="text-muted-foreground/30 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.49s" }}>
+          at /node_modules/express/lib/application.js:<span className="text-blue-500/30 dark:text-blue-400/30">168</span>:<span className="text-blue-500/30 dark:text-blue-400/30">10</span>
+        </div>
+        <div className="text-muted-foreground/25 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.52s" }}>
+          at <span className="text-purple-500/25 dark:text-purple-400/25">Server.emit</span>{" "}
+          (node:events:<span className="text-blue-500/25 dark:text-blue-400/25">519</span>:<span className="text-blue-500/25 dark:text-blue-400/25">28</span>)
         </div>
       </div>
     </div>
@@ -983,43 +1006,77 @@ const DiagramLogs = () => (
       </span>
     </div>
 
-    {/* Log lines — all theme-aware colors */}
-    <div className="p-4 flex flex-col gap-2 flex-1 font-mono text-[11px] bg-muted/10">
-      <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.1s" }}>
-        <span className="text-blue-500 dark:text-blue-400 mr-3">
-          10:42:01.001
-        </span>
-        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-12">
-          INFO
-        </span>{" "}
-        User session validated
+    {/* Log lines — real-world payment flow scenario, theme-aware */}
+    <div className="px-3 py-2 flex flex-col gap-0.5 flex-1 font-mono text-[10px] bg-muted/10 overflow-hidden">
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.05s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:01.001</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        Request received POST /api/checkout
       </div>
-      <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.2s" }}>
-        <span className="text-blue-500 dark:text-blue-400 mr-3">
-          10:42:05.421
-        </span>
-        <span className="text-amber-600 dark:text-amber-400 font-bold inline-block w-12">
-          WARN
-        </span>{" "}
-        High latency on upstream API
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.1s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:01.015</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        User session validated uid=8294
       </div>
-      <div className="text-foreground bg-red-500/10 -mx-4 px-4 py-1 border-l-2 border-red-500 dark:border-red-400 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
-        <span className="text-blue-500 dark:text-blue-400 mr-3">
-          10:42:09.912
-        </span>
-        <span className="text-red-600 dark:text-red-400 font-bold inline-block w-12">
-          ERROR
-        </span>{" "}
-        Database connection timeout
+      <div className="text-muted-foreground/70 animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.15s" }}>
+        <span className="text-blue-500/70 dark:text-blue-400/70 mr-2">10:42:01.089</span>
+        <span className="text-muted-foreground font-bold inline-block w-11">DEBUG</span>{" "}
+        Cart items fetched (3 items, $142.50)
       </div>
-      <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.4s" }}>
-        <span className="text-blue-500 dark:text-blue-400 mr-3">
-          10:42:11.001
-        </span>
-        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-12">
-          INFO
-        </span>{" "}
-        Connection pool rebuilt
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.2s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:02.401</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        Payment intent created pi_3Nk8s2...
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.25s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:05.421</span>
+        <span className="text-amber-600 dark:text-amber-400 font-bold inline-block w-11">WARN</span>{" "}
+        High latency on payment gateway (3.2s)
+      </div>
+      <div className="text-foreground bg-red-500/10 -mx-3 px-3 py-0.5 border-l-2 border-red-500 dark:border-red-400 animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:09.912</span>
+        <span className="text-red-600 dark:text-red-400 font-bold inline-block w-11">ERROR</span>{" "}
+        Database connection timeout on primary
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.35s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:10.004</span>
+        <span className="text-amber-600 dark:text-amber-400 font-bold inline-block w-11">WARN</span>{" "}
+        Failover to read replica initiated
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.4s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:11.001</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        Connection pool rebuilt (12 active)
+      </div>
+      <div className="text-muted-foreground/70 animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.44s" }}>
+        <span className="text-blue-500/70 dark:text-blue-400/70 mr-2">10:42:11.203</span>
+        <span className="text-muted-foreground font-bold inline-block w-11">DEBUG</span>{" "}
+        Read replica latency: 12ms
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.48s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:11.450</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        Checkout total recalculated $142.50
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.52s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:12.001</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        Charge confirmed ch_1Oj2kA...
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.56s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:12.089</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        Order #ORD-20240823-4921 created
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.6s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:12.102</span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-11">INFO</span>{" "}
+        Confirmation email queued uid=8294
+      </div>
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.25s_ease-out_both]" style={{ animationDelay: "0.64s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-2">10:42:12.340</span>
+        <span className="text-amber-600 dark:text-amber-400 font-bold inline-block w-11">WARN</span>{" "}
+        POST /api/checkout completed 11.3s
       </div>
     </div>
   </DiagramFrame>
