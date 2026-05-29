@@ -15,8 +15,8 @@ const PLAN_UI_META: Record<string, any> = {
     features: [
       "2 GB pooled ingestion/month",
       "1 service per type (APM, RUM, etc.)",
+      "1 organization",
       "Community support",
-      "Standard dashboards",
     ],
     ctaText: "Start for free",
     popular: false,
@@ -26,8 +26,8 @@ const PLAN_UI_META: Record<string, any> = {
     features: [
       "15 GB pooled ingestion/month",
       "5 services per type",
+      "3 organizations",
       "Email support",
-      "Advanced alerting",
     ],
     ctaText: "Upgrade to Pro",
     popular: true,
@@ -37,8 +37,8 @@ const PLAN_UI_META: Record<string, any> = {
     features: [
       "100 GB pooled ingestion/month",
       "Unlimited services",
+      "10 organizations",
       "Priority support SLA",
-      "Advanced incident routing",
     ],
     ctaText: "Upgrade to Business",
     popular: false,
@@ -64,6 +64,14 @@ const COMPARE_FEATURES = [
         starter: "1 per type",
         pro: "5 per type",
         business: "Unlimited",
+        enterprise: "Unlimited",
+      },
+      {
+        name: "Organizations",
+        tooltip: "Team workspaces with shared resources, billing, and access control.",
+        starter: "1",
+        pro: "3",
+        business: "10",
         enterprise: "Unlimited",
       },
       {

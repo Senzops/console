@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { api } from "../../lib/auth";
 import { Button, Dialog, Spinner, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../Core";
@@ -13,6 +14,7 @@ import {
   ChevronLeft,
   EyeOff,
   Eye,
+  ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/utils/axiosError";
@@ -129,6 +131,8 @@ export const ServiceModals: React.FC = () => {
     setLoading,
     error,
     setError,
+    isQuotaError,
+    setIsQuotaError,
     selectedFramework,
     setSelectedFramework,
     selectedServerMethod,
@@ -153,6 +157,21 @@ export const ServiceModals: React.FC = () => {
   };
 
   // =======================================================================
+  // Shared error helper — detects 402 quota limits and sets both states
+  // =======================================================================
+
+  const handleApiError = (e: any, fallback: string) => {
+    const status = e?.response?.status;
+    const code = e?.response?.data?.code;
+    const isQuota = status === 402 && (code === "SERVICE_LIMIT_EXCEEDED" || code === "ORG_LIMIT_EXCEEDED");
+    setIsQuotaError(isQuota);
+    setError(isQuota
+      ? (e.response.data.details || e.response.data.error || fallback)
+      : extractErrorMessage(e, fallback)
+    );
+  };
+
+  // =======================================================================
   // Handlers
   // =======================================================================
 
@@ -173,9 +192,7 @@ export const ServiceModals: React.FC = () => {
         mutateFns.server?.();
       }
     } catch (e: any) {
-      setError(
-        extractErrorMessage(e, isEdit ? "Failed to update server" : "Failed to register server. Please try again."),
-      );
+      handleApiError(e, isEdit ? "Failed to update server" : "Failed to register server. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -209,12 +226,7 @@ export const ServiceModals: React.FC = () => {
         mutateFns.web?.();
       }
     } catch (e: any) {
-      setError(
-        extractErrorMessage(
-          e,
-          isEdit ? "Failed to update website" : "Failed to register website. Check domain format.",
-        ),
-      );
+      handleApiError(e, isEdit ? "Failed to update website" : "Failed to register website. Check domain format.");
     } finally {
       setLoading(false);
     }
@@ -248,9 +260,7 @@ export const ServiceModals: React.FC = () => {
         mutateFns.rum?.();
       }
     } catch (e: any) {
-      setError(
-        extractErrorMessage(e, isEdit ? "Failed to update RUM service" : "Failed to register RUM. Check domain format."),
-      );
+      handleApiError(e, isEdit ? "Failed to update RUM service" : "Failed to register RUM. Check domain format.");
     } finally {
       setLoading(false);
     }
@@ -286,12 +296,7 @@ export const ServiceModals: React.FC = () => {
         mutateFns.monitor?.();
       }
     } catch (e: any) {
-      setError(
-        extractErrorMessage(
-          e,
-          isEdit ? "Failed to update monitor" : "Failed to create monitor. Ensure URL is valid.",
-        ),
-      );
+      handleApiError(e, isEdit ? "Failed to update monitor" : "Failed to create monitor. Ensure URL is valid.");
     } finally {
       setLoading(false);
     }
@@ -316,7 +321,7 @@ export const ServiceModals: React.FC = () => {
         mutateFns.apm?.();
       }
     } catch (e: any) {
-      setError(isEdit ? extractErrorMessage(e, "Failed to update APM service") : (e.response?.data?.error || "Failed"));
+      handleApiError(e, isEdit ? "Failed to update APM service" : "Failed to register APM service.");
     } finally {
       setLoading(false);
     }
@@ -340,11 +345,7 @@ export const ServiceModals: React.FC = () => {
         toast.success("Task Environment Registered!");
       }
     } catch (e: any) {
-      setError(
-        isEdit
-          ? extractErrorMessage(e, "Failed to update task service")
-          : (e.response?.data?.error || "Failed to create task environment"),
-      );
+      handleApiError(e, isEdit ? "Failed to update task service" : "Failed to create task environment.");
     } finally {
       setLoading(false);
     }
@@ -384,7 +385,7 @@ export const ServiceModals: React.FC = () => {
         toast.success("Database Connected & Monitored!");
       }
     } catch (e: any) {
-      setError(isEdit ? extractErrorMessage(e, "Failed to update database") : (e.response?.data?.error || "Connection Failed"));
+      handleApiError(e, isEdit ? "Failed to update database" : "Failed to connect database.");
     } finally {
       setLoading(false);
     }
@@ -416,7 +417,7 @@ export const ServiceModals: React.FC = () => {
         router.push(`/dashboard/views/${res.data.view._id}`);
       }
     } catch (e: any) {
-      setError(isEdit ? extractErrorMessage(e, "Failed to update dashboard") : (e.response?.data?.error || "Failed to create view"));
+      handleApiError(e, isEdit ? "Failed to update dashboard" : "Failed to create dashboard.");
     } finally {
       setLoading(false);
     }
@@ -426,13 +427,30 @@ export const ServiceModals: React.FC = () => {
   // Shared UI fragments
   // =======================================================================
 
-  const ErrorBanner = () =>
-    error ? (
+  const ErrorBanner = () => {
+    if (!error) return null;
+
+    if (isQuotaError) {
+      return (
+        <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg text-sm leading-relaxed shadow-sm">
+          <strong className="block text-amber-600 dark:text-amber-500 font-bold mb-1">Plan Limit Reached</strong>
+          <p className="text-amber-700/80 dark:text-amber-400/70">{error}</p>
+          <Link href="/pricing">
+            <Button variant="outline" size="sm" className="mt-3 font-semibold text-xs border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">
+              <ArrowUpRight className="w-3.5 h-3.5 mr-1.5" /> View Plans & Upgrade
+            </Button>
+          </Link>
+        </div>
+      );
+    }
+
+    return (
       <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
         <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
         <span>{error}</span>
       </div>
-    ) : null;
+    );
+  };
 
   const CopyButton = ({ text }: { text: string }) => (
     <Button

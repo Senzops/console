@@ -79,6 +79,8 @@ export interface ServiceModalContextValue extends ServiceModalState {
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   error: string | null;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
+  isQuotaError: boolean;
+  setIsQuotaError: React.Dispatch<React.SetStateAction<boolean>>;
 
   // --- Snippet selectors ---
   selectedFramework: string;
@@ -148,6 +150,7 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
   // Loading / error (single pair — only one modal open at a time)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isQuotaError, setIsQuotaError] = useState(false);
 
   // Snippet selectors
   const [selectedFramework, setSelectedFramework] = useState("Express");
@@ -169,6 +172,7 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
     setCreds(null);
     setLoading(false);
     setError(null);
+    setIsQuotaError(false);
     setSelectedFramework("Express");
     setSelectedServerMethod("Interactive");
     setSelectedWebMethod("CDN Script");
@@ -236,6 +240,8 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
         setLoading,
         error,
         setError,
+        isQuotaError,
+        setIsQuotaError,
         selectedFramework,
         setSelectedFramework,
         selectedServerMethod,

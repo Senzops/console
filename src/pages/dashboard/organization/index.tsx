@@ -37,6 +37,7 @@ import {
   UserPlus,
   Plus,
   ArrowUpDown,
+  ArrowUpRight,
   ExternalLink,
   ShieldCheck,
   Eye,
@@ -722,6 +723,7 @@ function CreateOrgModal({ open, onClose }: { open: boolean; onClose: () => void 
   const [slug, setSlug] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isQuotaError, setIsQuotaError] = useState(false);
   const { refreshOrgs, setActiveOrg } = useOrg();
 
   const handleNameChange = (val: string) => {
@@ -729,25 +731,48 @@ function CreateOrgModal({ open, onClose }: { open: boolean; onClose: () => void 
     setSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").substring(0, 50));
   };
 
-  useEffect(() => { if (open) { setName(""); setSlug(""); setError(null); } }, [open]);
+  useEffect(() => { if (open) { setName(""); setSlug(""); setError(null); setIsQuotaError(false); } }, [open]);
 
   const handleSubmit = async () => {
     if (!name.trim() || !slug.trim()) return;
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setIsQuotaError(false);
     try {
       const { data } = await api.post("/org", { name: name.trim(), slug: slug.trim() });
       toast.success("Organization created");
       await refreshOrgs();
       if (data.organization) setActiveOrg(data.organization);
       onClose();
-    } catch (e: any) { setError(extractErrorMessage(e, "Failed to create organization")); }
+    } catch (e: any) {
+      const isOrgLimit = e?.response?.status === 402 && e?.response?.data?.code === "ORG_LIMIT_EXCEEDED";
+      setIsQuotaError(isOrgLimit);
+      setError(isOrgLimit
+        ? e.response.data.details
+        : extractErrorMessage(e, "Failed to create organization")
+      );
+    }
     finally { setLoading(false); }
   };
 
   return (
     <Dialog open={open} onClose={onClose} title="Create Organization">
       <div className="space-y-4">
-        {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2"><AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" /><span>{error}</span></div>}
+        {error && (
+          isQuotaError ? (
+            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg text-sm leading-relaxed shadow-sm">
+              <strong className="block text-amber-600 dark:text-amber-500 font-bold mb-1">Organization Limit Reached</strong>
+              <p className="text-amber-700/80 dark:text-amber-400/70">{error}</p>
+              <Link href="/pricing">
+                <Button variant="outline" size="sm" className="mt-3 font-semibold text-xs border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">
+                    <ArrowUpRight className="w-3.5 h-3.5 mr-1.5" /> View Plans & Upgrade
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" /><span>{error}</span>
+            </div>
+          )
+        )}
         <div className="space-y-2">
           <label className="text-sm font-medium">Organization Name</label>
           <Input value={name} onChange={(e) => handleNameChange(e.target.value)} placeholder="Acme Inc" maxLength={100} />
