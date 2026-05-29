@@ -108,7 +108,7 @@ export default function FeaturePage({ feature }: FeaturePageProps) {
                     size="lg"
                     className="h-14 px-8 text-lg rounded-full shadow-primary/20 shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center"
                   >
-                    {user ? "Go to Dashboard" : "Start for free"}
+                    Get Started
                   </Button>
                 </Link>
                 <Link href="/demo" target="_blank">
