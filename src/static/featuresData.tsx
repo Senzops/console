@@ -10,7 +10,6 @@ import {
   LayoutTemplate,
   BellRing,
   AlertOctagon,
-  ChartNoAxesCombined,
   Bot,
   Zap,
   CheckCircle2,
@@ -19,89 +18,184 @@ import {
   MousePointerClick,
   Layout,
   Layers,
+  Mail,
+  ArrowUpRight,
+  TrendingUp,
 } from "lucide-react";
 
 // ============================================================================
-// 1. ENTERPRISE DIAGRAM ABSTRACTIONS (Pure CSS/Tailwind)
+// TYPES
 // ============================================================================
 
-// Reusable 3D Tilted Card Wrapper (Removed border-t-4)
-const TiltedCard = ({ color, innerClassName = "", children }: any) => {
-  const colorMap: Record<string, { back: string; front: string }> = {
-    teal: {
-      back: "from-teal-500/30 border-teal-500/30",
-      front: "from-teal-500/10",
-    },
-    orange: {
-      back: "from-orange-500/30 border-orange-500/30",
-      front: "from-orange-500/10",
-    },
-    blue: {
-      back: "from-blue-500/30 border-blue-500/30",
-      front: "from-blue-500/10",
-    },
-    emerald: {
-      back: "from-emerald-500/30 border-emerald-500/30",
-      front: "from-emerald-500/10",
-    },
-    indigo: {
-      back: "from-indigo-500/30 border-indigo-500/30",
-      front: "from-indigo-500/10",
-    },
-    violet: {
-      back: "from-violet-500/30 border-violet-500/30",
-      front: "from-violet-500/10",
-    },
-    red: {
-      back: "from-red-500/30 border-red-500/30",
-      front: "from-red-500/10",
-    },
-    slate: {
-      back: "from-slate-500/30 border-slate-500/30",
-      front: "from-slate-500/10",
-    },
-    pink: {
-      back: "from-pink-500/30 border-pink-500/30",
-      front: "from-pink-500/10",
-    },
-    cyan: {
-      back: "from-cyan-500/30 border-cyan-500/30",
-      front: "from-cyan-500/10",
-    },
-    green: {
-      back: "from-green-500/30 border-green-500/30",
-      front: "from-green-500/10",
-    },
-    rose: {
-      back: "from-rose-500/30 border-rose-500/30",
-      front: "from-rose-500/10",
-    },
-    fuchsia: {
-      back: "from-fuchsia-500/30 border-fuchsia-500/30",
-      front: "from-fuchsia-500/10",
-    },
-  };
+export interface FeatureData {
+  readonly id: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly description: string;
+  readonly points: readonly string[];
+  readonly diagramId: string;
+  readonly href: string;
+  readonly colorClasses: string;
+}
 
-  const c = colorMap[color] || colorMap.blue;
+// ============================================================================
+// DIAGRAM PRIMITIVES — Reusable building blocks mirroring the actual product UI
+// ============================================================================
 
-  return (
-    <div className="relative w-full h-full group z-10">
-      {/* 3D Offset Back Layer */}
-      <div
-        className={`absolute inset-0 bg-gradient-to-br ${c.back} to-transparent rounded-xl transform rotate-3 translate-x-2 translate-y-3 border shadow-md transition-all duration-500 group-hover:rotate-6 group-hover:translate-x-4 group-hover:translate-y-5 -z-10`}
-      />
+/** Status badge style presets matching the real Senzor dashboard */
+const BADGE_STYLE = {
+  online: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+  live: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+  active: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
+  tracking: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  custom: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+  armed: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  duration: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+  uptime: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+} as const;
 
-      {/* Main Front Layer (Removed border-t-4) */}
-      <div
-        className={`w-full h-full bg-card border border-border/50 rounded-xl shadow-sm relative z-10 bg-gradient-to-br to-background flex flex-col ${c.front} ${innerClassName}`}
-      >
-        {children}
-      </div>
+/** Clean card frame matching the real product dashboard cards */
+const DiagramFrame = ({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <div
+    className={`w-full h-full bg-card border border-border/50 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow duration-300 ${className}`}
+  >
+    {children}
+  </div>
+);
+
+/** Card header bar with title, optional leading icon, and status badge */
+const FrameHeader = ({
+  title,
+  icon,
+  badge,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  badge?: { label: string; style: string; pulse?: boolean };
+}) => (
+  <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/20 shrink-0">
+    <div className="flex items-center gap-2 min-w-0">
+      {icon}
+      <span className="text-xs font-semibold font-mono text-foreground truncate">
+        {title}
+      </span>
     </div>
+    {badge && (
+      <span
+        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border inline-flex items-center gap-1.5 shrink-0 ${badge.style}`}
+      >
+        {badge.pulse && <PulseDot />}
+        {badge.label}
+      </span>
+    )}
+  </div>
+);
+
+/** Animated pulsing dot for live/active status indicators */
+const PulseDot = ({ className }: { className?: string } = {}) => {
+  const bg = className || "bg-[currentColor]";
+  return (
+    <span className="relative flex h-1.5 w-1.5 shrink-0">
+      <span
+        className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${bg}`}
+      />
+      <span
+        className={`relative inline-flex rounded-full h-1.5 w-1.5 ${bg}`}
+      />
+    </span>
   );
 };
 
-const VIEW_COLORS = [
+/** Progress bar metric row — mirrors CPU/Memory/Disk rows in server dashboard */
+const MetricRow = ({
+  label,
+  value,
+  percent,
+  barClass,
+  valueClass,
+  delay = 0,
+}: {
+  label: string;
+  value: string;
+  percent: number;
+  barClass: string;
+  valueClass: string;
+  delay?: number;
+}) => (
+  <div className="space-y-1.5">
+    <div className="flex justify-between text-xs font-mono text-muted-foreground">
+      <span>{label}</span>
+      <span className={`font-bold ${valueClass}`}>{value}</span>
+    </div>
+    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full origin-left animate-[diag-fill-x_0.8s_ease-out_both] ${barClass}`}
+        style={{ width: `${percent}%`, animationDelay: `${delay}s` }}
+      />
+    </div>
+  </div>
+);
+
+/** Compact stat card for metric grids — mirrors the ApmView stat cards */
+const StatCard = ({
+  label,
+  value,
+  valueClass = "text-foreground",
+  icon,
+  trend,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+  icon?: React.ReactNode;
+  trend?: { value: string; positive: boolean };
+}) => (
+  <div className="bg-background border border-border/50 rounded-lg p-2.5 flex flex-col gap-1 shadow-sm">
+    <div className="flex items-center gap-1.5">
+      {icon}
+      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+        {label}
+      </span>
+    </div>
+    <div className="flex items-end gap-1.5">
+      <span
+        className={`text-lg font-bold font-mono leading-none ${valueClass}`}
+      >
+        {value}
+      </span>
+      {trend && (
+        <span
+          className={`text-[8px] font-bold flex items-center gap-0.5 mb-0.5 ${trend.positive ? "text-emerald-500" : "text-red-500"}`}
+        >
+          <ArrowUpRight
+            className={`w-2.5 h-2.5 ${!trend.positive ? "rotate-90" : ""}`}
+          />
+          {trend.value}
+        </span>
+      )}
+    </div>
+  </div>
+);
+
+/** Shimmer overlay that sweeps across a container for a polished live-data feel */
+const ShimmerOverlay = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-xl">
+    <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-foreground/[0.03] to-transparent animate-[diag-shimmer_4s_ease-in-out_infinite]" />
+  </div>
+);
+
+// ============================================================================
+// DIAGRAM DATA CONSTANTS
+// ============================================================================
+
+const TRAFFIC_HEIGHTS = [40, 70, 45, 90, 65, 80, 55];
+const TRAFFIC_COLORS = [
   "bg-teal-500",
   "bg-blue-500",
   "bg-indigo-500",
@@ -110,133 +204,288 @@ const VIEW_COLORS = [
   "bg-fuchsia-500",
   "bg-rose-500",
 ];
+
+const QUERY_LATENCIES = [12, 15, 14, 45, 80, 22, 14, 13, 15, 12, 110, 14, 12];
+
+const TRACE_SPANS = [
+  {
+    offset: 0,
+    width: 100,
+    bg: "bg-blue-500/15",
+    border: "border-blue-500/30",
+    text: "text-blue-600 dark:text-blue-400",
+    label: "GET /api/checkout/process",
+  },
+  {
+    offset: 10,
+    width: 25,
+    bg: "bg-orange-500/15",
+    border: "border-orange-500/30",
+    text: "text-orange-600 dark:text-orange-400",
+    label: "AUTH.validateToken",
+  },
+  {
+    offset: 35,
+    width: 15,
+    bg: "bg-purple-500/15",
+    border: "border-purple-500/30",
+    text: "text-purple-600 dark:text-purple-400",
+    label: "CACHE.getSession",
+  },
+  {
+    offset: 50,
+    width: 35,
+    bg: "bg-blue-500/15",
+    border: "border-blue-500/30",
+    text: "text-blue-600 dark:text-blue-400",
+    label: "DB.query.users",
+  },
+  {
+    offset: 55,
+    width: 15,
+    bg: "bg-emerald-500/15",
+    border: "border-emerald-500/30",
+    text: "text-emerald-600 dark:text-emerald-400",
+    label: "HTTP /stripe/charge",
+  },
+  {
+    offset: 85,
+    width: 10,
+    bg: "bg-indigo-500/15",
+    border: "border-indigo-500/30",
+    text: "text-indigo-600 dark:text-indigo-400",
+    label: "PUBLISH.event",
+  },
+];
+
+const RUM_WATERFALL = [
+  {
+    label: "document",
+    offset: 0,
+    width: 55,
+    bg: "bg-blue-500/20",
+    border: "border-blue-500/30",
+    text: "text-blue-600 dark:text-blue-400",
+  },
+  {
+    label: "styles.css",
+    offset: 12,
+    width: 22,
+    bg: "bg-emerald-500/20",
+    border: "border-emerald-500/30",
+    text: "text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    label: "app.js",
+    offset: 18,
+    width: 42,
+    bg: "bg-amber-500/20",
+    border: "border-amber-500/30",
+    text: "text-amber-600 dark:text-amber-400",
+  },
+  {
+    label: "/api/user",
+    offset: 38,
+    width: 30,
+    bg: "bg-purple-500/20",
+    border: "border-purple-500/30",
+    text: "text-purple-600 dark:text-purple-400",
+  },
+  {
+    label: "fonts.woff2",
+    offset: 48,
+    width: 20,
+    bg: "bg-pink-500/20",
+    border: "border-pink-500/30",
+    text: "text-pink-600 dark:text-pink-400",
+  },
+];
+
+const OTEL_SERVICES = [
+  {
+    label: "Go Service",
+    color: "text-blue-500",
+    hoverBorder: "hover:border-blue-500/50",
+  },
+  {
+    label: "Java Service",
+    color: "text-orange-500",
+    hoverBorder: "hover:border-orange-500/50",
+  },
+  {
+    label: "Python Worker",
+    color: "text-yellow-500",
+    hoverBorder: "hover:border-yellow-500/50",
+  },
+];
+
+const MCP_ORBIT_NODES: {
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  pos: string;
+}[] = [
+  { icon: Database, color: "text-blue-500", pos: "top-[12%] left-[18%]" },
+  { icon: Server, color: "text-emerald-500", pos: "bottom-[18%] left-[12%]" },
+  { icon: Globe, color: "text-pink-500", pos: "top-[8%] right-[22%]" },
+  {
+    icon: Workflow,
+    color: "text-indigo-500",
+    pos: "bottom-[12%] right-[18%]",
+  },
+  { icon: Code, color: "text-orange-500", pos: "top-[42%] left-[6%]" },
+  {
+    icon: LayoutTemplate,
+    color: "text-teal-500",
+    pos: "top-[42%] right-[6%]",
+  },
+  { icon: BellRing, color: "text-rose-500", pos: "bottom-[38%] right-[25%]" },
+  { icon: Terminal, color: "text-amber-500", pos: "bottom-[35%] left-[25%]" },
+];
+
+// ============================================================================
+// ENTERPRISE DIAGRAM COMPONENTS — Each mirrors the actual Senzor dashboard
+// ============================================================================
+
+/** Saved Views — Mini dashboard canvas with stat cards, bar chart, and donut */
 const DiagramViews = () => (
-  <TiltedCard color="teal" innerClassName="p-4 gap-3">
-    <div className="flex-1 grid grid-cols-3 gap-3">
-      <div className="col-span-2 row-span-2 bg-background border border-border/50 rounded-lg p-3 flex flex-col shadow-sm">
-        <div className="w-24 bg-background text-muted-foreground rounded mb-4 p-1 text-xs">7day Traffic</div>
-        <div className="flex-1 flex items-end gap-1.5 opacity-90">
-          {[40, 70, 45, 90, 65, 80, 30].map((h, i) => (
+  <DiagramFrame className="relative">
+    <ShimmerOverlay />
+    <FrameHeader
+      title="Production Overview"
+      badge={{ label: "CUSTOM", style: BADGE_STYLE.custom }}
+    />
+    <div className="flex-1 p-3 grid grid-cols-3 grid-rows-[auto_1fr] gap-2.5">
+      <StatCard
+        label="Requests"
+        value="14.2k"
+        icon={<Zap className="w-3 h-3 text-orange-500" />}
+        trend={{ value: "12%", positive: true }}
+      />
+      <StatCard
+        label="Error Rate"
+        value="0.4%"
+        valueClass="text-emerald-500"
+        icon={<AlertOctagon className="w-3 h-3 text-red-500" />}
+        trend={{ value: "0.1%", positive: false }}
+      />
+      <StatCard
+        label="Avg Latency"
+        value="124ms"
+        valueClass="text-blue-500"
+        icon={<Activity className="w-3 h-3 text-blue-500" />}
+        trend={{ value: "8ms", positive: false }}
+      />
+
+      {/* 7-Day Traffic bar chart with grow animation */}
+      <div className="col-span-2 bg-background border border-border/50 rounded-lg p-3 flex flex-col shadow-sm">
+        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+          7-Day Traffic
+        </span>
+        <div className="flex-1 flex items-end gap-1.5">
+          {TRAFFIC_HEIGHTS.map((h, i) => (
             <div
               key={i}
-              className={`flex-1 ${VIEW_COLORS[i]} rounded-t-sm transition-all`}
-              style={{ height: `${h}%` }}
+              className={`flex-1 ${TRAFFIC_COLORS[i]} rounded-t-sm opacity-80 hover:opacity-100 transition-opacity origin-bottom animate-[diag-bar-grow_0.6s_ease-out_both]`}
+              style={{
+                height: `${h}%`,
+                animationDelay: `${i * 0.08}s`,
+              }}
             />
           ))}
         </div>
       </div>
-      <div className="col-span-1 bg-background border border-border/50 rounded-lg p-3 flex flex-col items-center justify-center shadow-sm relative">
-        <div className="relative w-16 h-16">
+
+      {/* Uptime donut */}
+      <div className="col-span-1 bg-background border border-border/50 rounded-lg p-3 flex flex-col items-center justify-center shadow-sm">
+        <div className="relative w-14 h-14">
           <svg
             viewBox="0 0 36 36"
-            className="w-full h-full stroke-teal-500 fill-transparent"
-            strokeWidth="4"
-            strokeDasharray="75 100"
+            className="w-full h-full fill-transparent"
+            strokeWidth="3.5"
             strokeLinecap="round"
           >
             <circle cx="18" cy="18" r="16" className="stroke-muted" />
-            <circle cx="18" cy="18" r="16" />
+            <circle
+              cx="18"
+              cy="18"
+              r="16"
+              className="stroke-teal-500"
+              strokeDasharray="75 100"
+              style={{
+                strokeDashoffset: 75,
+                animation: "diag-line-draw 1.2s ease-out 0.3s forwards",
+              }}
+            />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-teal-600 dark:text-teal-400">
             75%
           </div>
         </div>
-      </div>
-      <div className="col-span-1 bg-background border border-border/50 rounded-lg p-3 flex flex-col items-center justify-center shadow-sm relative">
-        <div className="relative w-16 h-16">
-          <svg
-            viewBox="0 0 36 36"
-            className="w-full h-full stroke-red-500 fill-transparent"
-            strokeWidth="4"
-            strokeDasharray="75 100"
-            strokeLinecap="round"
-          >
-            <circle cx="18" cy="18" r="16" className="stroke-muted" />
-            <circle cx="18" cy="18" r="16" />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-600 dark:text-red-400">
-            75%
-          </div>
-        </div>
+        <span className="text-[8px] text-muted-foreground font-bold mt-1 uppercase tracking-wider">
+          Uptime
+        </span>
       </div>
     </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
+/** APM — Trace waterfall with animated span bars and type colors */
 const DiagramApm = () => (
-  <TiltedCard color="orange" innerClassName="p-4 gap-1.5 overflow-hidden">
-    <div className="flex justify-between border-b border-border/40 pb-2 mb-2">
-      <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-        Trace: a8f9c0e2...
-      </span>
-      <span className="text-[10px] font-mono text-orange-600 dark:text-orange-400 font-bold">
-        124.5ms
-      </span>
+  <DiagramFrame>
+    <FrameHeader
+      title="Trace: a8f9c0e2..."
+      badge={{ label: "124.5ms", style: BADGE_STYLE.duration }}
+    />
+    <div className="flex-1 p-4 flex flex-col gap-2 justify-center overflow-hidden">
+      {TRACE_SPANS.map((span, i) => (
+        <div key={i} className="relative h-[22px] w-full flex items-center">
+          <div
+            className={`absolute h-[18px] ${span.bg} ${span.border} border rounded-sm origin-left animate-[diag-fill-x_0.5s_ease-out_both]`}
+            style={{
+              left: `${span.offset}%`,
+              width: `${span.width}%`,
+              animationDelay: `${i * 0.1}s`,
+            }}
+          />
+          <span
+            className={`absolute text-[10px] font-mono font-bold ${span.text} truncate animate-[diag-fade-in-up_0.3s_ease-out_both]`}
+            style={{
+              left: `${span.offset + 2}%`,
+              maxWidth: `${Math.max(span.width - 4, 0)}%`,
+              animationDelay: `${i * 0.1 + 0.2}s`,
+            }}
+          >
+            {span.label}
+          </span>
+        </div>
+      ))}
     </div>
-    <div className="relative h-5 w-full flex items-center">
-      <div className="absolute left-0 h-4 w-full bg-blue-500/10 border border-blue-500/30 rounded-sm" />
-      <span className="absolute left-2 text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 truncate max-w-[90%]">
-        GET /api/checkout/process_payment
-      </span>
-    </div>
-    <div className="relative h-5 w-full flex items-center mt-1">
-      <div className="absolute left-[10%] h-4 w-[25%] bg-orange-500/10 border border-orange-500/30 rounded-sm" />
-      <span className="absolute left-[12%] text-[10px] font-mono font-bold text-orange-600 dark:text-orange-400 truncate max-w-[23%]">
-        AUTH.validateToken
-      </span>
-    </div>
-    <div className="relative h-5 w-full flex items-center mt-1">
-      <div className="absolute left-[35%] h-4 w-[15%] bg-purple-500/10 border border-purple-500/30 rounded-sm" />
-      <span className="absolute left-[37%] text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400 truncate max-w-[13%]">
-        CACHE.getSession
-      </span>
-    </div>
-    <div className="relative h-5 w-full flex items-center mt-1">
-      <div className="absolute left-[50%] h-4 w-[40%] bg-emerald-500/10 border border-emerald-500/30 rounded-sm" />
-      <span className="absolute left-[52%] text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate max-w-[38%]">
-        DB.query.users_and_preferences
-      </span>
-    </div>
-    <div className="relative h-5 w-full flex items-center mt-1">
-      <div className="absolute left-[55%] h-4 w-[15%] bg-blue-500/10 border border-blue-500/30 rounded-sm" />
-      <span className="absolute left-[57%] text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 truncate max-w-[13%]">
-        fetch(/stripe/charge)
-      </span>
-    </div>
-    <div className="relative h-5 w-full flex items-center mt-1">
-      <div className="absolute left-[70%] h-4 w-[10%] bg-indigo-500/10 border border-indigo-500/30 rounded-sm" />
-      <span className="absolute left-[72%] text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 truncate max-w-[8%]">
-        PUBLISH.topic
-      </span>
-    </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
+/** OpenTelemetry — Service→Collector ingestion flow with animated data dots */
 const DiagramOTel = () => (
-  <TiltedCard
-    color="blue"
-    innerClassName="p-6 items-center justify-center relative overflow-hidden"
-  >
-    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+  <DiagramFrame className="relative">
+    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:20px_20px]" />
 
-    <div className="flex w-full items-center justify-between relative z-10 max-w-sm mx-auto">
-      {/* Left Nodes */}
-      <div className="flex flex-col gap-4">
-        <div className="px-3 py-1.5 bg-background border border-border rounded-md text-[10px] font-mono font-bold shadow-sm flex items-center gap-2 hover:border-blue-500/50 transition-colors">
-          <Box className="w-3 h-3 text-blue-500" /> Go Service
-        </div>
-        <div className="px-3 py-1.5 bg-background border border-border rounded-md text-[10px] font-mono font-bold shadow-sm flex items-center gap-2 hover:border-orange-500/50 transition-colors">
-          <Box className="w-3 h-3 text-orange-500" /> Java Service
-        </div>
-        <div className="px-3 py-1.5 bg-background border border-border rounded-md text-[10px] font-mono font-bold shadow-sm flex items-center gap-2 hover:border-yellow-500/50 transition-colors">
-          <Box className="w-3 h-3 text-yellow-500" /> Python Worker
-        </div>
+    <div className="flex-1 flex w-full items-center justify-between px-6 relative z-10 max-w-sm mx-auto">
+      {/* Service nodes */}
+      <div className="flex flex-col gap-3.5">
+        {OTEL_SERVICES.map((svc, i) => (
+          <div
+            key={i}
+            className={`px-3 py-1.5 bg-background border border-border rounded-md text-[10px] font-mono font-bold shadow-sm flex items-center gap-2 transition-colors hover:shadow-md ${svc.hoverBorder} animate-[diag-fade-in-up_0.4s_ease-out_both]`}
+            style={{ animationDelay: `${i * 0.12}s` }}
+          >
+            <Box className={`w-3 h-3 ${svc.color}`} /> {svc.label}
+          </div>
+        ))}
       </div>
 
-      {/* Lines */}
-      <div className="flex-1 flex flex-col justify-center items-center opacity-40">
+      {/* Dashed connection lines with animated flow dots */}
+      <div className="flex-1 flex flex-col justify-center items-center mx-2 relative">
         <svg
-          className="w-full h-24 text-blue-500"
+          className="w-full h-24 text-blue-500 opacity-30"
           preserveAspectRatio="none"
           viewBox="0 0 100 96"
         >
@@ -264,420 +513,674 @@ const DiagramOTel = () => (
         </svg>
       </div>
 
-      {/* Right Node (Ingestion) */}
-      <div className="px-4 py-3 bg-blue-600 border border-blue-500 rounded-lg shadow-lg shadow-blue-500/20 flex flex-col items-center gap-1 text-white">
-        <Activity className="w-5 h-5 text-white" />
+      {/* OTLP Ingest collector */}
+      <div className="px-4 py-3 bg-blue-600 border border-blue-500 rounded-lg shadow-lg shadow-blue-500/20 flex flex-col items-center gap-1 text-white animate-[diag-fade-in-up_0.5s_ease-out_both]">
+        <Activity className="w-5 h-5" />
         <span className="text-[10px] font-bold tracking-wider">
           OTLP INGEST
         </span>
       </div>
     </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
+/** Infrastructure — Server monitoring with animated progress bars and sparkline */
 const DiagramInfra = () => (
-  <TiltedCard color="emerald" innerClassName="p-5 gap-5">
-    <div className="flex justify-between items-center border-b border-border/40 pb-3">
-      <div className="flex items-center gap-2">
-        <Server className="w-4 h-4 text-emerald-500" />
-        <span className="text-sm font-bold font-mono">prod-database-01</span>
+  <DiagramFrame className="relative">
+    <ShimmerOverlay />
+    <FrameHeader
+      title="prod-database-01"
+      icon={<Server className="w-3.5 h-3.5 text-emerald-500" />}
+      badge={{ label: "ONLINE", style: BADGE_STYLE.online, pulse: true }}
+    />
+    <div className="flex-1 p-4 flex flex-col gap-3.5 justify-center">
+      <MetricRow
+        label="CPU Load"
+        value="82%"
+        percent={82}
+        barClass="bg-orange-500"
+        valueClass="text-orange-500"
+        delay={0}
+      />
+      <MetricRow
+        label="Memory (RAM)"
+        value="4.2 / 8 GB"
+        percent={52}
+        barClass="bg-blue-500"
+        valueClass="text-blue-500"
+        delay={0.1}
+      />
+      <MetricRow
+        label="Disk Usage"
+        value="45%"
+        percent={45}
+        barClass="bg-emerald-500"
+        valueClass="text-emerald-500"
+        delay={0.2}
+      />
+
+      {/* Network I/O sparkline with draw animation */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-xs font-mono text-muted-foreground">
+          <span>Network I/O</span>
+          <span className="text-emerald-500 font-bold">15 MB/s</span>
+        </div>
+        <div className="h-8 w-full bg-emerald-500/5 rounded-md relative overflow-hidden border border-emerald-500/20">
+          <svg
+            className="absolute inset-0 w-full h-full"
+            preserveAspectRatio="none"
+            viewBox="0 0 100 32"
+          >
+            <path
+              d="M0,26 L10,22 L25,24 L40,12 L55,18 L70,8 L85,16 L100,6 L100,32 L0,32 Z"
+              fill="rgb(16,185,129)"
+              opacity="0.1"
+            />
+            <path
+              d="M0,26 L10,22 L25,24 L40,12 L55,18 L70,8 L85,16 L100,6"
+              stroke="rgb(16,185,129)"
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="200"
+              strokeDashoffset="200"
+              style={{
+                animation: "diag-line-draw 1.5s ease-out 0.4s forwards",
+              }}
+            />
+          </svg>
+        </div>
       </div>
-      <div className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">
-        ONLINE
+
+      {/* Top processes micro-table */}
+      <div className="flex gap-2 text-[9px] font-mono text-muted-foreground">
+        <div className="flex-1 flex items-center justify-between bg-muted/30 px-2 py-1 rounded border border-border/30">
+          <span className="truncate">nginx</span>
+          <span className="text-orange-500 font-bold">34%</span>
+        </div>
+        <div className="flex-1 flex items-center justify-between bg-muted/30 px-2 py-1 rounded border border-border/30">
+          <span className="truncate">mongod</span>
+          <span className="text-blue-500 font-bold">28%</span>
+        </div>
       </div>
     </div>
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs font-mono text-muted-foreground">
-        <span>CPU Load</span>
-        <span className="text-orange-500 font-bold">82%</span>
+  </DiagramFrame>
+);
+
+/** Database — Query latency profiling with animated threshold-colored bars */
+const DiagramDatabase = () => (
+  <DiagramFrame>
+    <FrameHeader
+      title="prod-mongo-01"
+      icon={<Database className="w-3.5 h-3.5 text-indigo-500" />}
+      badge={{ label: "ACTIVE", style: BADGE_STYLE.online, pulse: true }}
+    />
+    <div className="flex-1 p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+          Query Latency (ms)
+        </span>
+        <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
+          Last 1h
+        </span>
       </div>
-      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-        <div className="h-full bg-orange-500 w-[82%]" />
+
+      {/* Latency bars with grow animation and threshold line */}
+      <div className="flex-1 flex items-end gap-1.5 px-1 relative">
+        {/* Threshold line at 50ms */}
+        <div className="absolute left-0 right-0 border-t border-dashed border-orange-500/40 pointer-events-none z-10" style={{ bottom: "50%" }}>
+          <span className="absolute -top-3.5 right-0 text-[8px] font-mono text-orange-500/60">
+            50ms
+          </span>
+        </div>
+        {QUERY_LATENCIES.map((h, i) => (
+          <div
+            key={i}
+            className={`flex-1 rounded-t-sm opacity-80 hover:opacity-100 transition-opacity origin-bottom animate-[diag-bar-grow_0.5s_ease-out_both] ${
+              h > 50 ? "bg-orange-500" : "bg-indigo-500"
+            }`}
+            style={{
+              height: `${Math.min(h, 100)}%`,
+              animationDelay: `${i * 0.05}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="flex justify-between text-[10px] text-muted-foreground font-mono pt-2 border-t border-border/40">
+        <span>
+          Avg: <span className="text-indigo-500 font-bold">24ms</span>
+        </span>
+        <span>
+          Pool: <span className="text-foreground font-bold">42</span>
+        </span>
+        <span>
+          Max: <span className="text-orange-500 font-bold">110ms</span>
+        </span>
       </div>
     </div>
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs font-mono text-muted-foreground">
-        <span>Memory (RAM)</span>
-        <span className="text-blue-500 font-bold">45%</span>
+  </DiagramFrame>
+);
+
+/** Web Analytics — Full-width area chart with animated draw and stats */
+const DiagramWeb = () => (
+  <DiagramFrame className="relative">
+    <ShimmerOverlay />
+    <FrameHeader
+      title="senzor.dev"
+      icon={<Globe className="w-3.5 h-3.5 text-cyan-500" />}
+      badge={{ label: "TRACKING", style: BADGE_STYLE.tracking }}
+    />
+    <div className="flex-1 p-3 flex flex-col gap-2.5">
+      <div className="grid grid-cols-3 gap-2">
+        <StatCard
+          label="Visitors"
+          value="12.4k"
+          valueClass="text-cyan-500"
+          icon={<MousePointerClick className="w-3 h-3 text-cyan-500" />}
+          trend={{ value: "18%", positive: true }}
+        />
+        <StatCard
+          label="Pageviews"
+          value="45.2k"
+          valueClass="text-blue-500"
+          icon={<Layout className="w-3 h-3 text-blue-500" />}
+          trend={{ value: "9%", positive: true }}
+        />
+        <StatCard
+          label="Bounce"
+          value="32%"
+          valueClass="text-amber-500"
+          icon={<TrendingUp className="w-3 h-3 text-amber-500" />}
+        />
       </div>
-      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-        <div className="h-full bg-blue-500 w-[45%]" />
-      </div>
-    </div>
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs font-mono text-muted-foreground">
-        <span>Disk I/O</span>
-        <span className="text-emerald-500 font-bold">15 MB/s</span>
-      </div>
-      <div className="h-6 w-full bg-emerald-500/10 rounded-md relative overflow-hidden border border-emerald-500/20">
+
+      {/* Traffic trend — full-bleed area chart with line draw animation */}
+      <div className="flex-1 bg-background border border-border/50 rounded-lg relative overflow-hidden shadow-sm">
+        <span className="absolute top-2.5 left-3 text-[9px] font-bold text-muted-foreground uppercase tracking-wider z-10">
+          Traffic Trend
+        </span>
         <svg
           className="absolute inset-0 w-full h-full"
           preserveAspectRatio="none"
-          viewBox="0 0 100 24"
+          viewBox="0 0 200 80"
         >
+          <defs>
+            <linearGradient
+              id="diag-web-grad"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop
+                offset="0%"
+                stopColor="rgb(6,182,212)"
+                stopOpacity={0.3}
+              />
+              <stop
+                offset="100%"
+                stopColor="rgb(6,182,212)"
+                stopOpacity={0}
+              />
+            </linearGradient>
+          </defs>
           <path
-            d="M0,24 L20,15 L40,20 L60,5 L80,18 L100,10 L100,24 Z"
-            fill="hsl(var(--emerald-500))"
-            opacity="0.3"
+            d="M0,65 L20,58 L40,62 L60,48 L80,52 L100,38 L120,42 L140,28 L160,34 L180,20 L200,15 L200,80 L0,80 Z"
+            fill="url(#diag-web-grad)"
+          />
+          <path
+            d="M0,65 L20,58 L40,62 L60,48 L80,52 L100,38 L120,42 L140,28 L160,34 L180,20 L200,15"
+            stroke="rgb(6,182,212)"
+            strokeWidth="1"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="400"
+            strokeDashoffset="400"
+            style={{
+              animation: "diag-line-draw 2s ease-out 0.3s forwards",
+            }}
           />
         </svg>
       </div>
     </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
-const DiagramDatabase = () => (
-  <TiltedCard color="indigo" innerClassName="p-5">
-    <div className="flex items-center justify-between border-b border-border/40 pb-3 mb-4">
-      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-        Query Latency (ms)
-      </span>
-      <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
-        Last 1h
-      </span>
+/** RUM — Core Web Vitals + network waterfall with text inside spans */
+const DiagramRum = () => (
+  <DiagramFrame>
+    {/* Browser chrome header */}
+    <div className="h-7 bg-muted/40 border-b border-border/40 flex items-center px-3 gap-1.5 shrink-0">
+      <div className="w-2 h-2 rounded-full bg-red-400" />
+      <div className="w-2 h-2 rounded-full bg-yellow-400" />
+      <div className="w-2 h-2 rounded-full bg-emerald-400" />
+      <div className="flex-1 mx-3 h-4 bg-background/60 rounded-sm border border-border/30 px-2 flex items-center">
+        <span className="text-[8px] text-muted-foreground font-mono truncate">
+          https://app.example.com
+        </span>
+      </div>
     </div>
-    <div className="flex-1 flex items-end gap-2 px-2">
-      {[12, 15, 14, 45, 80, 22, 14, 13, 15, 12, 110, 14, 12].map((h, i) => (
-        <div
-          key={i}
-          className={`flex-1 rounded-t-sm transition-all ${h > 50 ? "bg-orange-500" : "bg-indigo-500"}`}
-          style={{ height: `${Math.min(h, 100)}%` }}
-        />
-      ))}
+
+    <div className="flex-1 p-3 flex flex-col gap-2">
+      {/* Core Web Vitals */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-background border border-border/50 rounded-lg p-2 text-center flex flex-col justify-center shadow-sm">
+          <span className="text-[8px] text-muted-foreground font-bold uppercase">
+            LCP
+          </span>
+          <span className="text-base font-bold text-emerald-500 font-mono">
+            1.2s
+          </span>
+          <span className="text-[7px] text-emerald-500 font-bold uppercase">
+            Good
+          </span>
+        </div>
+        <div className="bg-background border border-border/50 rounded-lg p-2 text-center flex flex-col justify-center shadow-sm">
+          <span className="text-[8px] text-muted-foreground font-bold uppercase">
+            CLS
+          </span>
+          <span className="text-base font-bold text-amber-500 font-mono">
+            0.14
+          </span>
+          <span className="text-[7px] text-amber-500 font-bold uppercase">
+            Fair
+          </span>
+        </div>
+        <div className="bg-background border border-border/50 rounded-lg p-2 text-center flex flex-col justify-center shadow-sm">
+          <span className="text-[8px] text-muted-foreground font-bold uppercase">
+            FID
+          </span>
+          <span className="text-base font-bold text-emerald-500 font-mono">
+            12ms
+          </span>
+          <span className="text-[7px] text-emerald-500 font-bold uppercase">
+            Good
+          </span>
+        </div>
+      </div>
+
+      {/* Network waterfall — text inside bars, like APM trace waterfall */}
+      <div className="flex-1 bg-background border border-border/50 rounded-lg p-2.5 flex flex-col shadow-sm overflow-hidden">
+        <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-wider mb-1.5">
+          Network Waterfall
+        </span>
+        <div className="flex-1 flex flex-col gap-1 justify-center">
+          {RUM_WATERFALL.map((span, i) => (
+            <div key={i} className="relative h-[18px] w-full flex items-center">
+              <div
+                className={`absolute h-[14px] ${span.bg} ${span.border} border rounded-sm origin-left animate-[diag-fill-x_0.5s_ease-out_both]`}
+                style={{
+                  left: `${span.offset}%`,
+                  width: `${span.width}%`,
+                  animationDelay: `${i * 0.08}s`,
+                }}
+              />
+              <span
+                className={`absolute text-[8px] font-mono font-bold ${span.text} truncate animate-[diag-fade-in-up_0.3s_ease-out_both]`}
+                style={{
+                  left: `${span.offset + 1.5}%`,
+                  maxWidth: `${Math.max(span.width - 3, 0)}%`,
+                  animationDelay: `${i * 0.08 + 0.15}s`,
+                }}
+              >
+                {span.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* JS Exception */}
+      <div className="bg-red-500/5 rounded-lg border border-red-500/20 p-2 flex items-center gap-2.5">
+        <AlertOctagon className="w-3.5 h-3.5 text-red-500 shrink-0" />
+        <div className="min-w-0 flex items-center gap-2">
+          <span className="text-[9px] font-bold text-red-600 dark:text-red-400">
+            TypeError
+          </span>
+          <span className="text-[9px] font-mono text-red-600/70 dark:text-red-400/70 truncate">
+            Cannot read properties of undefined
+          </span>
+        </div>
+      </div>
     </div>
-    <div className="flex justify-between text-[10px] text-muted-foreground font-mono mt-3 border-t border-border/40 pt-2">
-      <span className="text-indigo-600 dark:text-indigo-400">Avg: 24ms</span>
-      <span className="text-orange-500">Max: 110ms</span>
-    </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
+/** Background Tasks — Queue→Worker→Success flow with animated pipeline */
 const DiagramTasks = () => (
-  <TiltedCard
-    color="violet"
-    innerClassName="p-6 justify-center gap-6 relative overflow-hidden"
-  >
-    <div className="flex items-center justify-between w-full max-w-sm mx-auto relative z-10">
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-12 h-12 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center">
-          <Layers className="w-5 h-5 text-muted-foreground" />
+  <DiagramFrame>
+    <FrameHeader
+      title="worker-payments"
+      badge={{ label: "ACTIVE", style: BADGE_STYLE.active, pulse: true }}
+    />
+    <div className="flex-1 p-5 flex flex-col justify-center gap-5">
+      {/* Pipeline flow: Queue → Worker Node → Success */}
+      <div className="flex items-center justify-between w-full max-w-sm mx-auto relative">
+        <div className="flex flex-col items-center gap-1.5 animate-[diag-fade-in-up_0.4s_ease-out_both]">
+          <div className="w-11 h-11 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center">
+            <Layers className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <span className="text-[9px] font-bold text-muted-foreground uppercase">
+            Queue
+          </span>
         </div>
-        <span className="text-[10px] font-bold text-muted-foreground uppercase">
-          Queue
-        </span>
-      </div>
-      <div className="flex-1 h-px bg-border relative">
-        <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-t border-r border-border" />
+
+        <div className="flex-1 h-px bg-border mx-3 relative">
+          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-1.5 h-1.5 rotate-45 border-t border-r border-border" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <PulseDot className="bg-violet-500" />
+          </div>
+        </div>
+
+        {/* Accent Worker Node */}
+        <div className="flex flex-col items-center gap-1.5 animate-[diag-fade-in-up_0.4s_ease-out_both]" style={{ animationDelay: "0.15s" }}>
+          <div className="w-12 h-12 rounded-xl border border-violet-500 bg-violet-600 shadow-lg shadow-violet-500/20 flex items-center justify-center">
+            <Workflow className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-[9px] font-bold text-violet-500 uppercase">
+            Worker
+          </span>
+        </div>
+
+        <div className="flex-1 h-px bg-emerald-500/50 mx-3 relative">
+          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-1.5 h-1.5 rotate-45 border-t border-r border-emerald-500/50" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <PulseDot className="bg-emerald-500" />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-1.5 animate-[diag-fade-in-up_0.4s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
+          <div className="w-11 h-11 rounded-lg border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center shadow-sm">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+          </div>
+          <span className="text-[9px] font-bold text-emerald-500 uppercase">
+            Done
+          </span>
+        </div>
       </div>
 
-      {/* Accent Worker Node */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-14 h-14 rounded-xl border border-violet-500 bg-violet-600 shadow-lg shadow-violet-500/20 flex items-center justify-center z-10">
-          <Workflow className="w-6 h-6 text-white" />
-        </div>
-        <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase">
-          Worker Node
+      {/* Pipeline stats */}
+      <div className="w-full max-w-sm mx-auto flex justify-between px-3 py-2 text-[10px] font-mono text-muted-foreground bg-background border border-border/50 shadow-sm rounded-md animate-[diag-fade-in-up_0.4s_ease-out_both]" style={{ animationDelay: "0.4s" }}>
+        <span>
+          Depth: <span className="text-foreground font-bold">42</span>
         </span>
-      </div>
-
-      <div className="flex-1 h-px bg-emerald-500/50 relative">
-        <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-t border-r border-emerald-500/50" />
-      </div>
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-12 h-12 rounded-lg border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center shadow-sm">
-          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-        </div>
-        <span className="text-[10px] font-bold text-emerald-500 uppercase">
-          Success
+        <span>
+          Delay: <span className="text-foreground font-bold">1.2s</span>
         </span>
+        <span className="text-emerald-500 font-bold">99.9% OK</span>
       </div>
     </div>
-    <div className="w-full max-w-sm mx-auto flex justify-between px-3 py-2 text-[10px] font-mono text-muted-foreground bg-background border border-border/50 shadow-sm rounded-md">
-      <span>
-        Depth: <span className="text-foreground font-bold">42</span>
-      </span>
-      <span>
-        Delay: <span className="text-foreground font-bold">1.2s</span>
-      </span>
-      <span className="text-emerald-500 font-bold">99.9% OK</span>
-    </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
+/** Global Error Tracking — Theme-compliant stack trace with error trend */
 const DiagramErrors = () => (
-  <TiltedCard color="red" innerClassName="!p-0 overflow-hidden">
-    <div className="bg-red-500/10 p-4 border-b border-red-500/20 flex flex-col gap-1.5 shrink-0">
-      <div className="flex justify-between items-start">
-        <span className="text-xs font-bold text-red-600 dark:text-red-400 font-mono bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 shadow-sm">
-          TypeError
-        </span>
-        <span className="text-[10px] text-red-600/70 dark:text-red-400/70 font-mono bg-red-500/5 px-2 py-0.5 rounded">
-          14 occurrences
-        </span>
+  <DiagramFrame>
+    {/* Error summary header with trend sparkline */}
+    <div className="bg-red-500/5 p-3.5 border-b border-red-500/20 flex flex-col gap-1.5 shrink-0">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-red-600 dark:text-red-400 font-mono bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
+            TypeError
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono bg-muted/50 px-2 py-0.5 rounded">
+            14 occurrences
+          </span>
+        </div>
       </div>
-      <span className="text-sm text-foreground font-medium truncate mt-1 px-1">
-        Cannot read properties of undefined (reading 'id')
+      <span className="text-sm text-foreground font-medium truncate px-0.5">
+        Cannot read properties of undefined (reading &apos;id&apos;)
       </span>
     </div>
-    <div className="p-4 bg-[#0d1117] flex-1 overflow-hidden border-t border-black/20">
+
+    {/* Stack trace — uses muted theme bg, not hardcoded dark */}
+    <div className="p-4 bg-muted/30 flex-1 overflow-hidden border-t border-border/20">
       <div className="text-[11px] font-mono leading-loose">
-        <div className="text-[#8b949e]">
-          at <span className="text-[#d2a8ff]">processData</span>{" "}
-          (/src/services/data.ts:<span className="text-[#79c0ff]">42</span>:
-          <span className="text-[#79c0ff]">15</span>)
+        <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.1s" }}>
+          at <span className="text-purple-500 dark:text-purple-400">processData</span>{" "}
+          (/src/services/data.ts:
+          <span className="text-blue-500 dark:text-blue-400">42</span>:
+          <span className="text-blue-500 dark:text-blue-400">15</span>)
         </div>
-        <div className="text-[#ff7b72] font-bold bg-[#ff7b72]/10 px-1 -mx-1 rounded border-l-2 border-[#ff7b72]">
-          at <span className="text-[#d2a8ff]">UserController.get</span>{" "}
-          (/src/controllers/user.ts:<span className="text-[#79c0ff]">18</span>:
-          <span className="text-[#79c0ff]">22</span>)
+        <div className="text-red-600 dark:text-red-400 font-bold bg-red-500/10 px-1.5 -mx-1.5 rounded border-l-2 border-red-500 dark:border-red-400 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.2s" }}>
+          at <span className="text-purple-500 dark:text-purple-400">UserController.get</span>{" "}
+          (/src/controllers/user.ts:
+          <span className="text-blue-500 dark:text-blue-400">18</span>:
+          <span className="text-blue-500 dark:text-blue-400">22</span>)
         </div>
-        <div className="text-[#8b949e]">
-          at <span className="text-[#d2a8ff]">Layer.handle</span>{" "}
+        <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
+          at <span className="text-purple-500 dark:text-purple-400">Layer.handle</span>{" "}
           (/node_modules/express/lib/router/layer.js:
-          <span className="text-[#79c0ff]">95</span>:
-          <span className="text-[#79c0ff]">5</span>)
+          <span className="text-blue-500 dark:text-blue-400">95</span>:
+          <span className="text-blue-500 dark:text-blue-400">5</span>)
         </div>
-        <div className="text-[#8b949e] opacity-50">
+        <div className="text-muted-foreground/60 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.4s" }}>
           at next (/node_modules/express/lib/router/route.js:144:13)
         </div>
       </div>
     </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
+/** Centralized Log Management — Theme-compliant live tail with animated entries */
 const DiagramLogs = () => (
-  <TiltedCard color="slate" innerClassName="!p-0 overflow-hidden !bg-[#0d1117]">
-    <div className="h-10 border-b border-white/10 px-4 flex items-center justify-between bg-[#161b22] shrink-0">
-      <div className="text-[11px] text-[#8b949e] font-mono flex items-center gap-2">
-        <Search className="w-3.5 h-3.5 text-[#79c0ff]" /> level:error OR
-        level:warn
+  <DiagramFrame>
+    {/* MQL search header */}
+    <div className="h-9 border-b border-border/40 px-4 flex items-center justify-between bg-muted/30 shrink-0">
+      <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-2">
+        <Search className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+        <span>level:error OR level:warn</span>
+        <span className="animate-pulse text-blue-500 dark:text-blue-400 font-bold">
+          |
+        </span>
       </div>
-      <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold tracking-wider border border-emerald-500/30">
+      <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold tracking-wider border border-emerald-500/20 inline-flex items-center gap-1.5">
+        <PulseDot className="bg-emerald-500" />
         LIVE TAIL
       </span>
     </div>
-    <div className="p-4 flex flex-col gap-2.5 flex-1 font-mono text-[11px]">
-      <div className="text-[#8b949e]">
-        <span className="text-[#79c0ff] mr-3">10:42:01.001</span>
-        <span className="text-[#3fb950] w-12 inline-block font-bold">
+
+    {/* Log lines — all theme-aware colors */}
+    <div className="p-4 flex flex-col gap-2 flex-1 font-mono text-[11px] bg-muted/10">
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.1s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-3">
+          10:42:01.001
+        </span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-12">
           INFO
         </span>{" "}
         User session validated
       </div>
-      <div className="text-[#8b949e]">
-        <span className="text-[#79c0ff] mr-3">10:42:05.421</span>
-        <span className="text-[#d2a8ff] w-12 inline-block font-bold">
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.2s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-3">
+          10:42:05.421
+        </span>
+        <span className="text-amber-600 dark:text-amber-400 font-bold inline-block w-12">
           WARN
         </span>{" "}
-        High latency detected on upstream API
+        High latency on upstream API
       </div>
-      <div className="text-[#c9d1d9] bg-[#f85149]/10 -mx-4 px-4 py-1 border-l-2 border-[#f85149]">
-        <span className="text-[#79c0ff] mr-3">10:42:09.912</span>
-        <span className="text-[#f85149] font-bold w-12 inline-block">
+      <div className="text-foreground bg-red-500/10 -mx-4 px-4 py-1 border-l-2 border-red-500 dark:border-red-400 animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-3">
+          10:42:09.912
+        </span>
+        <span className="text-red-600 dark:text-red-400 font-bold inline-block w-12">
           ERROR
         </span>{" "}
-        Database connection timeout on primary cluster
+        Database connection timeout
       </div>
-      <div className="text-[#8b949e]">
-        <span className="text-[#79c0ff] mr-3">10:42:11.001</span>
-        <span className="text-[#3fb950] w-12 inline-block font-bold">
+      <div className="text-muted-foreground animate-[diag-fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: "0.4s" }}>
+        <span className="text-blue-500 dark:text-blue-400 mr-3">
+          10:42:11.001
+        </span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold inline-block w-12">
           INFO
         </span>{" "}
         Connection pool rebuilt
       </div>
     </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
-const DiagramRum = () => (
-  <TiltedCard color="pink" innerClassName="!p-0 overflow-hidden">
-    <div className="h-8 bg-muted/40 border-b border-border/40 flex items-center px-3 gap-1.5 shrink-0">
-      <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-      <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-    </div>
-    <div className="p-4 flex-1 grid grid-cols-2 gap-3">
-      <div className="bg-card shadow-sm rounded-lg border border-border/50 p-2 text-center flex flex-col justify-center">
-        <span className="text-[9px] text-muted-foreground font-bold">LCP</span>
-        <span className="text-lg font-bold text-emerald-500">1.2s</span>
-      </div>
-      <div className="bg-card shadow-sm rounded-lg border border-border/50 p-2 text-center flex flex-col justify-center">
-        <span className="text-[9px] text-muted-foreground font-bold">CLS</span>
-        <span className="text-lg font-bold text-yellow-500">0.14</span>
-      </div>
-      <div className="col-span-2 bg-red-500/10 rounded-lg border border-red-500/30 p-2 flex items-center justify-center gap-2">
-        <div className="flex flex-col items-center justify-center min-w-0">
-          <span className="text-[9px] font-bold text-red-600 dark:text-red-400 uppercase">
-            JS Exception
-          </span>
-          <span className="text-[10px] font-mono text-red-600/80 dark:text-red-400/80 truncate">
-            TypeError: Cannot read properties
-          </span>
-        </div>
-      </div>
-    </div>
-  </TiltedCard>
-);
-
-const DiagramWeb = () => (
-  <TiltedCard color="cyan" innerClassName="p-5 gap-5">
-    <div className="flex gap-4">
-      <div className="flex-1 bg-cyan-500/10 p-3 rounded-lg border border-cyan-500/20 shadow-sm">
-        <div className="text-[10px] text-cyan-700 dark:text-cyan-400 uppercase tracking-widest font-bold mb-1">
-          Unique Visitors
-        </div>
-        <div className="text-2xl font-bold text-foreground">12.4k</div>
-      </div>
-      <div className="flex-1 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 shadow-sm">
-        <div className="text-[10px] text-blue-700 dark:text-blue-400 uppercase tracking-widest font-bold mb-1">
-          Pageviews
-        </div>
-        <div className="text-2xl font-bold text-foreground">45.2k</div>
-      </div>
-    </div>
-    <div className="flex-1 border rounded-md border-cyan-500/30 relative ml-2 mb-2">
-      <svg
-        className="absolute inset-0 w-full h-full"
-        preserveAspectRatio="none"
-        viewBox="0 0 100 60"
-      >
-        <defs>
-          <linearGradient id="webGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <path
-          d="M0,60 L0,40 L20,35 L40,45 L60,25 L80,30 L100,10 L100,60 Z"
-          fill="url(#webGrad)"
-        />
-        <path
-          d="M0,40 L20,35 L40,45 L60,25 L80,30 L100,10"
-          stroke="#06b6d4"
-          strokeWidth="0.5"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  </TiltedCard>
-);
-
+/** Uptime Monitoring — Animated status bars with response time sparkline */
 const DiagramUptime = () => (
-  <TiltedCard color="green" innerClassName="p-6 justify-center gap-6">
-    <div className="flex items-center justify-between">
-      <span className="text-sm font-bold font-mono text-foreground">
-        api.production.com
-      </span>
-      <span className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-md border border-emerald-500/20 font-bold shadow-sm">
-        99.9% UPTIME
-      </span>
+  <DiagramFrame className="relative">
+    <ShimmerOverlay />
+    <FrameHeader
+      title="api.production.com"
+      badge={{ label: "99.9% UP", style: BADGE_STYLE.uptime }}
+    />
+    <div className="flex-1 p-5 flex flex-col justify-center gap-4">
+      {/* 30-bar status grid with staggered grow animation */}
+      <div className="flex items-center gap-0.5 h-7 bg-muted/30 p-1 rounded-md">
+        {Array.from({ length: 30 }).map((_, i) => (
+          <div
+            key={i}
+            className={`flex-1 rounded-sm h-full origin-bottom animate-[diag-bar-grow_0.4s_ease-out_both] ${
+              i === 22
+                ? "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.4)]"
+                : "bg-emerald-500/70 hover:bg-emerald-500"
+            }`}
+            style={{ animationDelay: `${i * 0.02}s` }}
+          />
+        ))}
+      </div>
+
+      <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+        <span>24 hours ago</span>
+        <span>Now</span>
+      </div>
+
+      {/* Response time sparkline with draw animation */}
+      <div className="bg-background border border-border/50 rounded-lg p-3 shadow-sm">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+            Response Time
+          </span>
+          <span className="text-[10px] font-mono font-bold text-emerald-500">
+            142ms avg
+          </span>
+        </div>
+        <div className="h-8 relative">
+          <svg
+            className="w-full h-full"
+            preserveAspectRatio="none"
+            viewBox="0 0 100 32"
+          >
+            <path
+              d="M0,20 L8,18 L16,22 L24,16 L32,19 L40,14 L48,17 L56,10 L64,15 L72,12 L80,16 L88,8 L96,14 L100,11"
+              stroke="rgb(16,185,129)"
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="200"
+              strokeDashoffset="200"
+              style={{
+                animation: "diag-line-draw 1.5s ease-out 0.6s forwards",
+              }}
+            />
+          </svg>
+        </div>
+      </div>
     </div>
-    <div className="flex items-center gap-1 h-8 bg-card border border-border/40 p-1 rounded-md shadow-inner">
-      {Array.from({ length: 30 }).map((_, i) => (
+  </DiagramFrame>
+);
+
+/** Alerts & Incident Routing — Evaluation rule with animated routing */
+const DiagramAlerts = () => (
+  <DiagramFrame>
+    <FrameHeader
+      title="Alert Policy"
+      icon={<BellRing className="w-3.5 h-3.5 text-rose-500" />}
+      badge={{ label: "ARMED", style: BADGE_STYLE.armed }}
+    />
+    <div className="flex-1 p-4 flex flex-col items-center justify-center gap-3">
+      {/* Evaluation rule card */}
+      <div className="bg-rose-500/5 border border-rose-500/20 rounded-lg p-3 flex flex-col gap-1.5 w-full max-w-xs shadow-sm animate-[diag-fade-in-up_0.4s_ease-out_both]">
+        <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1.5">
+          Evaluation Rule
+        </span>
+        <div className="font-mono text-xs text-foreground">
+          COUNT(status == 500){" "}
+          <span className="text-rose-500 font-bold">{">"} 50</span>
+        </div>
+        <span className="text-[9px] text-muted-foreground font-mono bg-muted/50 w-fit px-1.5 py-0.5 rounded">
+          in the last 5 minutes
+        </span>
+      </div>
+
+      {/* Dashed trigger line with pulsing indicator */}
+      <div className="h-6 w-0 border-l-2 border-dashed border-rose-500/40 relative">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-card border border-rose-500/40 rounded-full flex items-center justify-center">
+          <PulseDot className="bg-rose-500" />
+        </div>
+      </div>
+
+      {/* Notification targets */}
+      <div className="flex justify-center gap-2.5 animate-[diag-fade-in-up_0.4s_ease-out_both]" style={{ animationDelay: "0.2s" }}>
+        <div className="bg-background border border-border/50 shadow-sm rounded-lg p-2 flex items-center gap-2 hover:shadow-md transition-shadow">
+          <div className="p-1 bg-blue-500/10 rounded">
+            <Globe className="w-3.5 h-3.5 text-blue-500" />
+          </div>
+          <span className="text-[10px] font-bold text-foreground">Slack</span>
+        </div>
+        <div className="bg-background border border-border/50 shadow-sm rounded-lg p-2 flex items-center gap-2 hover:shadow-md transition-shadow">
+          <div className="p-1 bg-orange-500/10 rounded">
+            <Terminal className="w-3.5 h-3.5 text-orange-500" />
+          </div>
+          <span className="text-[10px] font-bold text-foreground">
+            Webhook
+          </span>
+        </div>
+        <div className="bg-background border border-border/50 shadow-sm rounded-lg p-2 flex items-center gap-2 hover:shadow-md transition-shadow">
+          <div className="p-1 bg-rose-500/10 rounded">
+            <Mail className="w-3.5 h-3.5 text-rose-500" />
+          </div>
+          <span className="text-[10px] font-bold text-foreground">Email</span>
+        </div>
+      </div>
+    </div>
+  </DiagramFrame>
+);
+
+/** MCP Server — AI hub with connecting lines and animated glow */
+const DiagramMcp = () => (
+  <DiagramFrame className="relative">
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(192,132,252,0.06)_0%,transparent_70%)]" />
+
+    <div className="flex-1 flex items-center justify-center relative">
+      {/* Concentric orbital rings + central AI node */}
+      <div className="relative w-44 h-44 border border-fuchsia-500/15 rounded-full flex items-center justify-center border-dashed">
+        <div className="w-28 h-28 border border-fuchsia-500/25 rounded-full flex items-center justify-center">
+          <div className="w-14 h-14 bg-gradient-to-br from-fuchsia-600 to-indigo-600 border border-indigo-400/50 rounded-2xl flex items-center justify-center shadow-lg animate-[diag-glow-pulse_3s_ease-in-out_infinite]">
+            <Bot className="w-6 h-6 text-white" />
+          </div>
+        </div>
+      </div>
+
+      {/* Orbiting tool nodes */}
+      {MCP_ORBIT_NODES.map((node, i) => (
         <div
           key={i}
-          className={`flex-1 rounded-sm h-full ${i === 22 ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] z-10 relative" : "bg-emerald-500/80 hover:bg-emerald-500"}`}
-        />
+          className={`absolute bg-card border border-border/50 shadow-sm p-1.5 rounded-md hover:shadow-md transition-shadow animate-[diag-fade-in-up_0.3s_ease-out_both] ${node.pos}`}
+          style={{ animationDelay: `${i * 0.08}s` }}
+        >
+          <node.icon className={`w-3.5 h-3.5 ${node.color}`} />
+        </div>
       ))}
     </div>
-    <div className="flex justify-between text-[10px] text-muted-foreground font-mono uppercase tracking-widest">
-      <span>24 hours ago</span>
-      <span>Now</span>
-    </div>
-  </TiltedCard>
+  </DiagramFrame>
 );
 
-const DiagramAlerts = () => (
-  <TiltedCard
-    color="rose"
-    innerClassName="p-5 justify-center gap-4 relative overflow-hidden"
-  >
-    <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 flex flex-col gap-2 relative z-10 shadow-md mx-auto w-full max-w-sm">
-      <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-        <BellRing className="w-3 h-3" /> Evaluation Rule
-      </div>
-      <div className="font-mono text-xs text-foreground">
-        COUNT (status == 500){" "}
-        <span className="text-rose-500 font-bold">{">"} 50</span>
-      </div>
-      <div className="text-[10px] text-muted-foreground font-mono bg-background/50 w-fit px-1.5 py-0.5 rounded">
-        in the last 5 minutes
-      </div>
-    </div>
+// ============================================================================
+// DIAGRAM RENDERER
+// ============================================================================
 
-    <div className="flex justify-center my-1 relative z-0">
-      <div className="h-8 w-0 border-l-2 border-dashed border-rose-500/50 relative">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-background border border-rose-500/50 rounded-full flex items-center justify-center">
-          <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping" />
-          <div className="w-1.5 h-1.5 bg-rose-500 rounded-full absolute" />
-        </div>
-      </div>
-    </div>
-
-    <div className="flex justify-center gap-4 relative z-10">
-      <div className="bg-card border border-border/60 shadow-sm rounded-lg p-2.5 flex items-center gap-2">
-        <div className="p-1.5 bg-blue-500/10 rounded">
-          <Globe className="w-4 h-4 text-blue-500" />
-        </div>
-        <span className="text-xs font-bold text-foreground">Slack</span>
-      </div>
-      <div className="bg-card border border-border/60 shadow-sm rounded-lg p-2.5 flex items-center gap-2">
-        <div className="p-1.5 bg-orange-500/10 rounded">
-          <Terminal className="w-4 h-4 text-orange-500" />
-        </div>
-        <span className="text-xs font-bold text-foreground">Webhook</span>
-      </div>
-    </div>
-  </TiltedCard>
-);
-
-const DiagramMcp = () => (
-  <TiltedCard
-    color="fuchsia"
-    innerClassName="items-center justify-center relative overflow-hidden"
-  >
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--fuchsia-500)/0.05)_0%,transparent_70%)]" />
-
-    {/* Corrected: Removed absolute, letting flex naturally center the main node */}
-    <div className="relative w-48 h-48 border border-fuchsia-500/20 rounded-full flex items-center justify-center border-dashed">
-      <div className="w-32 h-32 border border-fuchsia-500/30 rounded-full flex items-center justify-center">
-        <div className="w-16 h-16 bg-gradient-to-br from-fuchsia-600 to-indigo-600 border border-indigo-400 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 z-10">
-          <Bot className="w-7 h-7 text-white" />
-        </div>
-      </div>
-    </div>
-
-    {/* Orbiting Nodes (Absolute positioned against the TiltedCard wrapper) */}
-    <div className="absolute top-[15%] left-[20%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <Database className="w-3.5 h-3.5 text-blue-500" />
-    </div>
-    <div className="absolute bottom-[20%] left-[15%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <Server className="w-3.5 h-3.5 text-emerald-500" />
-    </div>
-    <div className="absolute top-[10%] right-[25%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <Globe className="w-3.5 h-3.5 text-pink-500" />
-    </div>
-    <div className="absolute bottom-[15%] right-[20%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <Workflow className="w-3.5 h-3.5 text-indigo-500" />
-    </div>
-    <div className="absolute top-[40%] left-[8%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <Code className="w-3.5 h-3.5 text-orange-500" />
-    </div>
-    <div className="absolute top-[45%] right-[8%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <LayoutTemplate className="w-3.5 h-3.5 text-teal-500" />
-    </div>
-    <div className="absolute bottom-[40%] right-[28%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <BellRing className="w-3.5 h-3.5 text-destructive" />
-    </div>
-    <div className="absolute bottom-[35%] left-[28%] bg-card border border-border/60 shadow-sm p-1.5 rounded-md">
-      <Terminal className="w-3.5 h-3.5 text-yellow-500" />
-    </div>
-  </TiltedCard>
-);
-
-export const renderDiagram = (id: string) => {
+export const renderDiagram = (id: string): React.ReactNode => {
   switch (id) {
     case "views":
       return <DiagramViews />;
@@ -715,9 +1218,10 @@ export const renderDiagram = (id: string) => {
 };
 
 // ============================================================================
-// 2. FEATURE DATA DEFINITIONS
+// FEATURE DATA DEFINITIONS — Content unchanged, types hardened
 // ============================================================================
-export const FEATURES_DATA = [
+
+export const FEATURES_DATA: FeatureData[] = [
   {
     id: "views",
     title: "Saved Views",
