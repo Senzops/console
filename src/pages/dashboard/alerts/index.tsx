@@ -1,10 +1,11 @@
-import React, { useState, useMemo, createContext, useContext } from "react";
+import React, { useState, useRef, useMemo, createContext, useContext } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import { format, formatDistanceToNow } from "date-fns";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
 import {
+  cn,
   Card,
   CardContent,
   CardHeader,
@@ -40,6 +41,7 @@ import {
   VolumeX,
   Clock,
   Shield,
+  Calendar,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -640,7 +642,11 @@ const SilencesTable = ({
 export default function AlertsDashboard() {
   const router = useRouter();
   const { token } = useAuth();
-  const { isMono } = useTheme();
+  const { theme, isMono } = useTheme();
+  const colorScheme = (theme === 'dark' || theme === 'nord') ? 'dark' : 'light';
+  const isDark = theme === 'dark' || theme === 'nord';
+  const silenceStartRef = useRef<HTMLInputElement>(null);
+  const silenceEndRef = useRef<HTMLInputElement>(null);
 
   // --- Modals State ---
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
@@ -1239,32 +1245,74 @@ export default function AlertsDashboard() {
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Starts At</label>
-              <Input
-                type="datetime-local"
-                value={silenceForm.startsAt}
-                onChange={(e) =>
-                  setSilenceForm({ ...silenceForm, startsAt: e.target.value })
-                }
-                disabled={isSubmitting}
-                required
-                className="font-mono text-xs"
-              />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-muted-foreground">Starts At</label>
+              <div className="flex items-center gap-1">
+                <input
+                  ref={silenceStartRef}
+                  type="datetime-local"
+                  value={silenceForm.startsAt}
+                  onChange={(e) =>
+                    setSilenceForm({ ...silenceForm, startsAt: e.target.value })
+                  }
+                  disabled={isSubmitting}
+                  required
+                  style={{ colorScheme }}
+                  className={cn(
+                    'flex h-8 min-w-0 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                    'sm:[&::-webkit-calendar-picker-indicator]:hidden',
+                  )}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => { try { silenceStartRef.current?.showPicker(); } catch { silenceStartRef.current?.focus(); } }}
+                  className={cn(
+                    'hidden sm:flex items-center justify-center h-8 w-8 shrink-0 rounded-md border border-input bg-transparent transition-colors',
+                    'hover:bg-accent hover:text-accent-foreground',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  )}
+                >
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Ends At</label>
-              <Input
-                type="datetime-local"
-                value={silenceForm.endsAt}
-                onChange={(e) =>
-                  setSilenceForm({ ...silenceForm, endsAt: e.target.value })
-                }
-                disabled={isSubmitting}
-                required
-                className="font-mono text-xs"
-              />
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-muted-foreground">Ends At</label>
+              <div className="flex items-center gap-1">
+                <input
+                  ref={silenceEndRef}
+                  type="datetime-local"
+                  value={silenceForm.endsAt}
+                  onChange={(e) =>
+                    setSilenceForm({ ...silenceForm, endsAt: e.target.value })
+                  }
+                  disabled={isSubmitting}
+                  required
+                  style={{ colorScheme }}
+                  className={cn(
+                    'flex h-8 min-w-0 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                    'sm:[&::-webkit-calendar-picker-indicator]:hidden',
+                  )}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => { try { silenceEndRef.current?.showPicker(); } catch { silenceEndRef.current?.focus(); } }}
+                  className={cn(
+                    'hidden sm:flex items-center justify-center h-8 w-8 shrink-0 rounded-md border border-input bg-transparent transition-colors',
+                    'hover:bg-accent hover:text-accent-foreground',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  )}
+                >
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </div>
             </div>
           </div>
           <div className="space-y-3 pt-2 border-t border-border/40">
