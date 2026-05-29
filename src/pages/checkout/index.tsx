@@ -11,7 +11,8 @@ import {
   Spinner,
 } from "../../components/Core";
 import { useAuth, api } from "../../lib/auth";
-import { ShieldCheck, Lock, Loader2, ArrowLeft } from "lucide-react";
+import { useOrg } from "../../lib/org";
+import { ShieldCheck, Lock, Loader2, ArrowLeft, Building2, User } from "lucide-react";
 import { toast } from "sonner";
 import { NetworkBackground } from "../../components/NetworkBackground";
 import { useTheme } from "@/lib/theme";
@@ -38,6 +39,7 @@ const getGravatar = (email: string) =>
 export default function PaymentPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { activeOrg } = useOrg();
   const { theme } = useTheme();
 
   const [plans, setPlans] = useState<BackendPlan[]>([]);
@@ -45,6 +47,9 @@ export default function PaymentPage() {
   const [subChecked, setSubChecked] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [hasActiveSub, setHasActiveSub] = useState(false);
+
+  // Redirect target depends on whether we're billing for an org or personal account
+  const dashboardPath = activeOrg ? "/dashboard/organization" : "/dashboard/profile";
 
   // Synchronous initialization to avoid React set-state-in-effect cascading render warnings
   const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
@@ -183,16 +188,16 @@ export default function PaymentPage() {
         <div className="relative z-10 flex flex-col items-center p-8 bg-card/85 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl max-w-md text-center">
           <ShieldCheck className="h-8 w-8 text-emerald-500 mb-4" />
           <p className="text-foreground font-bold text-lg">
-            You Already Have an Active Plan
+            {activeOrg ? `${activeOrg.name} Already Has an Active Plan` : "You Already Have an Active Plan"}
           </p>
           <p className="text-muted-foreground text-sm mt-2 leading-relaxed">
-            To switch plans or change your billing interval, use the plan management option in your profile settings.
+            To switch plans or change your billing interval, use the plan management option in your {activeOrg ? "organization" : "profile"} settings.
           </p>
           <Button
             className="mt-6 font-bold"
-            onClick={() => router.push("/dashboard/profile")}
+            onClick={() => router.push(dashboardPath)}
           >
-            Go to Profile Settings
+            Go to {activeOrg ? "Organization" : "Profile"} Settings
           </Button>
         </div>
       </div>
@@ -234,22 +239,41 @@ export default function PaymentPage() {
                     </div>
                   </div>
 
-                  {/* User Account Indicator */}
+                  {/* Workspace Billing Indicator */}
                   <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 min-w-[220px]">
-                    <Avatar
-                      src={getGravatar(user.email || "")}
-                      fallback={
-                        user.email?.substring(0, 2).toUpperCase() || "US"
-                      }
-                    />
-                    <div className="flex flex-col text-left overflow-hidden">
-                      <span className="text-sm font-bold text-foreground leading-tight truncate">
-                        {user.displayName || "Senzor Account"}
-                      </span>
-                      <span className="text-xs font-medium text-muted-foreground leading-tight truncate">
-                        {user.email}
-                      </span>
-                    </div>
+                    {activeOrg ? (
+                      <>
+                        <Avatar
+                          src={getGravatar(activeOrg._id)}
+                          fallback={activeOrg.name.substring(0, 2).toUpperCase()}
+                        />
+                        <div className="flex flex-col text-left overflow-hidden">
+                          <span className="text-sm font-bold text-foreground leading-tight truncate">
+                            {activeOrg.name}
+                          </span>
+                          <span className="text-xs font-medium text-muted-foreground leading-tight truncate flex items-center gap-1">
+                            <Building2 className="w-3 h-3 shrink-0" /> Organization
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Avatar
+                          src={getGravatar(user.email || "")}
+                          fallback={
+                            user.email?.substring(0, 2).toUpperCase() || "US"
+                          }
+                        />
+                        <div className="flex flex-col text-left overflow-hidden">
+                          <span className="text-sm font-bold text-foreground leading-tight truncate">
+                            {user.displayName || "Senzor Account"}
+                          </span>
+                          <span className="text-xs font-medium text-muted-foreground leading-tight truncate flex items-center gap-1">
+                            <User className="w-3 h-3 shrink-0" /> Personal Account
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 

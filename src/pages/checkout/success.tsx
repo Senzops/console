@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import md5 from "md5";
 import { useAuth } from "../../lib/auth";
+import { useOrg } from "../../lib/org";
 import { Card, CardContent, Button, cn, Avatar } from "../../components/Core";
 import { NetworkBackground } from "../../components/NetworkBackground";
 import {
@@ -16,17 +17,63 @@ import {
   AlertCircle,
   Loader2,
   Clock,
+  Building2,
+  User,
 } from "lucide-react";
 
-const getGravatar = (email: string) =>
-  `https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?d=identicon`;
+const getGravatar = (identifier: string) =>
+  `https://www.gravatar.com/avatar/${md5(identifier.trim().toLowerCase())}?d=identicon`;
+
+/** Workspace identity chip — shows org or personal account context */
+function WorkspaceChip({ user, activeOrg }: { user: any; activeOrg: any }) {
+  if (!user) return null;
+  return (
+    <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 min-w-[220px] shrink-0">
+      {activeOrg ? (
+        <>
+          <Avatar
+            src={getGravatar(activeOrg._id)}
+            fallback={activeOrg.name.substring(0, 2).toUpperCase()}
+          />
+          <div className="flex flex-col text-left overflow-hidden">
+            <span className="text-sm font-bold text-foreground leading-tight truncate">
+              {activeOrg.name}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground leading-tight truncate flex items-center gap-1">
+              <Building2 className="w-3 h-3 shrink-0" /> Organization
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
+          <Avatar
+            src={getGravatar(user.email || "")}
+            fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
+          />
+          <div className="flex flex-col text-left overflow-hidden">
+            <span className="text-sm font-bold text-foreground leading-tight truncate">
+              {user.displayName || "Senzor Account"}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground leading-tight truncate flex items-center gap-1">
+              <User className="w-3 h-3 shrink-0" /> Personal Account
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function CheckoutOutcomePage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { activeOrg } = useOrg();
   const [isMounted, setIsMounted] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(10);
+
+  // Redirect target depends on whether we're in org context
+  const dashboardPath = activeOrg ? "/dashboard/organization" : "/dashboard/profile";
 
   useEffect(() => {
     setIsMounted(true);
@@ -47,7 +94,7 @@ export default function CheckoutOutcomePage() {
     if (status === "failed" || status === "pending" || status === "unknown") return;
 
     if (countdown <= 0) {
-      router.push("/dashboard/profile");
+      router.push(dashboardPath);
       return;
     }
 
@@ -60,7 +107,7 @@ export default function CheckoutOutcomePage() {
 
   useEffect(() => {
     if (!isMounted || status !== "unknown") return;
-    router.replace("/dashboard/profile");
+    router.replace(dashboardPath);
   }, [isMounted, status, router]);
 
   if (!isMounted) {
@@ -120,23 +167,7 @@ export default function CheckoutOutcomePage() {
                   </div>
                 </div>
 
-                {/* User Account Context (Matches Success/Checkout) */}
-                {user && (
-                  <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 min-w-[220px] shrink-0">
-                    <Avatar
-                      src={getGravatar(user.email || "")}
-                      fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
-                    />
-                    <div className="flex flex-col text-left overflow-hidden">
-                      <span className="text-sm font-bold text-foreground leading-tight truncate">
-                        {user.displayName || "Senzor Account"}
-                      </span>
-                      <span className="text-xs font-medium text-muted-foreground leading-tight truncate">
-                        {user.email}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                <WorkspaceChip user={user} activeOrg={activeOrg} />
               </div>
 
               {/* --- Troubleshooting Information --- */}
@@ -188,7 +219,7 @@ export default function CheckoutOutcomePage() {
                   <Button
                     variant="outline"
                     className="w-full sm:w-auto h-11 text-sm font-bold border-border/60 hover:bg-secondary/40 shrink-0"
-                    onClick={() => router.push("/dashboard/profile")}
+                    onClick={() => router.push(dashboardPath)}
                   >
                     Return to Dashboard
                   </Button>
@@ -248,23 +279,7 @@ export default function CheckoutOutcomePage() {
                   </div>
                 </div>
 
-                {/* User Account Context */}
-                {user && (
-                  <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 min-w-[220px] shrink-0">
-                    <Avatar
-                      src={getGravatar(user.email || "")}
-                      fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
-                    />
-                    <div className="flex flex-col text-left overflow-hidden">
-                      <span className="text-sm font-bold text-foreground leading-tight truncate">
-                        {user.displayName || "Senzor Account"}
-                      </span>
-                      <span className="text-xs font-medium text-muted-foreground leading-tight truncate">
-                        {user.email}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                <WorkspaceChip user={user} activeOrg={activeOrg} />
               </div>
 
               {/* --- Troubleshooting/Pending Information --- */}
@@ -322,7 +337,7 @@ export default function CheckoutOutcomePage() {
                   </Button>
                   <Button
                     className="w-full sm:w-auto h-11 text-sm font-bold shadow-md hover:scale-[1.01] transition-transform group shrink-0"
-                    onClick={() => router.push("/dashboard/profile")}
+                    onClick={() => router.push(dashboardPath)}
                   >
                     Go to Dashboard
                     <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
@@ -376,23 +391,7 @@ export default function CheckoutOutcomePage() {
                 </div>
               </div>
 
-              {/* User Account Context (Matches Checkout) */}
-              {user && (
-                <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 min-w-[220px] shrink-0">
-                  <Avatar
-                    src={getGravatar(user.email || "")}
-                    fallback={user.email?.substring(0, 2).toUpperCase() || "US"}
-                  />
-                  <div className="flex flex-col text-left overflow-hidden">
-                    <span className="text-sm font-bold text-foreground leading-tight truncate">
-                      {user.displayName || "Senzor Account"}
-                    </span>
-                    <span className="text-xs font-medium text-muted-foreground leading-tight truncate">
-                      {user.email}
-                    </span>
-                  </div>
-                </div>
-              )}
+              <WorkspaceChip user={user} activeOrg={activeOrg} />
             </div>
 
             {/* --- Provisioning Status Grid --- */}
@@ -456,7 +455,7 @@ export default function CheckoutOutcomePage() {
               <Button
                 size="lg"
                 className="w-full sm:w-auto h-11 text-sm font-bold shadow-md transition-transform group shrink-0"
-                onClick={() => router.push("/dashboard/profile")}
+                onClick={() => router.push(dashboardPath)}
               >
                 Go to Dashboard
               </Button>

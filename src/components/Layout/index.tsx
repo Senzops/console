@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth, api } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
 import { useRouter } from "next/router";
-import { Button, Dialog, Avatar, Spinner, Badge } from "../Core";
+import { Button, Dialog, Avatar, Spinner, Badge, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../Core";
 import {
   Plus,
   Copy,
@@ -46,6 +46,7 @@ import {
   Menu,
   X,
   Download,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -54,6 +55,7 @@ import { toast } from "sonner";
 import { FEATURES_DATA } from "@/static/featuresData";
 import { ServiceModalProvider, useServiceModal } from "../ServiceModals/context";
 import { ServiceModals } from "../ServiceModals";
+import { useOrg, Organization } from "../../lib/org";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -1469,6 +1471,29 @@ const DashboardLayoutInner = ({
               )}>
                 {isActuallyMinimized ? (
                   <>
+                    <Link href="/dashboard/organization" title="Organization">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground",
+                          router.pathname.startsWith("/dashboard/organization") && "bg-secondary text-foreground"
+                        )}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
+                      onClick={() => setIsSettingsOpen(true)}
+                      title="Global Settings"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                    </Button>
+
                     {isInstallable && !isInstalled && (
                       <Button
                         variant="ghost"
@@ -1480,19 +1505,29 @@ const DashboardLayoutInner = ({
                         <Download className="h-3.5 w-3.5 shrink-0" />
                       </Button>
                     )}
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
-                      onClick={() => setIsSettingsOpen(true)}
-                      title="Global Settings"
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                    </Button>
                   </>
                 ) : (
                   <>
+                    <Link href="/dashboard/organization">
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-9",
+                          router.pathname.startsWith("/dashboard/organization") && "bg-secondary text-foreground"
+                        )}
+                      >
+                        <Building2 className="h-4 w-4" /> Organization
+                      </Button>
+                    </Link>
+
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-9"
+                      onClick={() => setIsSettingsOpen(true)}
+                    >
+                      <Settings className="h-4 w-4" /> Global Settings
+                    </Button>
+
                     {isInstallable && !isInstalled && (
                       <Button
                         variant="ghost"
@@ -1502,18 +1537,65 @@ const DashboardLayoutInner = ({
                         <Download className="h-4 w-4 shrink-0" /> Install App
                       </Button>
                     )}
-
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-9"
-                      onClick={() => setIsSettingsOpen(true)}
-                    >
-                      <Settings className="h-4 w-4" /> Global Settings
-                    </Button>
                   </>
                 )}
               </div>
             </div>
+
+            {/* Org Switcher */}
+            {(() => {
+              const { organizations, activeOrg, setActiveOrg } = useOrg();
+              if (organizations.length === 0) return null;
+              const items = [
+                { _id: null, name: 'Personal Account', slug: '' },
+                ...organizations,
+              ];
+              return (
+                <div className={cn(
+                  "border-t shrink-0 transition-all duration-300",
+                  isActuallyMinimized ? "px-1 py-2" : "px-3 py-2"
+                )}>
+                  {isActuallyMinimized ? (
+                    <button
+                      onClick={() => {
+                        const currentIdx = items.findIndex((i: any) => (activeOrg ? i._id === activeOrg._id : i._id === null));
+                        const nextIdx = (currentIdx + 1) % items.length;
+                        const next = items[nextIdx];
+                        setActiveOrg(next._id ? (next as Organization) : null);
+                      }}
+                      className="h-8 w-8 mx-auto rounded-lg bg-secondary/30 border border-border/40 flex items-center justify-center text-xs font-bold text-muted-foreground hover:bg-secondary/50 transition-colors"
+                      title={activeOrg ? activeOrg.name : 'Personal Account'}
+                    >
+                      {activeOrg ? activeOrg.name.substring(0, 2).toUpperCase() : 'P'}
+                    </button>
+                  ) : (
+                    <Select
+                      value={activeOrg?._id || '__personal__'}
+                      onValueChange={(val) => {
+                        if (val === '__personal__') {
+                          setActiveOrg(null);
+                        } else {
+                          const org = organizations.find((o) => o._id === val);
+                          setActiveOrg(org || null);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full h-9 rounded-lg border border-border/60 bg-secondary/20 text-sm font-medium hover:bg-secondary/40 transition-colors">
+                        <SelectValue placeholder="Personal Account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__personal__">Personal Account</SelectItem>
+                        {organizations.map((org) => (
+                          <SelectItem key={org._id} value={org._id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Profile */}
             <div className={cn(

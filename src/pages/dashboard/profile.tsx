@@ -16,6 +16,7 @@ import {
   cn,
 } from "../../components/Core";
 import { useAuth, api } from "../../lib/auth";
+import { personalFetcher } from "../../lib/org";
 import { toast } from "sonner";
 import {
   User as UserIcon,
@@ -307,12 +308,23 @@ export default function ProfilePage() {
   const router = useRouter();
 
   // --- SWR Data Fetching ---
+  // Profile page ALWAYS shows the user's personal billing data, even when
+  // an org is active. personalFetcher sends an empty x-org-id header so the
+  // backend resolves ownerId to the user's Firebase UID (not the org).
+  // Keys are prefixed with "personal:" so SWR cache stays isolated from
+  // the org page's billing cache (which uses bare "/billing/..." keys).
   const { data: billingData, mutate: mutateBilling } = useSWR(
-    "/billing/subscription",
-    fetcher,
+    "personal:/billing/subscription",
+    () => personalFetcher("/billing/subscription"),
   );
-  const { data: storageData } = useSWR("/billing/storage-stats", fetcher);
-  const { data: txData } = useSWR("/billing/transactions", fetcher);
+  const { data: storageData } = useSWR(
+    "personal:/billing/storage-stats",
+    () => personalFetcher("/billing/storage-stats"),
+  );
+  const { data: txData } = useSWR(
+    "personal:/billing/transactions",
+    () => personalFetcher("/billing/transactions"),
+  );
 
   // --- Modal States ---
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -364,11 +376,15 @@ export default function ProfilePage() {
   const getGravatar = (email: string) =>
     `https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?d=identicon`;
 
+  // Header override to ensure profile billing actions always target the
+  // personal account, never the active org.
+  const personalHeaders = { headers: { 'x-org-id': '' } };
+
   // --- Handlers ---
   const handleCancelSubscription = async () => {
     setIsCanceling(true);
     try {
-      const res = await api.post("/billing/cancel");
+      const res = await api.post("/billing/cancel", {}, personalHeaders);
       const msg = res.data?.immediateDowngrade
         ? "Subscription canceled. You've been downgraded to the Free Starter plan."
         : "Subscription canceled. Your plan remains active until the end of your billing cycle.";
@@ -405,6 +421,7 @@ export default function ProfilePage() {
       // The API handles both cached URLs and JIT Dodo Payments receipt fetching
       const res = await api.get(
         `/billing/transactions/${transactionId}/receipt`,
+        personalHeaders,
       );
       if (res.data.url) {
         window.open(res.data.url, "_blank");
@@ -444,7 +461,7 @@ export default function ProfilePage() {
 
     setChangePlanLoading(true);
     try {
-      const res = await api.post("/billing/change-plan", { productId });
+      const res = await api.post("/billing/change-plan", { productId }, personalHeaders);
       toast.success(res.data.message || "Plan change initiated.");
       setIsChangePlanOpen(false);
       mutateBilling();
@@ -457,7 +474,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-24">
+      <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 pb-24">
         {/* Page Header */}
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">

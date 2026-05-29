@@ -178,6 +178,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(demoUser as any);
     setToken('demo-token');
     delete api.defaults.headers.common['Authorization'];
+    // Clear any stale org context — demo users operate in personal workspace only
+    delete api.defaults.headers.common['x-org-id'];
+    try { sessionStorage.removeItem('senzor-active-org'); } catch {}
     api.defaults.headers.common['x-demo-mode'] = 'true';
     setLoading(false);
     router.push('/dashboard');
@@ -185,6 +188,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try { localStorage.removeItem('has-session'); } catch {}
+    // Clear org context on logout — prevents stale header on next login
+    delete api.defaults.headers.common['x-org-id'];
+    try { sessionStorage.removeItem('senzor-active-org'); } catch {}
     if (user?.isDemo) {
       setUser(null);
       setToken(null);

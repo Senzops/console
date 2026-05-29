@@ -1,5 +1,6 @@
 import type { AppProps } from "next/app";
 import { AuthProvider } from "../lib/auth";
+import { OrgProvider } from "../lib/org";
 import "../styles/globals.css";
 import Head from "next/head";
 import { ThemeProvider } from "@/lib/theme";
@@ -57,6 +58,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <div className={`${inter.variable} ${dmSerif.variable} font-sans`}>
       <AuthProvider>
+        <OrgProvider>
         <ThemeProvider>
           <Head>
             <title>{title}</title>
@@ -91,6 +93,7 @@ export default function App({ Component, pageProps }: AppProps) {
           />
           {getLayout(content)}
         </ThemeProvider>
+        </OrgProvider>
       </AuthProvider>
     </div>
   );
