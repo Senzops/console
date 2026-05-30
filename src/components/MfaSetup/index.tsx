@@ -38,9 +38,12 @@ import {
   Eye,
   EyeOff,
   Lock,
+  MonitorSmartphone,
+  LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/auth';
 
 const OTP_LENGTH = 6;
 const APP_NAME = 'Senzor';
@@ -77,6 +80,10 @@ export const MfaSecuritySection = () => {
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [removeResolver, setRemoveResolver] = useState<MultiFactorResolver | null>(null);
   const [removeDigits, setRemoveDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+
+  // --- Session revocation state ---
+  const [isRevokeOpen, setIsRevokeOpen] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
 
   // --- Shared re-auth state ---
   const [reauthPassword, setReauthPassword] = useState('');
@@ -357,6 +364,24 @@ export const MfaSecuritySection = () => {
   };
 
   // ============================================================================
+  // SESSION REVOCATION
+  // ============================================================================
+
+  const handleRevokeSessions = async () => {
+    setIsRevoking(true);
+    try {
+      await api.post('/auth/revoke-sessions');
+      toast.success('All sessions revoked.');
+      setIsRevokeOpen(false);
+      await logout();
+    } catch {
+      toast.error('Failed to revoke sessions. Please try again.');
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
+  // ============================================================================
   // SHARED DIGIT INPUT HANDLER FACTORY
   // ============================================================================
 
@@ -516,8 +541,57 @@ export const MfaSecuritySection = () => {
               </Button>
             )}
           </div>
+
+          <div className="border-t border-border/40 mt-5 pt-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-muted">
+                  <MonitorSmartphone className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Active Sessions</h3>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-md">
+                    Sign out from all devices and browsers. You will need to sign in again everywhere, including this device.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 font-semibold"
+                onClick={() => setIsRevokeOpen(true)}
+              >
+                <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign Out All
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      {/* --- Revoke Sessions Dialog --- */}
+      <Dialog
+        open={isRevokeOpen}
+        onClose={() => setIsRevokeOpen(false)}
+        title="Sign Out from All Devices"
+      >
+        <div className="space-y-4">
+          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg text-sm text-amber-700 dark:text-amber-500/90 leading-relaxed">
+            <strong className="block text-amber-600 dark:text-amber-500 mb-1 font-bold">
+              This will sign you out everywhere
+            </strong>
+            All active sessions across every device and browser will be invalidated,
+            including this one. You will be redirected to the sign-in page.
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setIsRevokeOpen(false)} disabled={isRevoking}>
+              Cancel
+            </Button>
+            <Button onClick={handleRevokeSessions} disabled={isRevoking}>
+              {isRevoking ? <><Spinner className="mr-2 w-4 h-4" /> Revoking...</> : 'Sign Out All Devices'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* --- Setup Dialog --- */}
       <Dialog open={isSetupOpen} onClose={handleCloseSetup} title="Set Up Authenticator App">
