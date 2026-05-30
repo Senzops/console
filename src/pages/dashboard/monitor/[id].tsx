@@ -6,7 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../components/TimeRangePicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil, Shield, ShieldAlert, ShieldCheck, Timer, Zap } from 'lucide-react';
+import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil, ShieldAlert, ShieldCheck, Timer, Zap } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
@@ -52,11 +52,25 @@ const getHealthBadge = (uptime: number, latency: number) => {
 };
 
 const getSslBadge = (ssl: any) => {
-  if (!ssl || !ssl.lastCheckedAt) return { label: 'Unknown', color: 'text-muted-foreground', icon: Shield };
-  if (!ssl.valid) return { label: 'Invalid', color: 'text-destructive', icon: ShieldAlert };
-  if (ssl.daysRemaining <= 7) return { label: 'Expiring Soon', color: 'text-destructive', icon: ShieldAlert };
-  if (ssl.daysRemaining <= 30) return { label: 'Expiring Soon', color: 'text-yellow-500', icon: ShieldAlert };
-  return { label: 'Valid', color: 'text-emerald-500', icon: ShieldCheck };
+  if (!ssl || !ssl.lastCheckedAt) return { label: 'Unknown', color: 'text-muted-foreground' };
+  if (!ssl.valid) return { label: 'Invalid', color: 'text-destructive' };
+  if (ssl.daysRemaining <= 7) return { label: 'Expiring Soon', color: 'text-destructive' };
+  if (ssl.daysRemaining <= 30) return { label: 'Expiring Soon', color: 'text-yellow-500' };
+  return { label: 'Valid', color: 'text-emerald-500' };
+};
+
+const getDomainBadge = (domain: any) => {
+  if (!domain || !domain.lastCheckedAt) return { label: 'Unknown', color: 'text-muted-foreground' };
+  if (domain.error) return { label: 'Error', color: 'text-muted-foreground' };
+  if (domain.daysRemaining <= 14) return { label: 'Expiring Soon', color: 'text-destructive' };
+  if (domain.daysRemaining <= 30) return { label: 'Expiring Soon', color: 'text-yellow-500' };
+  return { label: 'Valid', color: 'text-emerald-500' };
+};
+
+const getDaysColor = (days: number) => {
+  if (days <= 7) return 'text-destructive';
+  if (days <= 30) return 'text-yellow-500';
+  return 'text-emerald-500';
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -260,62 +274,112 @@ const StatCard = ({ title, value, sub, icon: Icon, color, isMono, textColor }: a
   )
 };
 
-const SslCard = ({ ssl, url }: { ssl: any; url: string }) => {
-  const isHttps = url?.startsWith('https://');
-  if (!isHttps) return null;
+const DomainSslCard = ({ ssl, domain, url }: { ssl: any; domain: any; url: string }) => {
+  const hasSsl = url?.startsWith('https://') && ssl?.lastCheckedAt;
+  const hasDomain = domain?.lastCheckedAt && !domain?.error;
 
-  const badge = getSslBadge(ssl);
-  const SslIcon = badge.icon;
+  if (!hasSsl && !hasDomain) return null;
 
-  if (!ssl?.lastCheckedAt) return null;
+  const sslBadge = getSslBadge(ssl);
+  const domainBadge = getDomainBadge(domain);
 
   return (
     <Card>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className={`p-2.5 rounded-lg ${ssl.valid ? 'bg-emerald-500/10' : 'bg-destructive/10'}`}>
-              <SslIcon className={`h-5 w-5 ${badge.color}`} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm font-medium">SSL Certificate</p>
-                <Badge variant={ssl.valid && ssl.daysRemaining > 7 ? 'success' : ssl.daysRemaining > 0 ? 'warning' : 'destructive'} className="text-[10px] px-1.5">
-                  {badge.label}
-                </Badge>
-              </div>
-              {ssl.error ? (
-                <p className="text-xs text-destructive">{ssl.error}</p>
-              ) : (
-                <div className="space-y-1">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+      <CardContent className="p-0">
+        <div className={`grid ${hasSsl && hasDomain ? 'md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border' : 'grid-cols-1'}`}>
+          {/* Domain Registration */}
+          {hasDomain && (
+            <div className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Domain Registration</p>
+                    <Badge variant={domain.daysRemaining > 30 ? 'success' : domain.daysRemaining > 14 ? 'warning' : 'destructive'} className="text-[10px] px-1.5">
+                      {domainBadge.label}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
                     <div>
-                      <span className="text-muted-foreground">Issuer: </span>
-                      <span className="font-medium truncate">{ssl.issuer || '-'}</span>
+                      <span className="text-muted-foreground">Domain: </span>
+                      <span className="font-mono font-medium">{domain.registeredDomain || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Protocol: </span>
-                      <span className="font-mono">{ssl.protocol || '-'}</span>
+                      <span className="text-muted-foreground">Registrar: </span>
+                      <span className="font-medium">{domain.registrar || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Valid From: </span>
-                      <span className="font-mono">{ssl.validFrom ? new Date(ssl.validFrom).toLocaleDateString() : '-'}</span>
+                      <span className="text-muted-foreground">Registered: </span>
+                      <span className="font-mono">{domain.registeredAt ? new Date(domain.registeredAt).toLocaleDateString() : '-'}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Expires: </span>
-                      <span className="font-mono">{ssl.validTo ? new Date(ssl.validTo).toLocaleDateString() : '-'}</span>
+                      <span className="font-mono">{domain.expiresAt ? new Date(domain.expiresAt).toLocaleDateString() : '-'}</span>
                     </div>
+                    {domain.nameServers?.length > 0 && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">NS: </span>
+                        <span className="font-mono">{domain.nameServers.slice(0, 2).join(', ')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
+                {domain.daysRemaining >= 0 && (
+                  <div className="text-right shrink-0">
+                    <p className={`text-2xl font-bold tabular-nums ${getDaysColor(domain.daysRemaining)}`}>
+                      {domain.daysRemaining}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Days Left</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          {ssl.valid && ssl.daysRemaining >= 0 && (
-            <div className="text-right shrink-0">
-              <p className={`text-2xl font-bold tabular-nums ${ssl.daysRemaining <= 7 ? 'text-destructive' : ssl.daysRemaining <= 30 ? 'text-yellow-500' : 'text-emerald-500'}`}>
-                {ssl.daysRemaining}
-              </p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Days Left</p>
+          )}
+
+          {/* SSL Certificate */}
+          {hasSsl && (
+            <div className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">SSL Certificate</p>
+                    <Badge variant={ssl.valid && ssl.daysRemaining > 7 ? 'success' : ssl.daysRemaining > 0 ? 'warning' : 'destructive'} className="text-[10px] px-1.5">
+                      {sslBadge.label}
+                    </Badge>
+                  </div>
+                  {ssl.error ? (
+                    <p className="text-xs text-destructive">{ssl.error}</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Issuer: </span>
+                        <span className="font-medium">{ssl.issuer || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Protocol: </span>
+                        <span className="font-mono">{ssl.protocol || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Valid From: </span>
+                        <span className="font-mono">{ssl.validFrom ? new Date(ssl.validFrom).toLocaleDateString() : '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Expires: </span>
+                        <span className="font-mono">{ssl.validTo ? new Date(ssl.validTo).toLocaleDateString() : '-'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {ssl.valid && ssl.daysRemaining >= 0 && (
+                  <div className="text-right shrink-0">
+                    <p className={`text-2xl font-bold tabular-nums ${getDaysColor(ssl.daysRemaining)}`}>
+                      {ssl.daysRemaining}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Days Left</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -454,6 +518,7 @@ export default function MonitorDetail() {
 
   const isUp = monitor.status === 'up';
   const sslWarning = monitor.ssl?.valid && monitor.ssl?.daysRemaining <= 14 && monitor.ssl?.daysRemaining >= 0;
+  const domainWarning = monitor.domain?.lastCheckedAt && !monitor.domain?.error && monitor.domain?.daysRemaining <= 30 && monitor.domain?.daysRemaining >= 0;
 
   return (
     <>
@@ -467,6 +532,12 @@ export default function MonitorDetail() {
               <Badge variant="outline" className={`animate-pulse ${health.color}`}>
                 {health.label}
               </Badge>
+              {domainWarning && (
+                <Badge variant="outline" className={`text-[10px] ${monitor.domain.daysRemaining <= 14 ? 'text-destructive border-destructive/20 bg-destructive/10' : 'text-yellow-500 border-yellow-500/20 bg-yellow-500/10'}`}>
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Domain Expiring
+                </Badge>
+              )}
               {sslWarning && (
                 <Badge variant="outline" className="text-yellow-500 border-yellow-500/20 bg-yellow-500/10 text-[10px]">
                   <ShieldAlert className="h-3 w-3 mr-1" />
@@ -554,8 +625,8 @@ export default function MonitorDetail() {
           />
         </div>
 
-        {/* SSL Certificate Card */}
-        <SslCard ssl={monitor.ssl} url={monitor.url} />
+        {/* Domain & SSL */}
+        <DomainSslCard ssl={monitor.ssl} domain={monitor.domain} url={monitor.url} />
 
         {/* Response Time Graph */}
         <ChartCard title="Response Time (ms)">
