@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { extractErrorMessage } from "@/utils/axiosError";
 import { MfaSecuritySection } from "@/components/MfaSetup";
+import { DataManagementSection } from "@/components/DataManagement";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -1025,7 +1026,15 @@ export default function ProfilePage() {
         {/* 5. Security / MFA */}
         {!user.isDemo && <MfaSecuritySection />}
 
-        {/* 6. Danger Zone */}
+        {/* 6. Data Management (Import / Export) */}
+        {!user.isDemo && (
+          <DataManagementSection
+            scope="personal"
+            axiosConfig={{ headers: { 'x-org-id': '' } }}
+          />
+        )}
+
+        {/* 7. Danger Zone */}
         <div className="border border-destructive/30 rounded-xl overflow-hidden mt-12 bg-destructive/5 shadow-sm">
           <div className="p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="flex-1">
