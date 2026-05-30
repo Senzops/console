@@ -580,10 +580,7 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        {/* 2. Security / MFA */}
-        {!user.isDemo && <MfaSecuritySection />}
-
-        {/* 3. Subscription & Quota (Decoupled Cycles) */}
+        {/* 2. Subscription & Quota (Decoupled Cycles) */}
         <Card className="border-border/60 shadow-sm w-full overflow-hidden">
           <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between h-14 shrink-0 bg-muted/20">
             <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground uppercase tracking-wider">
@@ -835,7 +832,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* 3. Data Breakdown (Full Width) */}
+        {/* 3. Data Breakdown */}
         <Card className="border-border/60 shadow-sm w-full">
           <CardContent className="p-0">
             <div className="p-6 border-b border-border/40 flex items-center gap-2 font-bold text-lg text-foreground bg-muted/20">
@@ -919,7 +916,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* 4. Billing History Table */}
+        {/* 4. Billing History */}
         <Card className="border-border/60 shadow-sm overflow-hidden">
           <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center h-16 shrink-0 bg-muted/20">
             <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
@@ -1025,7 +1022,10 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* 5. Danger Zone */}
+        {/* 5. Security / MFA */}
+        {!user.isDemo && <MfaSecuritySection />}
+
+        {/* 6. Danger Zone */}
         <div className="border border-destructive/30 rounded-xl overflow-hidden mt-12 bg-destructive/5 shadow-sm">
           <div className="p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="flex-1">
