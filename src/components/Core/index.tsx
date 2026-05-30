@@ -537,21 +537,26 @@ export const Badge = ({ className, variant = "default", ...props }: React.HTMLAt
 
 // --- Modal (Dialog) ---
 export const Dialog = ({ open, onClose, children, title }: { open: boolean; onClose: () => void; children: React.ReactNode; title: string }) => {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg max-h-[calc(100vh-2rem)] flex flex-col rounded-xl border bg-card text-card-foreground shadow-lg animate-in fade-in zoom-in-95 duration-200">
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
+
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+      <div className="relative w-full max-w-lg max-h-[calc(100vh-2rem)] flex flex-col rounded-xl border bg-card text-card-foreground shadow-lg animate-in fade-in zoom-in-95 duration-200">
         <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-border/50 shrink-0">
           <h3 className="font-semibold leading-none tracking-tight text-lg">{title}</h3>
         </div>
         <div className="p-6 overflow-y-auto">{children}</div>
-        <div className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground cursor-pointer" onClick={onClose}>
+        <div className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 cursor-pointer" onClick={onClose}>
           ✕
         </div>
       </div>
       <div className="absolute inset-0 -z-10" onClick={onClose} />
-    </div>
-  )
+    </div>,
+    document.body
+  );
 }
 
 // --- Avatar ---

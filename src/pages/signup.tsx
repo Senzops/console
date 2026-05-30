@@ -1,18 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
+import {
+  getAuth,
+  getMultiFactorResolver,
+  TotpMultiFactorGenerator,
+  MultiFactorResolver,
+} from 'firebase/auth';
 import { useAuth } from '../lib/auth';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Spinner } from '../components/Core';
 import { PasswordField } from '../components/PasswordField';
-import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { AuthLayout } from '@/components/AuthLayout';
 
+const OTP_LENGTH = 6;
+
 export default function Signup() {
-  const { signupEmail, loginGoogle } = useAuth();
+  const router = useRouter();
+  const { signupEmail, loginGoogle, completeOtpVerification } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // TOTP MFA state (for returning Google users who have TOTP enrolled)
+  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null);
+  const [totpDigits, setTotpDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  const [isResolvingMfa, setIsResolvingMfa] = useState(false);
+  const totpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const validatePassword = (p: string) => {
     const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})");
@@ -46,8 +63,18 @@ export default function Signup() {
     setIsLoading(true);
     try {
       await loginGoogle();
-      // AuthProvider handles redirect to /verify-otp (Google emails are pre-verified)
     } catch (err: any) {
+      if (err.code === 'auth/multi-factor-auth-required') {
+        const resolver = getMultiFactorResolver(getAuth(), err);
+        const hasTotpFactor = resolver.hints.some(
+          (h) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID
+        );
+        if (hasTotpFactor) {
+          setMfaResolver(resolver);
+          setError(null);
+          return;
+        }
+      }
       if (err.code !== 'auth/popup-closed-by-user') {
         setError('Failed to sign up with Google.');
       }
@@ -55,6 +82,105 @@ export default function Signup() {
       setIsLoading(false);
     }
   };
+
+  // --- TOTP handlers ---
+  const handleTotpDigitChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const newDigits = [...totpDigits];
+    if (value.length > 1) {
+      const chars = value.slice(0, OTP_LENGTH - index).split('');
+      chars.forEach((char, i) => { if (index + i < OTP_LENGTH) newDigits[index + i] = char; });
+      setTotpDigits(newDigits);
+      totpInputRefs.current[Math.min(index + chars.length, OTP_LENGTH - 1)]?.focus();
+      return;
+    }
+    newDigits[index] = value;
+    setTotpDigits(newDigits);
+    if (value && index < OTP_LENGTH - 1) totpInputRefs.current[index + 1]?.focus();
+  };
+
+  const handleTotpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !totpDigits[index] && index > 0) totpInputRefs.current[index - 1]?.focus();
+  };
+
+  const handleTotpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (!pasted) return;
+    const newDigits = [...totpDigits];
+    pasted.split('').forEach((char, i) => { newDigits[i] = char; });
+    setTotpDigits(newDigits);
+    totpInputRefs.current[Math.min(pasted.length, OTP_LENGTH - 1)]?.focus();
+  };
+
+  const resolveMfa = useCallback(async (code: string) => {
+    if (!mfaResolver) return;
+    setIsResolvingMfa(true);
+    setError(null);
+    const totpHint = mfaResolver.hints.find((h) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+    if (!totpHint) return;
+    try {
+      const assertion = TotpMultiFactorGenerator.assertionForSignIn(totpHint.uid, code);
+      await mfaResolver.resolveSignIn(assertion);
+      completeOtpVerification();
+      toast.success('Welcome back!');
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.code === 'auth/invalid-verification-code' ? 'Incorrect code. Check your authenticator app.' : 'Verification failed.');
+      setTotpDigits(Array(OTP_LENGTH).fill(''));
+      totpInputRefs.current[0]?.focus();
+    } finally {
+      setIsResolvingMfa(false);
+    }
+  }, [mfaResolver, completeOtpVerification, router]);
+
+  useEffect(() => {
+    const code = totpDigits.join('');
+    if (code.length === OTP_LENGTH && mfaResolver) resolveMfa(code);
+  }, [totpDigits, mfaResolver, resolveMfa]);
+
+  useEffect(() => {
+    if (mfaResolver) setTimeout(() => totpInputRefs.current[0]?.focus(), 100);
+  }, [mfaResolver]);
+
+  if (mfaResolver) {
+    return (
+      <AuthLayout>
+        <Card className="w-full max-w-md border-border/50 shadow-2xl">
+          <CardHeader className="space-y-1">
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => { setMfaResolver(null); setError(null); setTotpDigits(Array(OTP_LENGTH).fill('')); }} className="p-2 -ml-2 rounded-full hover:bg-secondary/50 transition-colors">
+                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <CardTitle className="text-2xl font-bold font-display">Two-Factor Authentication</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center text-center space-y-5 py-2">
+              <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+                <ShieldCheck className="h-7 w-7 text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground">Enter the 6-digit code from your authenticator app</p>
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-md flex items-start gap-2 w-full animate-in fade-in slide-in-from-top-1">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" /><span>{error}</span>
+                </div>
+              )}
+              <div className="flex gap-2 justify-center" onPaste={handleTotpPaste}>
+                {totpDigits.map((digit, i) => (
+                  <input key={i} ref={(el) => { totpInputRefs.current[i] = el; }} type="text" inputMode="numeric" maxLength={OTP_LENGTH} value={digit}
+                    onChange={(e) => handleTotpDigitChange(i, e.target.value)} onKeyDown={(e) => handleTotpKeyDown(i, e)} disabled={isResolvingMfa}
+                    className="w-11 h-13 text-center text-xl font-semibold rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all disabled:opacity-50" />
+                ))}
+              </div>
+              {isResolvingMfa && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner className="h-4 w-4" /><span>Verifying...</span></div>}
+              <p className="text-xs text-muted-foreground pt-2">Open your authenticator app and enter the current code for Senzor.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

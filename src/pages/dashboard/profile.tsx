@@ -41,6 +41,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { extractErrorMessage } from "@/utils/axiosError";
+import { MfaSecuritySection } from "@/components/MfaSetup";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -579,7 +580,10 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        {/* 2. Subscription & Quota (Decoupled Cycles) */}
+        {/* 2. Security / MFA */}
+        {!user.isDemo && <MfaSecuritySection />}
+
+        {/* 3. Subscription & Quota (Decoupled Cycles) */}
         <Card className="border-border/60 shadow-sm w-full overflow-hidden">
           <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between h-14 shrink-0 bg-muted/20">
             <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground uppercase tracking-wider">
