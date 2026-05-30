@@ -6,10 +6,12 @@ import { CheckCircle2, XCircle, Key, Eye, EyeOff, MailCheck, ArrowRight, AlertCi
 import Link from 'next/link';
 import { PasswordField } from '@/components/PasswordField';
 import { AuthLayout } from '@/components/AuthLayout';
+import { useAuth } from '@/lib/auth';
 
 export default function AuthAction() {
   const router = useRouter();
   const auth = getAuth();
+  const { user, completeOtpVerification } = useAuth();
 
   // Params
   const mode = router.query.mode as string; // resetPassword | verifyEmail
@@ -119,6 +121,9 @@ export default function AuthAction() {
 
     // 3. Verify Email Success
     if (mode === 'verifyEmail' && status === 'success') {
+      const isSignedIn = !!user && !user.isDemo;
+      if (isSignedIn) completeOtpVerification();
+
       return (
         <div className="flex flex-col items-center justify-center py-6 space-y-4 text-center">
           <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -128,8 +133,10 @@ export default function AuthAction() {
             <h3 className="font-semibold text-lg">Email Verified</h3>
             <p className="text-sm text-muted-foreground">Your email has been successfully verified.</p>
           </div>
-          <Link href="/dashboard">
-            <Button className="mt-4 w-full">Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" /></Button>
+          <Link href={isSignedIn ? '/dashboard' : '/login'}>
+            <Button className="mt-4 w-full">
+              {isSignedIn ? 'Go to Dashboard' : 'Sign In'} <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </Link>
         </div>
       );

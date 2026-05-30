@@ -808,7 +808,7 @@ const DashboardLayoutInner = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const { user, loading, logout, token, resendVerification } = useAuth();
+  const { user, loading, logout, token, resendVerification, otpVerified } = useAuth();
   const {
     theme,
     setTheme,
@@ -1070,6 +1070,16 @@ const DashboardLayoutInner = ({
     );
   if (!user) {
     router.push("/");
+    return null;
+  }
+
+  if (!user.isDemo && !user.emailVerified) {
+    router.push("/verify-email");
+    return null;
+  }
+
+  if (!user.isDemo && !otpVerified) {
+    router.push("/verify-otp");
     return null;
   }
 

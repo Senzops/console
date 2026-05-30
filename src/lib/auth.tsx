@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -35,21 +35,21 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     // If the error is 401/403 and we haven't already retried this request
     if (error.response && [401, 403].includes(error.response.status) && !originalRequest._retry) {
       originalRequest._retry = true; // Prevent infinite loops
-      
+
       try {
         const currentUser = auth.currentUser;
         if (currentUser) {
           // Force fetch a fresh token from Firebase
           const newToken = await currentUser.getIdToken(true);
-          
+
           // Update the global Axios instance AND the original request headers
           api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
           originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-          
+
           // Transparently retry the failed request
           return api(originalRequest);
         }
@@ -57,18 +57,20 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
 // --------------------------------------------------------
 
+const OTP_STORAGE_KEY = 'senzor-otp-verified';
 
-export type SenzorUser = (FirebaseUser & { isDemo?: boolean }) | { uid: string, email: string, displayName: string, isDemo: boolean, emailVerified: boolean, getIdToken: () => Promise<string | null> };
+export type SenzorUser = (FirebaseUser & { isDemo?: boolean }) | { uid: string, email: string, displayName: string, isDemo: boolean, emailVerified: boolean, getIdToken: () => Promise<string | null>, reload?: () => Promise<void> };
 
 interface AuthContextType {
   user: SenzorUser | null;
   loading: boolean;
+  otpVerified: boolean;
   loginGoogle: () => Promise<void>;
   loginEmail: (e: string, p: string) => Promise<void>;
   signupEmail: (e: string, p: string, n: string) => Promise<void>;
@@ -78,6 +80,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   token: string | null;
   getIdToken: () => Promise<string | null>;
+  completeOtpVerification: () => void;
+  sendLoginOtp: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as any);
@@ -86,6 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<SenzorUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
+  const [otpVerified, setOtpVerified] = useState(false);
   const router = useRouter();
 
   // Helper function to safely get token
@@ -94,6 +99,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (user.isDemo) return 'demo-token';
     return await user.getIdToken();
   };
+
+  useEffect(() => {
+    const stored = localStorage.getItem(OTP_STORAGE_KEY);
+    if (stored) setOtpVerified(true);
+  }, []);
 
   useEffect(() => {
     if (user?.isDemo) return;
@@ -115,6 +125,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!user?.isDemo) {
           setUser(null);
           setToken(null);
+          setOtpVerified(false);
+          localStorage.removeItem(OTP_STORAGE_KEY);
           delete api.defaults.headers.common['Authorization'];
           try { localStorage.removeItem('has-session'); } catch {}
         }
@@ -130,14 +142,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     handleCodeInApp: true,
   });
 
+  const completeOtpVerification = useCallback(() => {
+    setOtpVerified(true);
+    localStorage.setItem(OTP_STORAGE_KEY, Date.now().toString());
+  }, []);
+
+  const sendLoginOtp = useCallback(async () => {
+    await api.post('/auth/otp/send');
+  }, []);
+
   const loginGoogle = async () => {
     await signInWithPopup(auth, googleProvider);
-    router.push('/dashboard');
+    try {
+      await api.post('/auth/otp/send');
+    } catch {}
+    router.push('/verify-otp');
   };
 
   const loginEmail = async (email: string, pass: string) => {
     await signInWithEmailAndPassword(auth, email, pass);
-    router.push('/dashboard');
+
+    const currentUser = auth.currentUser;
+    if (currentUser && !currentUser.emailVerified) {
+      router.push('/verify-email');
+      return;
+    }
+
+    try {
+      await api.post('/auth/otp/send');
+    } catch {}
+    router.push('/verify-otp');
   };
 
   const signupEmail = async (email: string, pass: string, name: string) => {
@@ -151,9 +185,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     // 2. Send Verification Email with Redirect
-    await sendEmailVerification(creds.user, getActionSettings('/dashboard'));
+    await sendEmailVerification(creds.user, getActionSettings('/login'));
 
-    router.push('/dashboard');
+    router.push('/verify-email');
   };
 
   const resetPassword = async (email: string) => {
@@ -162,7 +196,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const resendVerification = async () => {
     if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser, getActionSettings('/dashboard'));
+      await sendEmailVerification(auth.currentUser, getActionSettings('/login'));
     }
   };
 
@@ -177,6 +211,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
     setUser(demoUser as any);
     setToken('demo-token');
+    setOtpVerified(true);
     delete api.defaults.headers.common['Authorization'];
     // Clear any stale org context — demo users operate in personal workspace only
     delete api.defaults.headers.common['x-org-id'];
@@ -188,6 +223,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try { localStorage.removeItem('has-session'); } catch {}
+    localStorage.removeItem(OTP_STORAGE_KEY);
+    setOtpVerified(false);
     // Clear org context on logout — prevents stale header on next login
     delete api.defaults.headers.common['x-org-id'];
     try { sessionStorage.removeItem('senzor-active-org'); } catch {}
@@ -203,7 +240,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginGoogle, loginEmail, signupEmail, resetPassword, resendVerification, loginAsDemo, logout, token, getIdToken }}>
+    <AuthContext.Provider value={{ user, loading, otpVerified, loginGoogle, loginEmail, signupEmail, resetPassword, resendVerification, loginAsDemo, logout, token, getIdToken, completeOtpVerification, sendLoginOtp }}>
       {children}
     </AuthContext.Provider>
   );
