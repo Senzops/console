@@ -3,7 +3,7 @@ import React, { useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { api } from "../../lib/auth";
-import { Button, Dialog, Spinner, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../Core";
+import { Button, Dialog, Spinner, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectLabel } from "../Core";
 import {
   Copy,
   Key,
@@ -139,6 +139,14 @@ export const ServiceModals: React.FC = () => {
     setSelectedServerMethod,
     selectedWebMethod,
     setSelectedWebMethod,
+    monitorMethod,
+    setMonitorMethod,
+    monitorHeaders,
+    setMonitorHeaders,
+    monitorBody,
+    setMonitorBody,
+    monitorExpectedStatus,
+    setMonitorExpectedStatus,
     selectedRumMethod,
     setSelectedRumMethod,
     mutateFns,
@@ -163,7 +171,7 @@ export const ServiceModals: React.FC = () => {
   const handleApiError = (e: any, fallback: string) => {
     const status = e?.response?.status;
     const code = e?.response?.data?.code;
-    const isQuota = status === 402 && (code === "SERVICE_LIMIT_EXCEEDED" || code === "ORG_LIMIT_EXCEEDED");
+    const isQuota = status === 402 && (code === "SERVICE_LIMIT_EXCEEDED" || code === "ORG_LIMIT_EXCEEDED" || code === "PLAN_INTERVAL_RESTRICTED");
     setIsQuotaError(isQuota);
     setError(isQuota
       ? (e.response.data.details || e.response.data.error || fallback)
@@ -266,6 +274,15 @@ export const ServiceModals: React.FC = () => {
     }
   };
 
+  const parseMonitorHeaders = (): Record<string, string> => {
+    if (!monitorHeaders.trim()) return {};
+    try {
+      const parsed = JSON.parse(monitorHeaders);
+      if (typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch { /* ignore */ }
+    return {};
+  };
+
   const handleMonitorSubmit = async () => {
     if (isEdit) {
       if (!name.trim() && !url.trim() && !interval) return;
@@ -275,12 +292,19 @@ export const ServiceModals: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      const headers = parseMonitorHeaders();
+      const expectedStatus = monitorExpectedStatus ? parseInt(monitorExpectedStatus, 10) : 0;
+
       if (isEdit && editData?.id) {
-        const body: any = {};
-        if (name.trim()) body.name = name.trim();
-        if (url.trim()) body.url = url.trim();
-        if (interval) body.interval = interval;
-        await api.put(`/uptime/${editData.id}`, body);
+        const payload: any = {};
+        if (name.trim()) payload.name = name.trim();
+        if (url.trim()) payload.url = url.trim();
+        if (interval) payload.interval = interval;
+        if (monitorMethod) payload.method = monitorMethod;
+        if (monitorHeaders.trim()) payload.headers = headers;
+        if (monitorBody.trim()) payload.body = monitorBody.trim();
+        if (expectedStatus) payload.expectedStatus = expectedStatus;
+        await api.put(`/uptime/${editData.id}`, payload);
         await editData.onSuccess?.();
         closeModal();
         toast.success("Monitor updated");
@@ -289,6 +313,10 @@ export const ServiceModals: React.FC = () => {
           name: name.trim(),
           url: url.trim(),
           interval,
+          method: monitorMethod,
+          headers,
+          body: monitorBody.trim(),
+          expectedStatus,
         });
         setName("");
         setUrl("");
@@ -1082,19 +1110,98 @@ export const ServiceModals: React.FC = () => {
               onChange={(e) => setUrl(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Check Interval</label>
-            <Select value={interval} onValueChange={(v) => setInterval(v)}>
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="15">Every 15 Minutes</SelectItem>
-                <SelectItem value="30">Every 30 Minutes</SelectItem>
-                <SelectItem value="60">Every 1 Hour</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">HTTP Method</label>
+              <Select value={monitorMethod} onValueChange={(v) => setMonitorMethod(v)}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                  <SelectItem value="HEAD">HEAD</SelectItem>
+                  <SelectItem value="PUT">PUT</SelectItem>
+                  <SelectItem value="PATCH">PATCH</SelectItem>
+                  <SelectItem value="OPTIONS">OPTIONS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Check Interval</label>
+              <Select value={interval} onValueChange={(v) => setInterval(v)}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>High Frequency</SelectLabel>
+                    <SelectItem value="1">Every 1 Minute <span className="text-[10px] ml-1 text-muted-foreground">(Business+)</span></SelectItem>
+                    <SelectItem value="2">Every 2 Minutes <span className="text-[10px] ml-1 text-muted-foreground">(Business+)</span></SelectItem>
+                    <SelectItem value="3">Every 3 Minutes <span className="text-[10px] ml-1 text-muted-foreground">(Business+)</span></SelectItem>
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Standard</SelectLabel>
+                    <SelectItem value="5">Every 5 Minutes</SelectItem>
+                    <SelectItem value="10">Every 10 Minutes</SelectItem>
+                    <SelectItem value="15">Every 15 Minutes</SelectItem>
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Low Frequency</SelectLabel>
+                    <SelectItem value="30">Every 30 Minutes</SelectItem>
+                    <SelectItem value="60">Every 1 Hour</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {/* Advanced Settings */}
+          <details className="group">
+            <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none flex items-center gap-1">
+              <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+              Advanced Settings
+            </summary>
+            <div className="mt-3 space-y-3 pl-1 border-l-2 border-border/40 ml-1.5">
+              <div className="space-y-2 pl-3">
+                <label className="text-sm font-medium">Expected Status Code</label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono"
+                  placeholder="Auto (200-299)"
+                  type="number"
+                  min={100}
+                  max={599}
+                  value={monitorExpectedStatus}
+                  onChange={(e) => setMonitorExpectedStatus(e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">Leave empty to accept any 2xx status. Set a specific code if your endpoint returns e.g. 204 or 301.</p>
+              </div>
+              <div className="space-y-2 pl-3">
+                <label className="text-sm font-medium">Custom Headers</label>
+                <textarea
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-emerald-500 outline-none transition-all resize-none"
+                  placeholder={'{\n  "Authorization": "Bearer token"\n}'}
+                  value={monitorHeaders}
+                  onChange={(e) => setMonitorHeaders(e.target.value)}
+                  rows={3}
+                />
+                <p className="text-[11px] text-muted-foreground">JSON object with custom request headers. Max 10 headers.</p>
+              </div>
+              {(monitorMethod === 'POST' || monitorMethod === 'PUT' || monitorMethod === 'PATCH') && (
+                <div className="space-y-2 pl-3">
+                  <label className="text-sm font-medium">Request Body</label>
+                  <textarea
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-emerald-500 outline-none transition-all resize-none"
+                    placeholder='{"key": "value"}'
+                    value={monitorBody}
+                    onChange={(e) => setMonitorBody(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
+          </details>
+
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="ghost" onClick={closeModal} disabled={loading}>
               Cancel

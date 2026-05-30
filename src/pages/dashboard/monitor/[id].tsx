@@ -1,4 +1,4 @@
-import { useState, useMemo, useContext, createContext } from 'react';
+import { useState, useMemo, useContext, useEffect, createContext } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
@@ -6,7 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../components/TimeRangePicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil } from 'lucide-react';
+import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil, Shield, ShieldAlert, ShieldCheck, Timer, Zap } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
@@ -16,13 +16,47 @@ import { extractErrorMessage } from '@/utils/axiosError';
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
 // --- Helpers ---
-const formatLatency = (ms: number) => ms > 0 ? `${ms.toFixed(0)}ms` : '-';
+const formatDuration = (ms: number): string => {
+  if (ms <= 0) return '0s';
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+};
+
+const computeDuration = (status: string, lastDownAt: string | null, createdAt: string, incidents: any[]): string => {
+  if (status === 'up') {
+    const since = lastDownAt || createdAt;
+    return formatDuration(Date.now() - new Date(since).getTime());
+  }
+  const openIncident = incidents?.find((i: any) => !i.resolvedAt);
+  if (openIncident?.startedAt) {
+    return formatDuration(Date.now() - new Date(openIncident.startedAt).getTime());
+  }
+  if (lastDownAt) {
+    return formatDuration(Date.now() - new Date(lastDownAt).getTime());
+  }
+  return '—';
+};
 
 const getHealthBadge = (uptime: number, latency: number) => {
   if (uptime >= 99.9 && latency < 500) return { label: 'Excellent', color: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10' };
   if (uptime >= 99) return { label: 'Good', color: 'text-blue-500 border-blue-500/20 bg-blue-500/10' };
   if (uptime >= 95) return { label: 'Degraded', color: 'text-yellow-500 border-yellow-500/20 bg-yellow-500/10' };
   return { label: 'Critical', color: 'text-destructive border-destructive/20 bg-destructive/10' };
+};
+
+const getSslBadge = (ssl: any) => {
+  if (!ssl || !ssl.lastCheckedAt) return { label: 'Unknown', color: 'text-muted-foreground', icon: Shield };
+  if (!ssl.valid) return { label: 'Invalid', color: 'text-destructive', icon: ShieldAlert };
+  if (ssl.daysRemaining <= 7) return { label: 'Expiring Soon', color: 'text-destructive', icon: ShieldAlert };
+  if (ssl.daysRemaining <= 30) return { label: 'Expiring Soon', color: 'text-yellow-500', icon: ShieldAlert };
+  return { label: 'Valid', color: 'text-emerald-500', icon: ShieldCheck };
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -168,8 +202,7 @@ const DistributionTable = ({ data }: { data: any[] }) => {
 };
 
 const UptimeStrip = ({ history }: { history: any[] }) => {
-  // Show last 60 checks or fill empty
-  const checks = history.slice(0, 60).reverse(); // Oldest -> Newest
+  const checks = history.slice(0, 60).reverse();
   const filledChecks = [...Array(Math.max(0, 60 - checks.length)).fill(null), ...checks];
 
   return (
@@ -227,6 +260,134 @@ const StatCard = ({ title, value, sub, icon: Icon, color, isMono, textColor }: a
   )
 };
 
+const SslCard = ({ ssl, url }: { ssl: any; url: string }) => {
+  const isHttps = url?.startsWith('https://');
+  if (!isHttps) return null;
+
+  const badge = getSslBadge(ssl);
+  const SslIcon = badge.icon;
+
+  if (!ssl?.lastCheckedAt) return null;
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className={`p-2.5 rounded-lg ${ssl.valid ? 'bg-emerald-500/10' : 'bg-destructive/10'}`}>
+              <SslIcon className={`h-5 w-5 ${badge.color}`} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-medium">SSL Certificate</p>
+                <Badge variant={ssl.valid && ssl.daysRemaining > 7 ? 'success' : ssl.daysRemaining > 0 ? 'warning' : 'destructive'} className="text-[10px] px-1.5">
+                  {badge.label}
+                </Badge>
+              </div>
+              {ssl.error ? (
+                <p className="text-xs text-destructive">{ssl.error}</p>
+              ) : (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Issuer: </span>
+                      <span className="font-medium truncate">{ssl.issuer || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Protocol: </span>
+                      <span className="font-mono">{ssl.protocol || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Valid From: </span>
+                      <span className="font-mono">{ssl.validFrom ? new Date(ssl.validFrom).toLocaleDateString() : '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Expires: </span>
+                      <span className="font-mono">{ssl.validTo ? new Date(ssl.validTo).toLocaleDateString() : '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          {ssl.valid && ssl.daysRemaining >= 0 && (
+            <div className="text-right shrink-0">
+              <p className={`text-2xl font-bold tabular-nums ${ssl.daysRemaining <= 7 ? 'text-destructive' : ssl.daysRemaining <= 30 ? 'text-yellow-500' : 'text-emerald-500'}`}>
+                {ssl.daysRemaining}
+              </p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Days Left</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const IncidentTable = ({ incidents }: { incidents: any[] }) => {
+  if (!incidents?.length) {
+    return (
+      <div className="py-8 text-center text-muted-foreground text-xs">
+        No incidents recorded in this time range
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full overflow-auto">
+      <table className="w-full text-sm text-left border-collapse">
+        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
+          <tr>
+            <th className="px-6 py-3">Started</th>
+            <th className="px-6 py-3">Resolved</th>
+            <th className="px-6 py-3">Duration</th>
+            <th className="px-6 py-3">Cause</th>
+            <th className="px-6 py-3 text-right">Status Code</th>
+          </tr>
+        </thead>
+        <tbody>
+          {incidents.map((incident: any) => (
+            <tr key={incident._id} className="border-b border-border hover:bg-muted/20">
+              <td className="px-6 py-3 font-mono text-xs">{new Date(incident.startedAt).toLocaleString()}</td>
+              <td className="px-6 py-3 font-mono text-xs">
+                {incident.resolvedAt ? new Date(incident.resolvedAt).toLocaleString() : (
+                  <Badge variant="destructive" className="text-[10px] px-1.5 animate-pulse">Ongoing</Badge>
+                )}
+              </td>
+              <td className="px-6 py-3 font-mono text-xs">
+                {incident.duration ? formatDuration(incident.duration) : (
+                  <span className="text-destructive">Active</span>
+                )}
+              </td>
+              <td className="px-6 py-3">
+                <Badge variant={incident.cause === 'timeout' ? 'warning' : 'destructive'} className="uppercase text-[10px] px-2">
+                  {incident.cause}
+                </Badge>
+              </td>
+              <td className="px-6 py-3 text-right font-mono text-muted-foreground">{incident.statusCode || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// --- Live ticking duration display ---
+const useLiveDuration = (status: string, lastDownAt: string | null, createdAt: string, incidents: any[]): string => {
+  const compute = () => computeDuration(status, lastDownAt, createdAt, incidents);
+
+  const [display, setDisplay] = useState(compute);
+
+  useEffect(() => {
+    setDisplay(compute());
+    const timer = setInterval(() => setDisplay(compute()), 1000);
+    return () => clearInterval(timer);
+  }, [status, lastDownAt, createdAt, incidents]);
+
+  return display;
+};
+
 export default function MonitorDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -242,7 +403,7 @@ export default function MonitorDetail() {
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? `/uptime/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null,
     fetcher,
-    { refreshInterval: 60000 } // Auto refresh every minute
+    { refreshInterval: 60000 }
   );
 
   const handleDelete = async () => {
@@ -256,24 +417,43 @@ export default function MonitorDetail() {
 
   const openEdit = () => {
     if (!data?.monitor) return;
-    openModal('monitor', 'edit', { id: id as string, name: data.monitor.name, url: data.monitor.url, interval: String(data.monitor.interval), onSuccess: () => mutate() });
+    openModal('monitor', 'edit', {
+      id: id as string,
+      name: data.monitor.name,
+      url: data.monitor.url,
+      interval: String(data.monitor.interval),
+      method: data.monitor.method,
+      headers: data.monitor.headers,
+      body: data.monitor.body,
+      expectedStatus: data.monitor.expectedStatus,
+      onSuccess: () => mutate(),
+    });
   };
 
   // --- Process Chart Data (Reverse to Chronological) ---
   const chartData = useMemo(() => {
     if (!data?.history) return [];
-    // History comes newest-first. Reverse it for the graph to show Old -> New.
     return [...data.history].reverse();
   }, [data?.history]);
+
+  // Hooks must run unconditionally — above all early returns
+  const liveDuration = useLiveDuration(
+    data?.monitor?.status ?? 'pending',
+    data?.monitor?.lastDownAt ?? null,
+    data?.monitor?.createdAt ?? new Date().toISOString(),
+    data?.incidents ?? [],
+  );
 
   if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></>;
   if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;
   if (!data?.monitor) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load server data.</div></div></>;
 
-  const { monitor, stats, history } = data;
+  const { monitor, stats, history, incidents } = data;
   const health = getHealthBadge(stats.uptime, stats.avgLatency);
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
-  const getFill = (defaultFill: string) => isMono ? 'hsl(var(--chart-mono))' : defaultFill;
+
+  const isUp = monitor.status === 'up';
+  const sslWarning = monitor.ssl?.valid && monitor.ssl?.daysRemaining <= 14 && monitor.ssl?.daysRemaining >= 0;
 
   return (
     <>
@@ -287,10 +467,22 @@ export default function MonitorDetail() {
               <Badge variant="outline" className={`animate-pulse ${health.color}`}>
                 {health.label}
               </Badge>
+              {sslWarning && (
+                <Badge variant="outline" className="text-yellow-500 border-yellow-500/20 bg-yellow-500/10 text-[10px]">
+                  <ShieldAlert className="h-3 w-3 mr-1" />
+                  SSL Expiring
+                </Badge>
+              )}
             </div>
-            <div className="text-xs text-muted-foreground font-mono flex items-center gap-3">
+            <div className="text-xs text-muted-foreground font-mono flex items-center gap-3 flex-wrap">
               <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> <a href={monitor.url} target="_blank" rel="noreferrer" className="hover:underline">{monitor.url}</a></span>
               <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {monitor.interval}m Interval</span>
+              {monitor.method && monitor.method !== 'GET' && (
+                <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> {monitor.method}</span>
+              )}
+              {monitor.expectedStatus > 0 && (
+                <span className="flex items-center gap-1">Expected: {monitor.expectedStatus}</span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -312,14 +504,58 @@ export default function MonitorDetail() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard title={`Uptime(${displayRange})`} value={`${stats.uptime.toFixed(2)}%`} sub={`Target: 99.9%`} icon={Activity} color="text-emerald-500" isMono={isMono} />
-          <StatCard title={`Avg Latency`} value={`${Math.round(stats.avgLatency)}ms`} sub={`Global Average`} icon={Clock} color="text-blue-500" isMono={isMono} />
-          <StatCard title={`Last Check`} value={`${stats.lastStatus}`} sub={`${new Date(stats.lastCheckTime).toLocaleTimeString(undefined, {
-            hour: 'numeric',
-            minute: '2-digit'
-          })}`} icon={Globe} color="text-purple-500" isMono={isMono} textColor={stats.lastStatus === 'up' ? 'text-emerald-500' : 'text-destructive'} />
-          <StatCard title={`Last Code`} value={`${stats.lastStatusCode || '-'}`} sub={`HTTP Status`} icon={Activity} color="text-yellow-500" isMono={isMono} />
+          <StatCard
+            title={`Uptime(${displayRange})`}
+            value={`${stats.uptime.toFixed(2)}%`}
+            sub={`Target: 99.9%`}
+            icon={Activity}
+            color="text-emerald-500"
+            isMono={isMono}
+          />
+          <StatCard
+            title={isUp ? 'Currently Up For' : 'Currently Down For'}
+            value={liveDuration}
+            sub={(() => {
+              if (isUp) {
+                return monitor.lastDownAt
+                  ? `Since ${new Date(monitor.lastDownAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                  : 'Since creation';
+              }
+              const openIncident = incidents?.find((i: any) => !i.resolvedAt);
+              const downSince = openIncident?.startedAt || monitor.lastCheck;
+              return downSince
+                ? `Since ${new Date(downSince).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                : 'Since last check';
+            })()}
+            icon={Timer}
+            color="text-purple-500"
+            isMono={isMono}
+            textColor={isUp ? 'text-emerald-500' : 'text-destructive'}
+          />
+          <StatCard
+            title="Avg Latency"
+            value={`${Math.round(stats.avgLatency)}ms`}
+            sub={`P95: ${Math.round(stats.p95)}ms`}
+            icon={Clock}
+            color="text-blue-500"
+            isMono={isMono}
+          />
+          <StatCard
+            title="Last Check"
+            value={`${stats.lastStatus}`}
+            sub={`${new Date(stats.lastCheckTime).toLocaleTimeString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit'
+            })}`}
+            icon={Globe}
+            color="text-yellow-500"
+            isMono={isMono}
+            textColor={stats.lastStatus === 'up' ? 'text-emerald-500' : 'text-destructive'}
+          />
         </div>
+
+        {/* SSL Certificate Card */}
+        <SslCard ssl={monitor.ssl} url={monitor.url} />
 
         {/* Response Time Graph */}
         <ChartCard title="Response Time (ms)">
@@ -333,12 +569,17 @@ export default function MonitorDetail() {
           </AreaChart>
         </ChartCard>
 
-        {/* Execution Log Table */}
-        <DistributionCard
-          title="Recent Checks"
-        >
+        {/* Recent Checks */}
+        <DistributionCard title="Recent Checks">
           <DistributionTable data={history} />
         </DistributionCard>
+
+        {/* Incident History */}
+        {incidents && incidents.length > 0 && (
+          <DistributionCard title="Incident History">
+            <IncidentTable incidents={incidents} />
+          </DistributionCard>
+        )}
 
       </div>
 

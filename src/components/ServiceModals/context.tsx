@@ -28,6 +28,10 @@ export interface EditData {
   framework?: string;
   dbType?: string;
   description?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  expectedStatus?: number;
   /** Called after a successful update so the dashboard page can refresh its SWR data. */
   onSuccess?: () => void | Promise<void>;
 }
@@ -81,6 +85,16 @@ export interface ServiceModalContextValue extends ServiceModalState {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   isQuotaError: boolean;
   setIsQuotaError: React.Dispatch<React.SetStateAction<boolean>>;
+
+  // --- Monitor advanced fields ---
+  monitorMethod: string;
+  setMonitorMethod: React.Dispatch<React.SetStateAction<string>>;
+  monitorHeaders: string;
+  setMonitorHeaders: React.Dispatch<React.SetStateAction<string>>;
+  monitorBody: string;
+  setMonitorBody: React.Dispatch<React.SetStateAction<string>>;
+  monitorExpectedStatus: string;
+  setMonitorExpectedStatus: React.Dispatch<React.SetStateAction<string>>;
 
   // --- Snippet selectors ---
   selectedFramework: string;
@@ -139,7 +153,7 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
   const [domain, setDomain] = useState("");
   const [domains, setDomains] = useState("");
   const [url, setUrl] = useState("");
-  const [interval, setInterval] = useState("15");
+  const [interval, setInterval] = useState("5");
   const [dbType, setDbType] = useState("mongodb");
   const [description, setDescription] = useState("");
   const [showUri, setShowUri] = useState(false);
@@ -151,6 +165,12 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isQuotaError, setIsQuotaError] = useState(false);
+
+  // Monitor advanced fields
+  const [monitorMethod, setMonitorMethod] = useState("GET");
+  const [monitorHeaders, setMonitorHeaders] = useState("");
+  const [monitorBody, setMonitorBody] = useState("");
+  const [monitorExpectedStatus, setMonitorExpectedStatus] = useState("");
 
   // Snippet selectors
   const [selectedFramework, setSelectedFramework] = useState("Express");
@@ -165,7 +185,7 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
     setDomain("");
     setDomains("");
     setUrl("");
-    setInterval("15");
+    setInterval("5");
     setDbType("mongodb");
     setDescription("");
     setShowUri(false);
@@ -173,6 +193,10 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
     setLoading(false);
     setError(null);
     setIsQuotaError(false);
+    setMonitorMethod("GET");
+    setMonitorHeaders("");
+    setMonitorBody("");
+    setMonitorExpectedStatus("");
     setSelectedFramework("Express");
     setSelectedServerMethod("Interactive");
     setSelectedWebMethod("CDN Script");
@@ -198,6 +222,10 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
         if (data.dbType) setDbType(data.dbType);
         if (data.framework) setSelectedFramework(data.framework);
         if (data.description) setDescription(data.description);
+        if (data.method) setMonitorMethod(data.method);
+        if (data.headers) setMonitorHeaders(JSON.stringify(data.headers, null, 2));
+        if (data.body) setMonitorBody(data.body);
+        if (data.expectedStatus) setMonitorExpectedStatus(String(data.expectedStatus));
       }
     },
     [resetFormState],
@@ -242,6 +270,14 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
         setError,
         isQuotaError,
         setIsQuotaError,
+        monitorMethod,
+        setMonitorMethod,
+        monitorHeaders,
+        setMonitorHeaders,
+        monitorBody,
+        setMonitorBody,
+        monitorExpectedStatus,
+        setMonitorExpectedStatus,
         selectedFramework,
         setSelectedFramework,
         selectedServerMethod,
