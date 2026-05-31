@@ -124,7 +124,7 @@ export default function FeaturePage({ feature }: FeaturePageProps) {
             </div>
 
             {/* FULL WIDE DIAGRAM */}
-            <div className="w-full lg:w-2/3 h-[300px] md:h-[400px] lg:h-[400px] relative mt-20 max-w-5xl mx-auto">
+            <div className="w-full lg:w-2/3 h-[300px] md:h-[400px] lg:h-[400px] relative mt-20 max-w-5xl mx-auto text-left">
               <div
                 className={cn(
                   "absolute inset-0 blur-3xl rounded-full transform pointer-events-none z-0 opacity-20",
