@@ -7,6 +7,7 @@ import { FitAddon } from "xterm-addon-fit";
 import { WebLinksAddon } from "xterm-addon-web-links";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "../../lib/auth";
+import { useOrg } from "../../lib/org";
 import { useTheme } from "../../lib/theme";
 import {
   Spinner,
@@ -154,6 +155,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { user, getIdToken } = useAuth();
+  const { activeOrg } = useOrg();
   const { theme } = useTheme();
 
   const [status, setStatus] = useState<
@@ -356,7 +358,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
 
         const socket = io(socketUrl, {
           path: "/api/socket",
-          auth: { token, type: "client" },
+          auth: { token, type: "client", orgId: activeOrg?._id || undefined },
           reconnection: false,
           transports: ["websocket"],
           timeout: 10000,
@@ -475,7 +477,7 @@ export default function TerminalView({ vpsId }: TerminalViewProps) {
       if (connectionTimeoutRef.current)
         clearTimeout(connectionTimeoutRef.current);
     };
-  }, [vpsId, user]);
+  }, [vpsId, user, activeOrg?._id]);
 
   const currentColors = getThemeColors(theme);
 
