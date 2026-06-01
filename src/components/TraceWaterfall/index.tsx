@@ -1,10 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Badge, cn, Button } from "../Core";
 import {
   Database,
   Globe,
-  Box,
-  Clock,
   Terminal,
   X,
   Zap,
@@ -13,10 +11,11 @@ import {
   LayoutList,
   ChevronRight,
   Tag,
-  ArrowRightCircle,
   Server,
 } from "lucide-react";
 import { useRouter } from "next/router";
+
+// --- Interfaces ---
 
 interface Span {
   name: string;
@@ -25,16 +24,34 @@ interface Span {
   duration: number;
   status?: number;
   meta?: any;
-  spanId?: string; // For linking
+  spanId?: string;
+  parentSpanId?: string;
+}
+
+interface SpanTreeNode {
+  span: Span;
+  children: SpanTreeNode[];
+  depth: number;
 }
 
 interface WaterfallProps {
   spans: Span[];
   totalDuration: number;
-  childrenTraces?: any[]; // Restored
+  childrenTraces?: any[];
 }
 
-// --- Theme Helpers ---
+// --- Constants ---
+
+const MAX_NESTING_DEPTH = 6;
+
+// --- Helpers ---
+
+const getSpanKey = (span: Span): string =>
+  span.spanId || `${span.name}::${span.startTime}::${span.duration}`;
+
+const getSpanParentId = (span: Span): string | undefined =>
+  span.parentSpanId || span.meta?.parentSpanId;
+
 const getSpanTheme = (type: string, status?: number) => {
   if (status && status >= 400) {
     return {
@@ -73,37 +90,314 @@ const getSpanTheme = (type: string, status?: number) => {
   }
 };
 
+// --- Tree Building ---
+
+const buildSpanTree = (spans: Span[]): SpanTreeNode[] => {
+  const nodes: SpanTreeNode[] = spans.map((span) => ({
+    span,
+    children: [],
+    depth: 0,
+  }));
+
+  const spanIdToNode = new Map<string, SpanTreeNode>();
+  for (const node of nodes) {
+    if (node.span.spanId) {
+      spanIdToNode.set(node.span.spanId, node);
+    }
+  }
+
+  const childNodes = new Set<SpanTreeNode>();
+  for (const node of nodes) {
+    const parentId = getSpanParentId(node.span);
+    if (parentId && parentId !== node.span.spanId) {
+      const parent = spanIdToNode.get(parentId);
+      if (parent && parent !== node) {
+        parent.children.push(node);
+        childNodes.add(node);
+      }
+    }
+  }
+
+  const roots = nodes.filter((n) => !childNodes.has(n));
+
+  const assignDepths = (
+    treeNodes: SpanTreeNode[],
+    depth: number,
+    visited = new Set<SpanTreeNode>(),
+  ) => {
+    treeNodes.sort((a, b) => a.span.startTime - b.span.startTime);
+    for (const node of treeNodes) {
+      if (visited.has(node)) continue;
+      visited.add(node);
+      node.depth = Math.min(depth, MAX_NESTING_DEPTH);
+      assignDepths(node.children, depth + 1, visited);
+    }
+  };
+  assignDepths(roots, 0);
+
+  return roots;
+};
+
+const findAncestorKeys = (
+  targetKey: string,
+  nodes: SpanTreeNode[],
+): Set<string> => {
+  const ancestors = new Set<string>();
+  const search = (searchNodes: SpanTreeNode[]): boolean => {
+    for (const node of searchNodes) {
+      const key = getSpanKey(node.span);
+      if (key === targetKey) return true;
+      if (node.children.length > 0 && search(node.children)) {
+        ancestors.add(key);
+        return true;
+      }
+    }
+    return false;
+  };
+  search(nodes);
+  return ancestors;
+};
+
+// --- Span Row Component ---
+
+const SpanRow = ({
+  node,
+  viewDuration,
+  selectedSpanKey,
+  ancestorKeys,
+  collapsedKeys,
+  hasNesting,
+  onSelect,
+  onToggleCollapse,
+  getChildTrace,
+}: {
+  node: SpanTreeNode;
+  viewDuration: number;
+  selectedSpanKey: string | null;
+  ancestorKeys: Set<string>;
+  collapsedKeys: Set<string>;
+  hasNesting: boolean;
+  onSelect: (span: Span) => void;
+  onToggleCollapse: (key: string) => void;
+  getChildTrace: (spanId: string | undefined) => any;
+}) => {
+  const { span, children, depth } = node;
+  const theme = getSpanTheme(span.type, span.status);
+  const spanKey = getSpanKey(span);
+  const isSelected = selectedSpanKey === spanKey;
+  const isCollapsed = collapsedKeys.has(spanKey);
+  const hasChildren = children.length > 0;
+  const linkedChild = getChildTrace(span.spanId || span.meta?.spanId);
+
+  const startPct = (span.startTime / viewDuration) * 100;
+  const widthPct = (span.duration / viewDuration) * 100;
+  const isInstant = span.duration < 0.1;
+  const safeWidth = Math.max(widthPct, 0.2);
+
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isSelected && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [isSelected]);
+
+  return (
+    <div>
+      <div
+        ref={rowRef}
+        onClick={() => onSelect(span)}
+        className={cn(
+          "relative flex flex-col gap-1.5 py-2 px-3 rounded-lg cursor-pointer transition-colors group z-10",
+          isSelected
+            ? "bg-secondary/80 border border-border/50"
+            : "border border-transparent hover:bg-muted/30 hover:border-border/40",
+        )}
+      >
+        {/* Row 1: Header Info */}
+        <div className="flex items-center justify-between z-10">
+          <div className="flex items-center gap-2 min-w-0 pr-4">
+            {hasChildren ? (
+              <div className="flex items-center shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleCollapse(spanKey);
+                  }}
+                  className="p-0.5 rounded-md text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                >
+                  <ChevronRight
+                    className={cn(
+                      "h-3.5 w-3.5 transition-transform duration-200",
+                      !isCollapsed && "rotate-90",
+                    )}
+                  />
+                </button>
+                <span className="text-[9px] font-mono text-muted-foreground/70 tabular-nums ml-0.5 select-none">
+                  {children.length}
+                </span>
+              </div>
+            ) : hasNesting ? (
+              <div className="w-[22px] shrink-0" />
+            ) : null}
+
+            <div className={cn("p-1 rounded shrink-0", theme.bg, theme.text)}>
+              {theme.icon}
+            </div>
+            <span
+              className={cn(
+                "text-xs truncate transition-colors max-w-[400px]",
+                isSelected
+                  ? "text-foreground font-semibold"
+                  : "text-foreground font-medium group-hover:text-primary",
+              )}
+            >
+              {span.name}
+            </span>
+            {linkedChild && (
+              <Badge
+                variant="outline"
+                className="h-4 px-1 text-[9px] border-blue-500/30 text-blue-500 bg-blue-500/5 gap-1"
+              >
+                <Zap className="w-2 h-2" /> Linked
+              </Badge>
+            )}
+          </div>
+          <span
+            className={cn(
+              "text-[10px] font-mono shrink-0 px-1.5 rounded border",
+              isSelected
+                ? "text-foreground bg-secondary border-border/40"
+                : "text-muted-foreground bg-background/50 border-border/20",
+            )}
+          >
+            {span.duration.toFixed(3)}ms
+          </span>
+        </div>
+
+        {/* Row 2: Waterfall Bar */}
+        <div className="h-2 w-full bg-muted-foreground/10 rounded-full overflow-hidden relative mt-1">
+          <div
+            className={cn(
+              "absolute h-full rounded-full transition-opacity",
+              theme.bar,
+              isSelected
+                ? "opacity-100"
+                : "opacity-80 group-hover:opacity-100",
+            )}
+            style={{
+              left: `${startPct}%`,
+              width: isInstant ? "4px" : `${safeWidth}%`,
+              minWidth: isInstant ? "4px" : undefined,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Children Container (Animated Accordion with Tree Connector) */}
+      {hasChildren && (
+        <div
+          className={cn(
+            "grid transition-all duration-300 ease-in-out",
+            !isCollapsed
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-0",
+          )}
+        >
+          <div className="overflow-hidden">
+            <div
+              className={cn(
+                "ml-5 pl-3 border-l-2 flex flex-col gap-0.5 py-0.5 transition-colors duration-300",
+                ancestorKeys.has(spanKey)
+                  ? "border-primary/50"
+                  : "border-border/30",
+              )}
+            >
+              {children.map((child) => (
+                <SpanRow
+                  key={getSpanKey(child.span)}
+                  node={child}
+                  viewDuration={viewDuration}
+                  selectedSpanKey={selectedSpanKey}
+                  ancestorKeys={ancestorKeys}
+                  collapsedKeys={collapsedKeys}
+                  hasNesting={hasNesting}
+                  onSelect={onSelect}
+                  onToggleCollapse={onToggleCollapse}
+                  getChildTrace={getChildTrace}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Main Component ---
+
 export const TraceWaterfall = ({
   spans,
   totalDuration,
   childrenTraces,
 }: WaterfallProps) => {
   const [selectedSpan, setSelectedSpan] = useState<Span | null>(null);
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set());
   const router = useRouter();
 
-  // 1. Calculate View Duration (Async Span Support)
-  const { sortedSpans, viewDuration } = useMemo(() => {
-    const sorted = [...spans].sort((a, b) => a.startTime - b.startTime);
+  const { spanTree, viewDuration, hasNesting } = useMemo(() => {
+    const tree = buildSpanTree(spans);
+
     let maxEnd = totalDuration;
+    const calcMaxEnd = (nodes: SpanTreeNode[]) => {
+      for (const node of nodes) {
+        const end = node.span.startTime + node.span.duration;
+        if (end > maxEnd) maxEnd = end;
+        calcMaxEnd(node.children);
+      }
+    };
+    calcMaxEnd(tree);
 
-    // Check if any span goes beyond the main request duration
-    sorted.forEach((s) => {
-      const end = s.startTime + s.duration;
-      if (end > maxEnd) maxEnd = end;
-    });
-
-    // Add 2% buffer for visual breathing room
-    return { sortedSpans: sorted, viewDuration: maxEnd * 1.02 };
+    return {
+      spanTree: tree,
+      viewDuration: maxEnd * 1.02,
+      hasNesting: tree.some((node) => node.children.length > 0),
+    };
   }, [spans, totalDuration]);
 
-  // Show "Response Sent" marker if async tasks exist
+  const selectedSpanKey = selectedSpan ? getSpanKey(selectedSpan) : null;
+
+  const ancestorKeys = useMemo(() => {
+    if (!selectedSpanKey) return new Set<string>();
+    return findAncestorKeys(selectedSpanKey, spanTree);
+  }, [selectedSpanKey, spanTree]);
+
   const showResponseLine = viewDuration > totalDuration * 1.05;
 
-  // Helper to find child traces
-  const getChildTrace = (spanId: string) => {
-    if (!childrenTraces || !spanId) return undefined;
-    return childrenTraces.find((c) => c.parentSpanId === spanId);
-  };
+  const getChildTrace = useCallback(
+    (spanId: string | undefined) => {
+      if (!childrenTraces || !spanId) return undefined;
+      return childrenTraces.find((c: any) => c.parentSpanId === spanId);
+    },
+    [childrenTraces],
+  );
+
+  const handleSelect = useCallback((span: Span) => {
+    setSelectedSpan(span);
+  }, []);
+
+  const handleToggleCollapse = useCallback((key: string) => {
+    setCollapsedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   // --- Empty State ---
   if (!spans || spans.length === 0) {
@@ -156,72 +450,21 @@ export const TraceWaterfall = ({
         </div>
 
         {/* Layer 2: Scrolling Content (z-10) */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-1 relative z-10">
-          {sortedSpans.map((span, i) => {
-            const theme = getSpanTheme(span.type, span.status);
-            const linkedChild = getChildTrace(
-              (span as any).spanId || span.meta?.spanId,
-            );
-
-            // Calculation based on viewDuration (handling async)
-            const startPct = (span.startTime / viewDuration) * 100;
-            const widthPct = (span.duration / viewDuration) * 100;
-            const isInstant = span.duration < 0.1;
-            const safeWidth = Math.max(widthPct, 0.2);
-
-            return (
-              <div
-                key={i}
-                onClick={() => setSelectedSpan(span)}
-                className="relative flex flex-col gap-1.5 py-2 px-3 rounded-lg hover:bg-muted/30 cursor-pointer transition-colors group border border-transparent hover:border-border/40 z-10"
-              >
-                {/* Row 1: Header Info */}
-                <div className="flex items-center justify-between z-10">
-                  <div className="flex items-center gap-2 min-w-0 pr-4">
-                    <div
-                      className={cn(
-                        "p-1 rounded shrink-0",
-                        theme.bg,
-                        theme.text,
-                      )}
-                    >
-                      {theme.icon}
-                    </div>
-                    <span className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors max-w-[400px]">
-                      {span.name}
-                    </span>
-                    {/* Link Badge */}
-                    {linkedChild && (
-                      <Badge
-                        variant="outline"
-                        className="h-4 px-1 text-[9px] border-blue-500/30 text-blue-500 bg-blue-500/5 gap-1"
-                      >
-                        <Zap className="w-2 h-2" /> Linked
-                      </Badge>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-mono text-muted-foreground shrink-0 bg-background/50 px-1.5 rounded border border-border/20">
-                    {span.duration.toFixed(3)}ms
-                  </span>
-                </div>
-
-                {/* Row 2: Waterfall Bar */}
-                <div className="h-2 w-full bg-secondary/20 rounded-full overflow-hidden relative mt-1">
-                  <div
-                    className={cn(
-                      "absolute h-full rounded-full opacity-80 group-hover:opacity-100 transition-opacity",
-                      theme.bar,
-                    )}
-                    style={{
-                      left: `${startPct}%`,
-                      width: isInstant ? "4px" : `${safeWidth}%`,
-                      minWidth: isInstant ? "4px" : undefined,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex-1 overflow-y-auto p-4 space-y-0.5 relative z-10">
+          {spanTree.map((node) => (
+            <SpanRow
+              key={getSpanKey(node.span)}
+              node={node}
+              viewDuration={viewDuration}
+              selectedSpanKey={selectedSpanKey}
+              ancestorKeys={ancestorKeys}
+              collapsedKeys={collapsedKeys}
+              hasNesting={hasNesting}
+              onSelect={handleSelect}
+              onToggleCollapse={handleToggleCollapse}
+              getChildTrace={getChildTrace}
+            />
+          ))}
         </div>
 
         {/* Layer 3: Response Line Overlay (Fixed Foreground z-20) */}
@@ -262,10 +505,10 @@ export const TraceWaterfall = ({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-8">
-            {/* Linked Service Card (Restored) */}
+            {/* Linked Service Card */}
             {(() => {
               const linkedChild = getChildTrace(
-                (selectedSpan as any).spanId || selectedSpan.meta?.spanId,
+                selectedSpan.spanId || selectedSpan.meta?.spanId,
               );
               if (linkedChild)
                 return (
