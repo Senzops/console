@@ -595,19 +595,19 @@ export default function DatabaseDetail() {
                   ]}
         />
 
-        {/* --- 4. Detailed Charts Grid --- */}
         {/* --- 4. Detailed Charts Grid (Configuration Driven) --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
            {gridCharts.map((chart, i) => (
-               <DynamicChart 
-                   key={i}
-                   title={chart.title}
-                   data={chartData}
-                   type={'type' in chart ? chart.type : undefined}
-                   series={chart.series}
-                   tooltipSuffix={chart.tooltipSuffix}
-                   tooltipFormatter={chart.formatter}
-               />
+               <div key={i} className={i === gridCharts.length - 1 && gridCharts.length % 2 !== 0 ? 'md:col-span-2' : ''}>
+                 <DynamicChart
+                     title={chart.title}
+                     data={chartData}
+                     type={'type' in chart ? chart.type : undefined}
+                     series={chart.series}
+                     tooltipSuffix={chart.tooltipSuffix}
+                     tooltipFormatter={chart.formatter}
+                 />
+               </div>
            ))}
         </div>
 
