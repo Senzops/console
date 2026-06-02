@@ -1244,8 +1244,8 @@ export const ServiceModals: React.FC = () => {
               <SelectContent>
                 <SelectItem value="mongodb">MongoDB</SelectItem>
                 <SelectItem value="redis">Redis</SelectItem>
-                <SelectItem value="postgresql" disabled>PostgreSQL (Coming Soon)</SelectItem>
-                <SelectItem value="mysql" disabled>MySQL (Coming Soon)</SelectItem>
+                <SelectItem value="postgresql">PostgreSQL</SelectItem>
+                <SelectItem value="mysql">MySQL</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1256,7 +1256,11 @@ export const ServiceModals: React.FC = () => {
               placeholder={
                 dbType === "redis"
                   ? "e.g. Production Cache"
-                  : "e.g. Production Cluster"
+                  : dbType === "postgresql"
+                    ? "e.g. Production PostgreSQL"
+                    : dbType === "mysql"
+                      ? "e.g. Production MySQL"
+                      : "e.g. Production Cluster"
               }
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -1281,7 +1285,11 @@ export const ServiceModals: React.FC = () => {
                     ? "Leave blank to keep current URI"
                     : dbType === "redis"
                       ? "redis://:password@host:6379/0"
-                      : "mongodb+srv://user:pass@cluster.net"
+                      : dbType === "postgresql"
+                        ? "postgresql://user:pass@host:5432/dbname"
+                        : dbType === "mysql"
+                          ? "mysql://user:pass@host:3306/dbname"
+                          : "mongodb+srv://user:pass@cluster.net"
                 }
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}

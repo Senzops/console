@@ -6,7 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize, Search, Pencil } from 'lucide-react';
+import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize, Search, Pencil, Gauge } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { toast } from 'sonner';
@@ -172,9 +172,10 @@ const CollectionsTable = ({ collections, type }: { collections: any[], type: str
   const filtered = collections.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
   const displayed = isMaximized ? filtered : filtered.slice(0, 5);
   
-  const titleText = type === 'redis' ? 'Top Keyspaces' : 'Top Collections';
-  const nameLabel = type === 'redis' ? 'Database' : 'Collection Name';
-  const countLabel = type === 'redis' ? 'Total Keys' : 'Documents';
+  const isSQLType = type === 'postgresql' || type === 'mysql';
+  const titleText = type === 'redis' ? 'Top Keyspaces' : isSQLType ? 'Top Tables' : 'Top Collections';
+  const nameLabel = type === 'redis' ? 'Database' : isSQLType ? 'Table Name' : 'Collection Name';
+  const countLabel = type === 'redis' ? 'Total Keys' : isSQLType ? 'Row Estimate' : 'Documents';
   const indexLabel = type === 'redis' ? 'Expiring Keys' : 'Index Size';
 
   const Content = (
@@ -201,8 +202,8 @@ const CollectionsTable = ({ collections, type }: { collections: any[], type: str
                    <tr>
                       <th className="px-5 py-3 whitespace-nowrap">{nameLabel}</th>
                       <th className="px-5 py-3 text-right whitespace-nowrap">{countLabel}</th>
-                      {type === 'mongodb' && <th className="px-5 py-3 text-right whitespace-nowrap">Data Size</th>}
-                      {type === 'mongodb' && <th className="px-5 py-3 text-right whitespace-nowrap">Storage Size</th>}
+                      {(type === 'mongodb' || isSQLType) && <th className="px-5 py-3 text-right whitespace-nowrap">Data Size</th>}
+                      {(type === 'mongodb' || isSQLType) && <th className="px-5 py-3 text-right whitespace-nowrap">Storage Size</th>}
                       <th className="px-5 py-3 text-right whitespace-nowrap">{indexLabel}</th>
                    </tr>
                 </thead>
@@ -211,8 +212,8 @@ const CollectionsTable = ({ collections, type }: { collections: any[], type: str
                       <tr key={i} className="hover:bg-muted/30 transition-colors group">
                          <td className="px-5 py-3 font-medium text-foreground break-all max-w-[200px]">{c.name}</td>
                          <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={Number(c.count).toLocaleString('en-US')}/></td>
-                         {type === 'mongodb' && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.size)}/></td>}
-                         {type === 'mongodb' && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.storageSize)}/></td>}
+                         {(type === 'mongodb' || isSQLType) && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.size)}/></td>}
+                         {(type === 'mongodb' || isSQLType) && <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={formatSize(c.storageSize)}/></td>}
                          <td className="px-5 py-3 text-right font-mono text-muted-foreground"><SmartAnimatedValue value={type === 'redis' ? Number(c.indexSize).toLocaleString('en-US') : formatSize(c.indexSize)}/></td>
                       </tr>
                    ))}
@@ -227,7 +228,7 @@ const CollectionsTable = ({ collections, type }: { collections: any[], type: str
                       </tr>
                    )}
                    {filtered.length === 0 && (
-                      <tr><td colSpan={type==='redis'?3:5} className="px-5 py-8 text-center text-muted-foreground text-sm">No collections match your search.</td></tr>
+                      <tr><td colSpan={type==='redis'?3:5} className="px-5 py-8 text-center text-muted-foreground text-sm">No results match your search.</td></tr>
                    )}
                 </tbody>
              </table>
@@ -302,6 +303,7 @@ export default function DatabaseDetail() {
 
   const { database, latest, history, collections } = data;
   const isRedis = database.type === 'redis';
+  const isSQL = database.type === 'postgresql' || database.type === 'mysql';
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
 
   // --- Configuration Driven Chart Definitions ---
@@ -330,6 +332,70 @@ export default function DatabaseDetail() {
         series: [
             { key: 'redisEvicted', name: 'Evicted (OOM)', color: '#f59e0b', style: 'gradient' },
             { key: 'redisExpired', name: 'Expired (TTL)', color: '#8b5cf6', style: 'gradient' }
+        ]
+    }
+  ] : isSQL ? [
+    {
+        title: "Query Latency (ms)", tooltipSuffix: " ms",
+        series: [{ key: 'latencyPing', name: 'Ping Latency', color: '#8b5cf6', style: 'gradient' }]
+    },
+    {
+        title: "Buffer Cache Hit Rate (%)", tooltipSuffix: "%",
+        series: [{ key: 'sqlCacheHitRate', name: 'Cache Hit Rate', color: '#10b981', style: 'gradient' }]
+    },
+    {
+        title: "Memory / Buffer Pool (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'memVirtual', name: 'Buffer Pool Total', color: '#64748b', style: 'gradient', dashed: true },
+            { key: 'memResident', name: 'Buffer Pool Used', color: '#ec4899', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Storage Size (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'storageData', name: 'Data Size', color: '#14b8a6', style: 'gradient' },
+            { key: 'storageIndex', name: 'Index Size', color: '#6366f1', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Transaction Rate (tx/sec)", tooltipSuffix: " tx/s",
+        series: [
+            { key: 'sqlTxRolledBack', name: 'Rolled Back', color: '#ef4444', style: 'gradient', stackId: 1 },
+            { key: 'sqlTxCommitted', name: 'Committed', color: '#10b981', style: 'gradient', stackId: 1 }
+        ]
+    },
+    {
+        title: "Row Operations (rows/sec)", tooltipSuffix: " rows/s",
+        series: [
+            { key: 'sqlRowsReturned', name: 'Rows Returned', color: '#3b82f6', style: 'gradient' },
+            { key: 'sqlRowsModified', name: 'Rows Modified', color: '#f59e0b', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Scan Efficiency (scans/sec)", tooltipSuffix: " scans/s",
+        series: [
+            { key: 'sqlTableScans', name: 'Seq / Full Table Scans', color: '#ef4444', style: 'gradient' },
+            { key: 'sqlIndexScans', name: 'Index Scans', color: '#10b981', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Locks & Contention", type: 'bar',
+        series: [
+            { key: 'locksAR', name: 'Granted Locks', color: '#3b82f6', stackId: 'a', radius: [0, 0, 4, 4] },
+            { key: 'locksQW', name: 'Waiting Locks', color: '#f59e0b', stackId: 'a', radius: [4, 4, 0, 0] }
+        ]
+    },
+    {
+        title: "Deadlocks & Blocked Queries",
+        series: [
+            { key: 'sqlDeadlocks', name: 'Deadlocks', color: '#ef4444', style: 'gradient' },
+            { key: 'sqlBlockedQueries', name: 'Blocked Queries', color: '#f59e0b', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Active Queries",
+        series: [
+            { key: 'sqlActiveQueries', name: 'Active Queries', color: '#8b5cf6', style: 'gradient' }
         ]
     }
   ] : [
@@ -414,7 +480,7 @@ export default function DatabaseDetail() {
                <span className="capitalize">{database.type} Engine</span>
                <span>•</span>
                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Polling {database.interval}m</span>
-               {!isRedis && (
+               {!isRedis && latest.storage?.dataSize > 0 && (
                  <>
                    <span>•</span>
                    <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> {formatSize(latest.storage?.dataSize)} Data</span>
@@ -456,28 +522,36 @@ export default function DatabaseDetail() {
              icon={Activity} 
              color="text-blue-500" 
            />
-           <StatCard 
+           <StatCard
              title={isRedis ? "Operations/sec" : "Total Ops/sec"}
-             value={isRedis ? (latest.throughput?.total || 0).toFixed(2) : ((latest.throughput?.read || 0) + (latest.throughput?.write || 0)).toFixed(2)} 
+             value={isRedis ? (latest.throughput?.total || 0).toFixed(2) : ((latest.throughput?.read || 0) + (latest.throughput?.write || 0)).toFixed(2)}
              subtext={isRedis ? "Commands processed" : "Reads & Writes combined"}
-             icon={Zap} 
-             color="text-emerald-500" 
+             icon={Zap}
+             color="text-emerald-500"
            />
            {isRedis ? (
-              <StatCard 
-                 title="Cache Hit Rate" 
-                 value={`${(latest.redis?.hitRate || 0).toFixed(2)}%`} 
+              <StatCard
+                 title="Cache Hit Rate"
+                 value={`${(latest.redis?.hitRate || 0).toFixed(2)}%`}
                  subtext="Hits vs Misses"
-                 icon={Zap} 
-                 color="text-yellow-500" 
+                 icon={Zap}
+                 color="text-yellow-500"
+              />
+           ) : isSQL ? (
+              <StatCard
+                 title="Buffer Cache Hit"
+                 value={`${(latest.sql?.cacheHitRate || 0).toFixed(2)}%`}
+                 subtext="Buffer pool efficiency"
+                 icon={Gauge}
+                 color="text-yellow-500"
               />
            ) : (
-              <StatCard 
-                 title="Memory Used" 
-                 value={formatSize(latest.memory?.resident)} 
+              <StatCard
+                 title="Memory Used"
+                 value={formatSize(latest.memory?.resident)}
                  subtext="Resident Set Size (RSS)"
-                 icon={HardDrive} 
-                 color="text-purple-500" 
+                 icon={HardDrive}
+                 color="text-purple-500"
               />
            )}
            <StatCard 
@@ -495,10 +569,10 @@ export default function DatabaseDetail() {
             className="h-[350px]"
             data={chartData}
             tooltipSuffix=" ops"
-            series={isRedis 
-                ? [{ key: 'throughputTotal', name: 'Commands', color: '#8b5cf6', style: 'gradient' }] 
+            series={isRedis
+                ? [{ key: 'throughputTotal', name: 'Commands', color: '#8b5cf6', style: 'gradient' }]
                 : [
-                    { key: 'throughputWrite', name: 'Writes', color: '#3b82f6', style: 'gradient' }, 
+                    { key: 'throughputWrite', name: 'Writes', color: '#3b82f6', style: 'gradient' },
                     { key: 'throughputRead', name: 'Reads', color: '#10b981', style: 'gradient' }
                   ]}
         />
