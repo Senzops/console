@@ -333,6 +333,14 @@ export default function DatabaseDetail() {
             { key: 'redisEvicted', name: 'Evicted (OOM)', color: '#f59e0b', style: 'gradient' },
             { key: 'redisExpired', name: 'Expired (TTL)', color: '#8b5cf6', style: 'gradient' }
         ]
+    },
+    {
+        title: "Memory Fragmentation Ratio", tooltipSuffix: "",
+        series: [{ key: 'redisFragRatio', name: 'Fragmentation', color: '#f59e0b', style: 'gradient' }]
+    },
+    {
+        title: "Blocked Clients", tooltipSuffix: "",
+        series: [{ key: 'redisBlockedClients', name: 'Blocked', color: '#ef4444', style: 'gradient' }]
     }
   ] : isSQL ? [
     {
@@ -386,18 +394,24 @@ export default function DatabaseDetail() {
         ]
     },
     {
-        title: "Deadlocks & Blocked Queries",
+        title: "Deadlocks & Blocked Queries", tooltipSuffix: "",
         series: [
             { key: 'sqlDeadlocks', name: 'Deadlocks', color: '#ef4444', style: 'gradient' },
             { key: 'sqlBlockedQueries', name: 'Blocked Queries', color: '#f59e0b', style: 'gradient' }
         ]
     },
     {
-        title: "Active Queries",
+        title: "Active & Slow Queries", tooltipSuffix: "",
         series: [
-            { key: 'sqlActiveQueries', name: 'Active Queries', color: '#8b5cf6', style: 'gradient' }
+            { key: 'sqlActiveQueries', name: 'Active Queries', color: '#8b5cf6', style: 'gradient' },
+            { key: 'sqlSlowQueries', name: 'Slow Queries (>1s)', color: '#ef4444', style: 'gradient' }
         ]
-    }
+    },
+    // Only show replication lag chart when the instance is a replica (lag >= 0)
+    ...((latest.sql?.replicationLagMs ?? -1) >= 0 ? [{
+        title: "Replication Lag (ms)", tooltipSuffix: " ms",
+        series: [{ key: 'sqlReplicationLag', name: 'Replica Lag', color: '#f59e0b', style: 'gradient' }]
+    }] : [])
   ] : [
     {
         title: "Read Latency (ms)", tooltipSuffix: " ms",
@@ -449,6 +463,10 @@ export default function DatabaseDetail() {
   // Append Common Shared Charts
   gridCharts.push(
       {
+          title: "Connections Over Time", tooltipSuffix: "",
+          series: [{ key: 'connections', name: 'Active Connections', color: '#3b82f6', style: 'gradient' }]
+      },
+      {
           title: "Network Traffic (KB/s)", tooltipSuffix: " KB/s",
           series: [
               { key: 'netOutKB', name: 'Bytes Out', color: '#10b981', style: 'gradient' },
@@ -477,7 +495,7 @@ export default function DatabaseDetail() {
                </Badge>
             </div>
             <div className="text-xs text-muted-foreground font-mono flex flex-wrap items-center gap-3">
-               <span className="capitalize">{database.type} Engine</span>
+               <span className="capitalize">{database.type}{database.version ? ` ${database.version}` : ''}</span>
                <span>•</span>
                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Polling {database.interval}m</span>
                {!isRedis && latest.storage?.dataSize > 0 && (
