@@ -86,12 +86,13 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
     (str: string) => {
       if (!str) return '';
       const date = new Date(str);
-
+      if (isNaN(date.getTime())) return str;
+      const short=(range?.includes('30m') || range?.includes('1h'));
       return date.toLocaleString(undefined, {
-        month: (range === '30m' || range === '1h') ? undefined : 'short',
-        day: (range === '30m' || range === '1h') ? undefined : 'numeric',
+        month: short ? undefined : 'short',
+        day: short ? undefined : 'numeric',
         hour: 'numeric',
-        minute: (range === '30m' || range === '1h') ? '2-digit' : undefined,
+        minute: short ? '2-digit' : undefined,
       });
     },
     [range],
