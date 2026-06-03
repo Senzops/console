@@ -29,6 +29,7 @@ import {
   LayoutGrid,
   List,
   Database,
+  Flame,
   EyeOff,
   Eye,
   AlertOctagon,
@@ -377,7 +378,9 @@ export const getSidebarItemIcon = (hrefPrefix: string, item: any, DefaultIcon: a
     else if (item.status === "offline" || item.status === "down")
       statusColor = "bg-destructive";
 
-    if (hrefPrefix.includes("web"))
+    if (hrefPrefix.includes("firebase"))
+      Icon = <Flame className="h-3 w-3 text-amber-500 shrink-0" />;
+    else if (hrefPrefix.includes("web"))
       Icon = <Globe className="h-3 w-3 text-blue-500 shrink-0" />;
     else if (hrefPrefix.includes("rum"))
       Icon = <MonitorSmartphone className="h-3 w-3 text-pink-500 shrink-0" />;
@@ -453,6 +456,9 @@ export const SidebarSection = ({
     } else if (title === "Databases") {
       HeaderIconComponent = Database;
       iconColorClass = "text-blue-500";
+    } else if (title === "Firebase") {
+      HeaderIconComponent = Flame;
+      iconColorClass = "text-amber-500";
     } else if (title === "Web Analytics") {
       HeaderIconComponent = Globe;
       iconColorClass = "text-sky-500";
@@ -777,6 +783,7 @@ export const DashboardLayout = ({
   const { mutate: mutateMonitors } = useSWR(token ? "/uptime/list" : null, fetcher);
   const { mutate: mutateApm } = useSWR(token ? "/apm/list" : null, fetcher);
   const { mutate: mutateDb } = useSWR(token ? "/database/list" : null, fetcher);
+  const { mutate: mutateFirebase } = useSWR(token ? "/firebase/list" : null, fetcher);
   const { mutate: mutateTask } = useSWR(token ? "/task/list" : null, fetcher);
   const { mutate: mutateRum } = useSWR(token ? "/rum/list" : null, fetcher);
   const { mutate: mutateViews } = useSWR(token ? "/views" : null, fetcher);
@@ -788,11 +795,12 @@ export const DashboardLayout = ({
       monitor: mutateMonitors,
       apm: mutateApm,
       database: mutateDb,
+      firebase: mutateFirebase,
       task: mutateTask,
       rum: mutateRum,
       view: mutateViews,
     }),
-    [mutateServers, mutateWeb, mutateMonitors, mutateApm, mutateDb, mutateTask, mutateRum, mutateViews],
+    [mutateServers, mutateWeb, mutateMonitors, mutateApm, mutateDb, mutateFirebase, mutateTask, mutateRum, mutateViews],
   );
 
   return (
@@ -1004,6 +1012,7 @@ const DashboardLayoutInner = ({
   const { data: monitorList } = useSWR(token ? "/uptime/list" : null, fetcher);
   const { data: apmList } = useSWR(token ? "/apm/list" : null, fetcher);
   const { data: dbList } = useSWR(token ? "/database/list" : null, fetcher);
+  const { data: firebaseList } = useSWR(token ? "/firebase/list" : null, fetcher);
   const { data: taskList } = useSWR(token ? "/task/list" : null, fetcher);
   const { data: rumList } = useSWR(token ? "/rum/list" : null, fetcher);
   const { data: viewsList } = useSWR(token ? "/views" : null, fetcher);
@@ -1047,6 +1056,7 @@ const DashboardLayoutInner = ({
     monitorList,
     apmList,
     dbList,
+    firebaseList,
     taskList,
     rumList,
     viewsList,
@@ -1228,6 +1238,27 @@ const DashboardLayoutInner = ({
                   linkPrefix: "/dashboard/db",
                   onAdd: !user.isDemo ? () => openModal('database') : undefined,
                   icon: <Database className="h-3.5 w-3.5 text-blue-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              <SidebarSection
+                title="Firebase"
+                items={firebaseList}
+                hrefPrefix="/dashboard/firebase"
+                linkPrefix="/dashboard/firebase"
+                onAdd={!user.isDemo ? () => openModal('firebase') : undefined}
+                icon={<Flame className="h-3 w-3 text-amber-500 shrink-0" />}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "firebase",
+                  title: "Firebase",
+                  items: firebaseList,
+                  hrefPrefix: "/dashboard/firebase",
+                  linkPrefix: "/dashboard/firebase",
+                  onAdd: !user.isDemo ? () => openModal('firebase') : undefined,
+                  icon: <Flame className="h-3.5 w-3.5 text-amber-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
                 onMouseLeave={handleSectionMouseLeave}

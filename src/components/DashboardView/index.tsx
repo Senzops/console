@@ -22,6 +22,7 @@ import {
   Workflow,
   MonitorSmartphone,
   LayoutTemplate,
+  Flame,
 } from "lucide-react";
 import useSWR from "swr";
 import { api, useAuth } from "../../lib/auth";
@@ -55,6 +56,7 @@ interface DashboardViewProps {
     | "database"
     | "task"
     | "rum"
+    | "firebase"
     | "view";
 }
 
@@ -103,6 +105,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutate: mutateRum,
   } = useSWR(token ? "/rum/list" : null, fetcher);
   const {
+    data: firebaseList,
+    error: firebaseErr,
+    mutate: mutateFirebase,
+  } = useSWR(token ? "/firebase/list" : null, fetcher);
+  const {
     data: viewsData,
     error: viewsErr,
     mutate: mutateViews,
@@ -116,6 +123,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     dbErr ||
     taskErr ||
     rumErr ||
+    firebaseErr ||
     viewsErr;
   const isLoading =
     !serverList &&
@@ -125,6 +133,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     !dbList &&
     !taskList &&
     !rumList &&
+    !firebaseList &&
     !viewsData &&
     !hasError;
 
@@ -136,6 +145,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     (apmList?.length || 0) === 0 &&
     (taskList?.length || 0) === 0 &&
     (rumList?.length || 0) === 0 &&
+    (firebaseList?.length || 0) === 0 &&
     (viewsData?.views?.length || 0) === 0;
 
   useEffect(() => {
@@ -150,6 +160,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutateDb();
     mutateTask();
     mutateRum();
+    mutateFirebase();
     mutateViews();
   };
 
@@ -205,6 +216,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
       type: "database",
       meta: `${d.type}`,
     })),
+    ...(firebaseList || []).map((f: any) => ({
+      ...f,
+      type: "firebase",
+      meta: f.projectId,
+    })),
     ...(webList || []).map((w: any) => ({ ...w, type: "web" })),
     ...(rumList || []).map((r: any) => ({ ...r, type: "rum" })),
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
@@ -226,6 +242,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     if (item.type === "apm") return `/dashboard/apm/${item._id}`;
     if (item.type === "task") return `/dashboard/task/${item._id}`;
     if (item.type === "database") return `/dashboard/db/${item._id}`;
+    if (item.type === "firebase") return `/dashboard/firebase/${item._id}`;
     if (item.type === "view") return `/dashboard/views/${item._id}`;
     return `/dashboard/monitor/${item._id}`;
   };
@@ -244,6 +261,15 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           className="text-blue-500 bg-blue-500/10 border-blue-500/20"
         >
           ACTIVE
+        </Badge>
+      );
+    if (item.type === "firebase")
+      return (
+        <Badge
+          variant={item.status === "online" ? "success" : "destructive"}
+          className="px-2 py-0 text-[10px]"
+        >
+          {item.status === "online" ? "ONLINE" : item.status === "error" ? "ERROR" : "OFFLINE"}
         </Badge>
       );
     if (item.type === "monitor")
@@ -344,6 +370,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         return <Workflow className={`h-5 w-5 text-indigo-500`} />;
       case "database":
         return <Database className={`h-5 w-5 text-emerald-500`} />;
+      case "firebase":
+        return <Flame className={`h-5 w-5 text-amber-500`} />;
       case "view":
         return <LayoutTemplate className={`h-5 w-5 text-teal-500`} />;
       case "monitor":
@@ -398,6 +426,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           <Settings className="h-3 w-3" /> {item.meta}
         </>
       );
+    if (item.type === "firebase")
+      return (
+        <>
+          <Flame className="h-3 w-3" /> {item.meta}
+        </>
+      );
     if (item.type === "view")
       return (
         <>
@@ -420,7 +454,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           ? "Web APM Services"
           : filterType === "view"
             ? "Saved Views"
-            : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
+            : filterType === "firebase"
+              ? "Firebase Projects"
+              : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
     : "Global Infra";
 
   return (
@@ -561,6 +597,35 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                             className="px-2 py-0 text-[10px]"
                           >
                             {item.status === "online" ? "ONLINE" : "OFFLINE"}
+                          </Badge>
+                        </>
+                      )}
+
+                      {item.type === "firebase" && (
+                        <>
+                          <div
+                            className={`mb-3 p-3 rounded-full transition-colors ${item.status === "online" ? "bg-amber-500/10 text-amber-500" : "bg-destructive/10 text-destructive"}`}
+                          >
+                            <Flame className="h-6 w-6" />
+                          </div>
+
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">
+                            {item.name}
+                          </h3>
+
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
+                            <Flame className="h-3 w-3" /> {item.meta}
+                          </div>
+
+                          <Badge
+                            variant={
+                              item.status === "online"
+                                ? "success"
+                                : "destructive"
+                            }
+                            className="px-2 py-0 text-[10px]"
+                          >
+                            {item.status === "online" ? "ONLINE" : item.status === "error" ? "ERROR" : "OFFLINE"}
                           </Badge>
                         </>
                       )}
@@ -769,7 +834,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                                 item.type === "server" ||
                                 item.type === "database"
                                   ? "bg-emerald-500/5"
-                                  : item.type === "apm"
+                                  : item.type === "firebase"
+                                    ? "bg-amber-500/5"
+                                    : item.type === "apm"
                                     ? "bg-orange-500/5"
                                     : item.type === "task"
                                       ? "bg-indigo-500/5"

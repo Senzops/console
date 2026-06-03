@@ -379,6 +379,43 @@ export const ServiceModals: React.FC = () => {
     }
   };
 
+  const handleFirebaseSubmit = async () => {
+    if (isEdit) {
+      if (!name.trim() && !interval) return;
+    } else {
+      if (!name.trim() || !url.trim()) return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      if (isEdit && editData?.id) {
+        const body: any = {};
+        if (name.trim()) body.name = name.trim();
+        if (url.trim()) body.serviceAccount = url.trim();
+        if (interval) body.interval = Number(interval);
+        await api.put(`/firebase/${editData.id}`, body);
+        await editData.onSuccess?.();
+        closeModal();
+        toast.success("Firebase project updated");
+      } else {
+        await api.post("/firebase/register", {
+          name: name.trim(),
+          serviceAccount: url.trim(),
+          interval: Number(interval),
+        });
+        setName("");
+        setUrl("");
+        closeModal();
+        mutateFns.firebase?.();
+        toast.success("Firebase Project Connected!");
+      }
+    } catch (e: any) {
+      handleApiError(e, isEdit ? "Failed to update Firebase project" : "Failed to connect Firebase project.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDbSubmit = async () => {
     if (isEdit) {
       // In edit mode, at least one field needed (uri can be blank = keep current)
@@ -1219,6 +1256,91 @@ export const ServiceModals: React.FC = () => {
                 "Update"
               ) : (
                 "Start Monitoring"
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* ================================================================= */}
+      {/* FIREBASE MODAL                                                    */}
+      {/* ================================================================= */}
+      <Dialog
+        open={activeModal === "firebase"}
+        onClose={closeModal}
+        title={isEdit ? "Edit Firebase Project" : "Connect Firebase Project"}
+      >
+        <div className="space-y-4">
+          <ErrorBanner />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Project Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+              placeholder="e.g. Production Firebase"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              disabled={loading}
+              maxLength={50}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Service Account JSON
+              {isEdit && (
+                <span className="text-muted-foreground font-normal text-xs ml-2">
+                  (leave blank to keep current)
+                </span>
+              )}
+            </label>
+            <div className="relative">
+              <textarea
+                className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-amber-500 outline-none transition-all resize-none"
+                placeholder={isEdit ? "Leave blank to keep current credentials" : '{"type": "service_account", "project_id": "...", ...}'}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={loading}
+                rows={5}
+              />
+            </div>
+            {!isEdit && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Paste the full JSON from Firebase Console &gt; Project Settings &gt; Service Accounts &gt; Generate New Private Key. Credentials are AES-256 encrypted.
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Monitoring Interval</label>
+            <Select value={interval} onValueChange={(v) => setInterval(v)} disabled={loading}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">Every 5 minutes</SelectItem>
+                <SelectItem value="15">Every 15 minutes (Recommended)</SelectItem>
+                <SelectItem value="30">Every 30 minutes</SelectItem>
+                <SelectItem value="60">Every 1 hour</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" onClick={closeModal} disabled={loading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleFirebaseSubmit}
+              disabled={loading}
+              className="min-w-[140px] bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {loading ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />{" "}
+                  {isEdit ? "Updating..." : "Connecting..."}
+                </>
+              ) : isEdit ? (
+                "Update"
+              ) : (
+                "Connect & Monitor"
               )}
             </Button>
           </div>

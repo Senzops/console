@@ -13,6 +13,7 @@ export type ServiceType =
   | "task"
   | "monitor"
   | "database"
+  | "firebase"
   | "view";
 
 export type ModalMode = "register" | "edit";
@@ -211,6 +212,10 @@ export const ServiceModalProvider: React.FC<ServiceModalProviderProps> = ({
       setActiveModal(type);
       setMode(m);
       setEditData(data ?? null);
+
+      if (type === "firebase" && m === "register") {
+        setInterval("15");
+      }
 
       // Pre-populate form fields from editData
       if (m === "edit" && data) {
