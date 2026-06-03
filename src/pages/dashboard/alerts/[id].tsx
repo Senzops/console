@@ -50,6 +50,7 @@ import {
   Bug,
   Cpu,
   Globe,
+  Flame,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -69,6 +70,7 @@ const DEFAULT_ALERT_QUERIES: Record<string, string> = {
   errors: '[\n  { "$match": {\n    "status": "unresolved"\n  } }\n]',
   runtime: '[\n  { "$match": {\n    "eventLoopLagMs": { "$gt": 100 }\n  } }\n]',
   web: '[\n  { "$match": {\n    "path": "/"\n  } }\n]',
+  firebase: '[\n  { "$match": {\n    "auth.newSignups24h": { "$gt": 100 }\n  } }\n]',
 };
 
 const getTargetIcon = (target: string) => {
@@ -91,6 +93,8 @@ const getTargetIcon = (target: string) => {
       return <Cpu className="h-4 w-4 text-violet-500" />;
     case "web":
       return <Globe className="h-4 w-4 text-cyan-500" />;
+    case "firebase":
+      return <Flame className="h-4 w-4 text-amber-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -1025,6 +1029,7 @@ export default function AlertPolicyDetail() {
                           <SelectItem value="errors">Errors</SelectItem>
                           <SelectItem value="runtime">Runtime Metrics</SelectItem>
                           <SelectItem value="web">Web Analytics</SelectItem>
+                          <SelectItem value="firebase">Firebase</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

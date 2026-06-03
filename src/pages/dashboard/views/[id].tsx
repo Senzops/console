@@ -76,7 +76,8 @@ import {
   Pencil,
   Bug,
   Cpu,
-  Globe
+  Globe,
+  Flame
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -116,6 +117,8 @@ const getTargetIcon = (target: string) => {
       return <Cpu className="h-4 w-4 text-violet-500" />;
     case "web":
       return <Globe className="h-4 w-4 text-cyan-500" />;
+    case "firebase":
+      return <Flame className="h-4 w-4 text-amber-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -196,6 +199,7 @@ const DEFAULT_QUERIES: Record<string, string> = {
   errors: '[\n  { "$match": { "status": "unresolved" } },\n  { "$project": { "time": "$lastSeen", "errorClass": 1, "message": 1, "totalCount": 1, "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   runtime: '[\n  { "$match": { "eventLoopLagMs": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "eventLoopLagMs": 1, "heapUsedPercent": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   web: '[\n  { "$match": { "type": "pageview" } },\n  { "$project": { "time": "$createdAt", "path": 1, "browser": 1, "country": 1, "device": 1, "duration": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  firebase: '[\n  { "$project": { "time": "$timestamp", "totalUsers": "$auth.totalUsers", "dau": "$auth.activeUsersDaily", "mau": "$auth.activeUsersMonthly", "signups": "$auth.newSignups24h", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
 // Universal Pipeline Templates
@@ -348,6 +352,28 @@ const QUICK_TEMPLATES: Record<string, any[]> = {
       label: "Traffic by Country (Map)",
       config: { viz: "map" },
       query: `[\n  { "$group": { "_id": "$country", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "value": -1 } }\n]`
+    }
+  ],
+  firebase: [
+    {
+      label: "User Growth (Area)",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Total Users": { "$avg": "$auth.totalUsers" }\n  }},\n  { "$project": { "time": "$_id", "Total Users": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    },
+    {
+      label: "Active Users DAU/MAU (Line)",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "DAU": { "$avg": "$auth.activeUsersDaily" },\n    "MAU": { "$avg": "$auth.activeUsersMonthly" }\n  }},\n  { "$project": { "time": "$_id", "DAU": 1, "MAU": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+    },
+    {
+      label: "Auth Providers (Pie)",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": {\n    "_id": null,\n    "Password": { "$sum": "$providers.password" },\n    "Google": { "$sum": "$providers.google" },\n    "Apple": { "$sum": "$providers.apple" },\n    "Phone": { "$sum": "$providers.phone" },\n    "GitHub": { "$sum": "$providers.github" }\n  }},\n  { "$project": { "_id": 0 } },\n  { "$unwind": { "path": { "$objectToArray": "$$ROOT" } } },\n  { "$replaceRoot": { "newRoot": { "name": "$$ROOT.k", "value": "$$ROOT.v" } } }\n]`
+    },
+    {
+      label: "New Signups Trend (Bar)",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Signups": { "$avg": "$auth.newSignups24h" }\n  }},\n  { "$project": { "time": "$_id", "Signups": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
     }
   ]
 };
@@ -2049,6 +2075,7 @@ export default function CustomDashboardView() {
                         <SelectItem value="errors">Error Tracking</SelectItem>
                         <SelectItem value="runtime">Runtime Metrics</SelectItem>
                         <SelectItem value="web">Web Analytics</SelectItem>
+                        <SelectItem value="firebase">Firebase</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
