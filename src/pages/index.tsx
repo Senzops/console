@@ -82,6 +82,9 @@ const ArchitectureFlowDiagram = () => (
             <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
               Database Telemetry
             </div>
+            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
+              Firebase Monitoring
+            </div>
             <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm text-muted-foreground border-dashed">
               3rd Party Integrations
             </div>

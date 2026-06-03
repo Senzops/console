@@ -21,6 +21,10 @@ import {
   Mail,
   ArrowUpRight,
   TrendingUp,
+  Flame,
+  ShieldCheck,
+  UserPlus,
+  Users,
 } from "lucide-react";
 
 // ============================================================================
@@ -1233,6 +1237,67 @@ const DiagramMcp = () => (
   </DiagramFrame>
 );
 
+/** Firebase Monitoring — Auth metrics dashboard with provider distribution */
+const DiagramFirebase = () => (
+  <DiagramFrame className="relative">
+    <ShimmerOverlay />
+    <FrameHeader
+      title="my-production-app"
+      icon={<Flame className="w-3.5 h-3.5 text-amber-500" />}
+      badge={{ label: "MONITORING", style: BADGE_STYLE.armed, pulse: true }}
+    />
+    <div className="flex-1 p-3 flex flex-col gap-2.5">
+      <div className="grid grid-cols-3 gap-2">
+        <StatCard
+          label="Total Users"
+          value="24.8k"
+          valueClass="text-blue-500"
+          icon={<Users className="w-3 h-3 text-blue-500" />}
+          trend={{ value: "12%", positive: true }}
+        />
+        <StatCard
+          label="Signups 24h"
+          value="147"
+          valueClass="text-emerald-500"
+          icon={<UserPlus className="w-3 h-3 text-emerald-500" />}
+          trend={{ value: "8%", positive: true }}
+        />
+        <StatCard
+          label="MFA Rate"
+          value="68%"
+          valueClass="text-purple-500"
+          icon={<ShieldCheck className="w-3 h-3 text-purple-500" />}
+          trend={{ value: "3%", positive: true }}
+        />
+      </div>
+
+      {/* Provider distribution bars */}
+      <div className="bg-background border border-border/50 rounded-lg p-3 shadow-sm flex-1 flex flex-col gap-2">
+        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+          Auth Providers
+        </span>
+        {[
+          { name: "Google", pct: 62, color: "bg-red-500" },
+          { name: "Email", pct: 28, color: "bg-blue-500" },
+          { name: "GitHub", pct: 7, color: "bg-purple-500" },
+          { name: "Phone", pct: 3, color: "bg-emerald-500" },
+        ].map((p, i) => (
+          <div key={p.name} className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground font-mono w-10 shrink-0">{p.name}</span>
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${p.color} origin-left animate-[diag-fill-x_0.8s_ease-out_both]`}
+                style={{ width: `${p.pct}%`, animationDelay: `${i * 0.1}s` }}
+              />
+            </div>
+            <span className="text-[10px] font-mono font-bold text-foreground w-7 text-right">{p.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </DiagramFrame>
+);
+
 // ============================================================================
 // DIAGRAM RENDERER
 // ============================================================================
@@ -1265,6 +1330,8 @@ export const renderDiagram = (id: string): React.ReactNode => {
       return <DiagramAlerts />;
     case "uptime":
       return <DiagramUptime />;
+    case "firebase":
+      return <DiagramFirebase />;
     default:
       return (
         <div className="w-full h-full bg-muted/20 border border-border/50 rounded-xl flex items-center justify-center">
@@ -1326,6 +1393,22 @@ export const FEATURES_DATA: FeatureData[] = [
     diagramId: "database",
     href: "/features/database",
     colorClasses: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+  },
+  {
+    id: "firebase",
+    title: "Firebase Monitoring",
+    subtitle: "Complete visibility into your Firebase Auth layer.",
+    description:
+      "Monitor your Firebase Authentication infrastructure in real time. Track user growth, sign-in activity, MFA adoption, and auth provider distribution with encrypted, agentless credential polling.",
+    points: [
+      "User growth and signup trend analytics",
+      "Daily and monthly active user tracking",
+      "MFA enrollment and email verification rates",
+      "Auth provider distribution breakdown",
+    ],
+    diagramId: "firebase",
+    href: "/features/firebase",
+    colorClasses: "text-amber-500 bg-amber-500/10 border-amber-500/20",
   },
   {
     id: "web-analytics",

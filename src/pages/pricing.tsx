@@ -128,6 +128,14 @@ const COMPARE_FEATURES = [
         business: true,
         enterprise: true,
       },
+      {
+        name: "Firebase Monitoring",
+        tooltip: "Firebase Auth user metrics, signups, and provider analytics.",
+        starter: true,
+        pro: true,
+        business: true,
+        enterprise: true,
+      },
     ],
   },
   {

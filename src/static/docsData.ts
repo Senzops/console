@@ -191,6 +191,34 @@ export const DOCS_DATA: DocsConfig = {
       ]
     },
     {
+      id: "firebase",
+      title: "Firebase Monitoring",
+      iconName: "Flame",
+      shortDescription: "Agentless Firebase Auth user metrics and sign-in analytics.",
+      overview: "Monitor your Firebase Authentication infrastructure without deploying agents. Senzor connects via the Firebase Admin SDK to poll user growth, sign-in activity, MFA adoption, auth provider distribution, and recent signup details — all with AES-256 encrypted credential storage.",
+      prerequisites: [
+        "A Firebase project with Authentication enabled.",
+        "A service account JSON key file (Firebase Console > Project Settings > Service Accounts > Generate New Private Key).",
+        "The service account must have the 'Firebase Authentication Admin' role or equivalent permissions."
+      ],
+      registrationSteps: [
+        { title: "Navigate to Firebase", description: "Click '+' next to Firebase in your dashboard sidebar." },
+        { title: "Name Your Project", description: "Enter a recognizable name for this Firebase project (e.g., 'Production Auth')." },
+        { title: "Paste Service Account JSON", description: "Paste the full JSON contents of your Firebase service account key file. Senzor validates and AES-256 encrypts these credentials at rest." },
+        { title: "Set Polling Interval", description: "Choose how often Senzor polls your Firebase project (5, 15, 30, or 60 minutes). Default is 15 minutes." }
+      ],
+      troubleshooting: [
+        {
+          issue: "Connection Failed / Authentication Error",
+          solution: "Verify that the service account JSON is complete and unmodified. Ensure the service account has Firebase Authentication Admin permissions and the project has Firebase Auth enabled."
+        },
+        {
+          issue: "Metrics show 0 users despite having users",
+          solution: "Confirm the service account belongs to the correct Firebase project. Check that Firebase Authentication (not just Firestore) is enabled in the Firebase Console."
+        }
+      ]
+    },
+    {
       id: "web-analytics",
       title: "Web Analytics",
       iconName: "Globe",
