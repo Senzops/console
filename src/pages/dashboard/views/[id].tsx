@@ -973,16 +973,32 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
                 <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
                   <PieChart className="focus:outline-none" style={{ outline: "none" }}>
                     <Pie
+                      data={[{ value: 100 }]}
+                      dataKey="value"
+                      cx="50%"
+                      cy="65%"
+                      startAngle={200}
+                      endAngle={-20}
+                      innerRadius="70%"
+                      outerRadius="100%"
+                      cornerRadius={8}
+                      fill="hsl(var(--muted))"
+                      stroke="none"
+                      isAnimationActive={false}
+                      className="focus:outline-none"
+                      style={{ outline: "none" }}
+                    />
+                    <Pie
                       data={[
                         { value: percentage, fill: color },
-                        { value: 100 - percentage, fill: "hsl(var(--muted))" }
                       ]}
                       cx="50%"
-                      cy="75%"
-                      startAngle={180}
-                      endAngle={0}
-                      innerRadius="75%"
+                      cy="65%"
+                      startAngle={200}
+                      endAngle={200 - (220 * percentage) / 100}
+                      innerRadius="70%"
                       outerRadius="100%"
+                      cornerRadius={8}
                       dataKey="value"
                       stroke="none"
                       isAnimationActive={true}
@@ -1083,8 +1099,9 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
               nameKey={nameKey}
               cx="50%"
               cy="50%"
-              innerRadius={60}
+              innerRadius={40}
               outerRadius={90}
+              cornerRadius={4}
               paddingAngle={2}
               stroke="none"
               className="focus:outline-none"
