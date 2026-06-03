@@ -355,6 +355,8 @@ export default function FirebaseDetail() {
 
   const { service, latest, recentUsers } = data;
 
+  const hasAnonymousData = (latest.auth?.anonymousUsers ?? 0) > 0;
+
   const gridCharts = [
     {
         title: "Daily Active Users", tooltipSuffix: " users",
@@ -384,11 +386,16 @@ export default function FirebaseDetail() {
         title: "Disabled Accounts", tooltipSuffix: " accounts",
         series: [{ key: 'disabledUsers', name: 'Disabled', color: '#ef4444', style: 'gradient' }]
     },
-    {
+    ...(hasAnonymousData ? [{
         title: "Anonymous Users", tooltipSuffix: " users",
         series: [{ key: 'anonymousUsers', name: 'Anonymous', color: '#64748b', style: 'gradient' }]
-    }
+    }] : [])
   ];
+
+  const showProviders = latest.providers &&
+    Object.values(latest.providers as Record<string, number>).some((v: number) => v > 0);
+  const totalGridItems = gridCharts.length + (showProviders ? 1 : 0);
+  const isOddGrid = totalGridItems % 2 !== 0;
 
   return (
     <>
@@ -485,22 +492,14 @@ export default function FirebaseDetail() {
 
         {/* --- 4. Provider Distribution + Charts Grid --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           <ProviderDistribution providers={latest.providers} />
-           {gridCharts.slice(0, 1).map((chart, i) => (
-             <DynamicChart key={i} title={chart.title} data={chartData} series={chart.series} tooltipSuffix={chart.tooltipSuffix} />
-           ))}
-        </div>
-
-        {/* --- 5. Remaining Charts Grid --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           {gridCharts.slice(1).map((chart, i) => (
-               <div key={i} className={i === gridCharts.length - 2 && (gridCharts.length - 1) % 2 !== 0 ? 'md:col-span-2' : ''}>
+           {showProviders && <ProviderDistribution providers={latest.providers} />}
+           {gridCharts.map((chart, i) => (
+               <div key={i} className={i === gridCharts.length - 1 && isOddGrid ? 'md:col-span-2' : ''}>
                  <DynamicChart
                      title={chart.title}
                      data={chartData}
                      series={chart.series}
                      tooltipSuffix={chart.tooltipSuffix}
-                     tooltipFormatter={('formatter' in chart) ? (chart as any).formatter : undefined}
                  />
                </div>
            ))}
