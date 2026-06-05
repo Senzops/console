@@ -22,6 +22,7 @@ import {
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
+import { ChartTooltip } from "@/components/ChartTooltip";
 import {
   AreaChart,
   Area,
@@ -102,7 +103,7 @@ const ChartCard = ({ title, children, actions }: any) => {
         className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? "fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl" : "h-[300px]"}`}
       >
         {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
           <div className="w-full h-full relative">{children}</div>
         </CardContent>
       </Card>
@@ -183,25 +184,6 @@ const getLevelColors = (level: string) => {
   }
 };
 
-const CustomTooltip = ({ active, payload, label, labelFormatter }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">
-          {labelFormatter ? labelFormatter(label) : label}
-        </p>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-blue-500" />
-          <span className="capitalize">Logs:</span>
-          <span className="font-mono font-medium text-foreground">
-            {Number(payload[0].value).toLocaleString()}
-          </span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 // --- Main Dashboard ---
 export default function GlobalLogsDashboard() {
@@ -491,12 +473,7 @@ export default function GlobalLogsDashboard() {
                 <XAxis dataKey="rawTime" hide />
                 <YAxis hide />
                 <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                  }}
-                  labelFormatter={axisFormatter}
-                  content={<CustomTooltip labelFormatter={axisFormatter} />}
+                  content={<ChartTooltip labelFormatter={axisFormatter} />}
                 />
                 <Area
                   type="monotone"

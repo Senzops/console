@@ -22,6 +22,7 @@ import {
 } from "../../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
+import { ChartTooltip } from "@/components/ChartTooltip";
 import {
   AreaChart,
   Area,
@@ -103,53 +104,13 @@ const getVitalColor = (metric: "lcp" | "inp" | "cls", value: number) => {
 
 // --- COMPONENTS ---
 
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-  unit = "",
-  labelFormatter,
-}: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">
-          {labelFormatter ? labelFormatter(label) : label}
-        </p>
-        {payload.map((entry: any, idx: number) => (
-          <div
-            key={idx}
-            className="flex items-center gap-2"
-            style={{ color: entry.color || entry.stroke || entry.fill }}
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-[2.5px]"
-              style={{
-                backgroundColor: entry.color || entry.stroke || entry.fill,
-              }}
-            />
-            <span className="capitalize text-muted-foreground">
-              {entry.name.replace("code_", "")}
-            </span>
-            <span className="font-mono text-foreground">
-              {entry.name.includes("LCP")
-                ? formatSec(entry.value)
-                : entry.name.includes("INP")
-                  ? formatMs(entry.value)
-                  : entry.name.includes("CLS")
-                    ? entry.value.toFixed(3)
-                    : typeof entry.value === "number"
-                      ? entry.value.toFixed(2)
-                      : entry.value}
-              {unit}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
+const rumValueFormatter = (value: number, name: string) => {
+  if (name.includes("LCP")) return formatSec(value);
+  if (name.includes("INP")) return formatMs(value);
+  if (name.includes("CLS")) return value.toFixed(3);
+  return typeof value === "number" ? value.toFixed(2) : String(value);
 };
+const rumNameFormatter = (name: string) => name.replace("code_", "");
 
 // Context for Expanding Cards
 const ChartContext = createContext<{
@@ -190,7 +151,7 @@ const ChartCard = ({ title, children, actions }: any) => {
         className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? "fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl" : "h-[400px]"}`}
       >
         {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
           <div className="w-full h-full relative">{children}</div>
         </CardContent>
       </Card>
@@ -834,12 +795,7 @@ export default function RumDashboard() {
                 <XAxis dataKey="rawTime" hide />
                 <YAxis hide />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                  }}
-                  labelFormatter={axisFormatter}
-                  content={<CustomTooltip labelFormatter={axisFormatter} />}
+                  content={<ChartTooltip labelFormatter={axisFormatter} valueFormatter={rumValueFormatter} nameFormatter={rumNameFormatter} />}
                 />
                 <Area
                   type="monotone"
@@ -910,12 +866,7 @@ export default function RumDashboard() {
                 <XAxis dataKey="rawTime" hide />
                 <YAxis hide />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                  }}
-                  labelFormatter={axisFormatter}
-                  content={<CustomTooltip labelFormatter={axisFormatter} />}
+                  content={<ChartTooltip labelFormatter={axisFormatter} valueFormatter={rumValueFormatter} nameFormatter={rumNameFormatter} />}
                 />
                 <Area
                   type="monotone"
@@ -987,12 +938,7 @@ export default function RumDashboard() {
                   />
                   <XAxis dataKey="rawTime" hide />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                    }}
-                    labelFormatter={axisFormatter}
-                    content={<CustomTooltip labelFormatter={axisFormatter} />}
+                    content={<ChartTooltip labelFormatter={axisFormatter} valueFormatter={rumValueFormatter} nameFormatter={rumNameFormatter} />}
                   />
                   <Area
                     type="monotone"
@@ -1040,12 +986,7 @@ export default function RumDashboard() {
                   />
                   <XAxis dataKey="rawTime" hide />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                    }}
-                    labelFormatter={axisFormatter}
-                    content={<CustomTooltip labelFormatter={axisFormatter} />}
+                    content={<ChartTooltip labelFormatter={axisFormatter} valueFormatter={rumValueFormatter} nameFormatter={rumNameFormatter} />}
                   />
                   <Area
                     type="monotone"

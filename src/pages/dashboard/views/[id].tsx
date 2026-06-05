@@ -25,6 +25,7 @@ import {
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { formatAxisDate as formatAxisDateUtil, getTimeSpanMs } from "@/lib/formatAxisDate";
+import { ChartTooltip } from "@/components/ChartTooltip";
 import {
   AreaChart,
   Area,
@@ -504,34 +505,6 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
 };
 
 // --- Recharts Tooltip Formatting ---
-const CustomTooltip = ({ active, payload, label, spanMs }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        {label && (
-          <p className="font-semibold text-foreground mb-1">
-            {formatAxisDateUtil(label, spanMs)}
-          </p>
-        )}
-        {payload.map((entry: any, idx: number) => (
-          <div
-            key={idx}
-            className="flex items-center gap-2"
-            style={{ color: entry.color || entry.fill }}
-          >
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono">
-              {typeof entry.value === "number"
-                ? entry.value.toFixed(2)
-                : entry.value}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 // Smooth closed path using Catmull-Rom spline
 const smoothRadarPath = (points, tension = 0.3) => {
@@ -780,6 +753,7 @@ const ChartContainer = ({
 // --- Sub-Component: Chart Renderer ---
 const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActionsRef, isParentHovered }: any) => {
   const activeViz = visualization || config?.viz || "table";
+  const viewsAxisFormatter = useMemo(() => (str: string) => formatAxisDateUtil(str, spanMs), [spanMs]);
 
   // Enterprise Interactive State
   const [hoveredSeries, setHoveredSeries] = useState<string | null>(null);
@@ -1082,7 +1056,7 @@ const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActi
       >
         <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
           <PieChart className="focus:outline-none" style={{ outline: "none" }}>
-            <RechartsTooltip content={<CustomTooltip spanMs={spanMs} />} />
+            <RechartsTooltip content={<ChartTooltip labelFormatter={viewsAxisFormatter} />} />
             <Pie
               data={sortedPieData.filter(d => !hiddenSeries.has(String(d[nameKey])))}
               dataKey={valueKey}
@@ -1158,7 +1132,7 @@ const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActi
             <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.4} />
             <PolarAngleAxis dataKey={timeKey} tick={false} />
             <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-            <RechartsTooltip content={<CustomTooltip spanMs={spanMs} />} />
+            <RechartsTooltip content={<ChartTooltip labelFormatter={viewsAxisFormatter} />} />
             {legendKeys.map((k, i) => {
               const isHighlighted = hoveredSeries === k;
               const isDimmed = hoveredSeries && hoveredSeries !== k;
@@ -1248,7 +1222,7 @@ const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActi
             <YAxis hide />
             <RechartsTooltip
               contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-              content={<CustomTooltip spanMs={spanMs} />}
+              content={<ChartTooltip labelFormatter={viewsAxisFormatter} />}
             />
             {legendKeys.map((k, i) => {
               const isHighlighted = hoveredSeries === k;
@@ -1285,7 +1259,7 @@ const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActi
             <YAxis hide />
             <RechartsTooltip
               contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-              content={<CustomTooltip spanMs={spanMs} />}
+              content={<ChartTooltip labelFormatter={viewsAxisFormatter} />}
               cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
             />
             {legendKeys.map((k, i) => {
@@ -1312,7 +1286,7 @@ const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActi
             <YAxis hide />
             <RechartsTooltip
               contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-              content={<CustomTooltip spanMs={spanMs} />}
+              content={<ChartTooltip labelFormatter={viewsAxisFormatter} />}
             />
             {legendKeys.map((k, i) => {
               const isHighlighted = hoveredSeries === k;
@@ -1432,7 +1406,7 @@ const WidgetWrapper = ({
       onMouseLeave={() => setIsHovered(false)}
     >
       {Header}
-      <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+      <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
         <div className="w-full h-full relative px-4 pb-4">
           {!data && !error ? (
             <div className="h-full flex items-center justify-center">

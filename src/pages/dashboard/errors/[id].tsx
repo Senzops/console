@@ -15,6 +15,7 @@ import {
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
+import { ChartTooltip } from "@/components/ChartTooltip";
 import {
   AreaChart,
   Area,
@@ -83,7 +84,7 @@ const ChartCard = ({ title, children, actions }: any) => {
         className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? "fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl" : "h-[400px]"}`}
       >
         {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
           <div className="w-full h-full relative">{children}</div>
         </CardContent>
       </Card>
@@ -104,36 +105,6 @@ const ChartCard = ({ title, children, actions }: any) => {
   );
 };
 
-const CustomTooltip = ({ active, payload, label, suffix = "" }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <div
-            key={idx}
-            className="flex items-center gap-2 mb-1"
-            style={{ color: entry.color || entry.stroke || entry.fill }}
-          >
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{
-                backgroundColor: entry.color || entry.stroke || entry.fill,
-              }}
-            />
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono font-medium text-foreground">
-              {entry.value === null
-                ? "0"
-                : `${Number(entry.value).toFixed(0)}${suffix}`}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const StatCard = ({ title, value, subtext, icon: Icon, color }: any) => (
   <Card className="border-border/60 shadow-sm">
@@ -435,7 +406,7 @@ export default function ErrorDetailPage() {
                   />
                   <XAxis dataKey="time" hide />
                   <YAxis hide />
-                  <Tooltip content={<CustomTooltip suffix=" events" />} />
+                  <Tooltip content={<ChartTooltip unit=" events" />} />
                   <Area
                     type="monotone"
                     dataKey="count"

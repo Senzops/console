@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { useServiceModal } from '@/components/ServiceModals/context';
 import { formatAxisDate, getTimeSpanMs, getBucketIntervalSeconds } from '@/lib/formatAxisDate';
+import { ChartTooltip } from '@/components/ChartTooltip';
 import RuntimeMetrics from './RuntimeMetrics';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -59,24 +60,7 @@ const getColorForCode = (code: number) => {
 
 // --- COMPONENTS ---
 
-const CustomTooltip = ({ active, payload, label, unit = '', labelFormatter }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{labelFormatter ? labelFormatter(label) : label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" 
-            style={{ color: entry.color || entry.stroke || entry.fill }}>
-            {/* If detailed mode, name is like "code_200", clean it up */}
-            <span className="capitalize">{entry.name.replace('code_', '')}:</span>
-            <span className="font-mono">{typeof entry.value === 'number' ? entry.value?.toFixed(2) : entry.value}{unit}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
+const apmNameFormatter = (name: string) => name.replace('code_', '');
 
 // Context for Expanding Cards
 const ChartContext = createContext<{ isMaximized: boolean; toggle: () => void }>({ isMaximized: false, toggle: () => {} });
@@ -96,7 +80,7 @@ const ChartCard = ({ title, children, actions }: any) => {
     <ChartContext.Provider value={{ isMaximized, toggle }}>
       <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-[400px]'}`}>
          {Header}
-         <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden"><div className="w-full h-full relative">{children}</div></CardContent>
+         <CardContent className="flex-1 min-h-0 relative px-0 pb-0"><div className="w-full h-full relative">{children}</div></CardContent>
       </Card>
     </ChartContext.Provider>
   );
@@ -518,7 +502,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="rawTime" hide />
                       <YAxis hide />
-                      <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} unit=" rps" />} />
+                      <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} unit=" rps" nameFormatter={apmNameFormatter} />} />
                       <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={("url(#colorRps)")} strokeWidth={2} name="RPS" />
                   </AreaChart>
               </ResponsiveContainer>
@@ -536,7 +520,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="rawTime" hide />
                     <YAxis hide />
-                    <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} unit="ms" />} />
+                    <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} unit="ms" nameFormatter={apmNameFormatter} />} />
                     <Area type="monotone" dataKey="avgLatency" stroke={getColor("#3b82f6")} fill={"url(#colorAvgLatency)"} strokeWidth={2} name="Avg" />
                     <Area type="monotone" dataKey="maxLatency" stroke={getColor("#ef4444")} fill="transparent" strokeWidth={1} name="Max" strokeDasharray="4 4" />
                   </AreaChart>
@@ -565,7 +549,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                             <defs><linearGradient id="colorErr" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ef4444")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ef4444")} stopOpacity={0} /></linearGradient></defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                             <XAxis dataKey="rawTime" hide />
-                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} />} />
+                            <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} nameFormatter={apmNameFormatter} />} />
                             <Area type="monotone" dataKey="errors" stroke={getColor("#ef4444")} fill={("url(#colorErr)")} strokeWidth={2} name="Errors" />
                         </AreaChart>
                     ) : (
@@ -573,7 +557,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                         <BarChart data={formattedGraph.data}>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                             <XAxis dataKey="rawTime" hide />
-                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} />} />
+                            <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} nameFormatter={apmNameFormatter} />} />
                             <Bar dataKey="codes2xx" stackId="a" fill={getColor("#10b981")} name="2xx" />
                             <Bar dataKey="codes3xx" stackId="a" fill={getColor("#3b82f6")} name="3xx" />
                             <Bar dataKey="codes4xx" stackId="a" fill={getColor("#f97316")} name="4xx" />

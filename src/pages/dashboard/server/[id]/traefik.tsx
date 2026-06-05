@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button, Spinner, Badge } from
 import { AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, Route, Activity, Maximize2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { ChartCard, CustomTooltip, fetcher } from '.';
+import { ChartCard, ChartTooltip, fetcher } from '.';
 import { SmartAnimatedValue } from '@/components/Tween';
 
 export default function TraefikDetail() {
@@ -94,7 +94,7 @@ export default function TraefikDetail() {
               {!isMono && <defs><linearGradient id="colorRout" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>}
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
-              <Tooltip content={<CustomTooltip unit="" />} />
+              <Tooltip content={<ChartTooltip unit="" />} />
               <Area type="step" dataKey="activeRouters" stroke={getColor("#10b981")} strokeWidth={2} fill={isMono ? getColor("#10b981") : "url(#colorRout)"} name="Routers" animationDuration={1500} />
             </AreaChart>
           </ChartCard>
@@ -103,7 +103,7 @@ export default function TraefikDetail() {
               {!isMono && <defs><linearGradient id="colorServ" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient></defs>}
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
-              <Tooltip content={<CustomTooltip unit="" />} />
+              <Tooltip content={<ChartTooltip unit="" />} />
               <Area type="step" dataKey="activeServices" stroke={getColor("#3b82f6")} strokeWidth={2} fill={isMono ? getColor("#3b82f6") : "url(#colorServ)"} name="Services" animationDuration={1500} />
             </AreaChart>
           </ChartCard>

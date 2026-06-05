@@ -5,6 +5,7 @@ import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, cn, DataError } from '../../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../../components/TimeRangePicker';
+import { ChartTooltip } from '@/components/ChartTooltip';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal, Layers, CloudLightning, ArrowRight, Route, Thermometer, Zap, Pencil } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -53,25 +54,7 @@ const formatUptime = (seconds: number) => {
   return parts.join(' ');
 };
 
-export const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" style={{ color: entry.color || entry.stroke || entry.fill }}>
-            <div className="w-2 h-2 rounded-full" style={{
-                backgroundColor: entry.color || entry.stroke || entry.fill,
-              }} />
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
+export { ChartTooltip } from '@/components/ChartTooltip';
 
 // --- Disk Tooltip ---
 export const DiskTooltip = ({ active, payload, label }: any) => {
@@ -160,7 +143,7 @@ const DistributionCard = ({ title, children, actions }: any) => {
     <DistributionContext.Provider value={{ isMaximized, toggle }}>
       <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : ''}`}>
         {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
           {/* Container for content ensuring it fills space */}
           <div className="w-full h-full relative">
             {children}
@@ -450,7 +433,7 @@ export default function ServerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis domain={[0, 100]} hide />
-              <Tooltip content={<CustomTooltip unit="%" />} />
+              <Tooltip content={<ChartTooltip unit="%" />} />
               <Area type="monotone" dataKey="cpu" stroke={getColor("#10b981")} strokeWidth={2} fillOpacity={1} fill={"url(#colorCpu)"} name="CPU" />
             </AreaChart>
           </ChartCard>
@@ -461,7 +444,7 @@ export default function ServerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis domain={[0, 100]} hide />
-              <Tooltip content={<CustomTooltip unit="%" />} />
+              <Tooltip content={<ChartTooltip unit="%" />} />
               <Area type="monotone" dataKey="memUsed" stroke={getColor("#6c28d8")} fill={getFill("#6c28d8")} fillOpacity={0.15} name="Usage" />
               <Area type="monotone" dataKey="memActive" stackId="1" stroke={getColor("#9a9aff")} fill={getFill("#9a9aff")} fillOpacity={0.1} name="Active" />
               <Area type="monotone" dataKey="memFree" stackId="1" stroke={getColor("#4D6AFF")} fill={getFill("#4D6AFF")} fillOpacity={0.15} name="Free" />
@@ -479,7 +462,7 @@ export default function ServerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip unit=" Ms" />} />
+              <Tooltip content={<ChartTooltip unit=" Ms" />} />
               <Area type="monotone" dataKey="latencyMs" stroke={getColor("#f59e0b")} strokeWidth={2} fillOpacity={1} fill={"url(#colorLat)"} name="Latency" />
             </AreaChart>
           </ChartCard>
@@ -491,7 +474,7 @@ export default function ServerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip unit=" KB/s" />} />
+              <Tooltip content={<ChartTooltip unit=" KB/s" />} />
               <Area type="monotone" dataKey="netRx" stroke={getColor("#8b5cf6")} strokeWidth={2} fill={"url(#colorNetRx)"} name="Rx" />
               <Area type="monotone" dataKey="netTx" stroke={getColor("#ec4899")} strokeWidth={2} fill={"url(#colorNetTx)"} name="Tx" />
             </AreaChart>
@@ -537,7 +520,7 @@ export default function ServerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip unit="" />} />
+              <Tooltip content={<ChartTooltip unit="" />} />
               <Bar dataKey="procRunning" stackId="a" fill={getColor("#10b981")} name="Running" />
               <Bar dataKey="procSleeping" stackId="a" fill={getColor('#636165')} name="Sleeping" opacity="0.4" />
               <Bar dataKey="procBlocked" stackId="a" fill={getColor("#ef4444")} name="Blocked" />
@@ -558,7 +541,7 @@ export default function ServerDetail() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="time" hide />
                 <YAxis hide />
-                <Tooltip content={<CustomTooltip unit=" °C" />} />
+                <Tooltip content={<ChartTooltip unit=" °C" />} />
                 <Area type="monotone" dataKey="sysTemp" stroke={getDynamicColor("sysTemp")} strokeWidth={2} fillOpacity={1} fill={"url(#colorTemp)"} name="Core Temp" />
               </AreaChart>
             </ChartCard>
@@ -576,7 +559,7 @@ export default function ServerDetail() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="time" hide />
                 <YAxis hide />
-                <Tooltip content={<CustomTooltip unit=" W" />} />
+                <Tooltip content={<ChartTooltip unit=" W" />} />
                 <Area type="monotone" dataKey="sysPower" stroke={getDynamicColor("sysPower")} strokeWidth={2} fillOpacity={1} fill={"url(#colorPower)"} name="Wattage" />
               </AreaChart>
             </ChartCard>
@@ -608,7 +591,7 @@ export default function ServerDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="time" hide />
                   <YAxis domain={[0, 100]} hide />
-                  <Tooltip content={<CustomTooltip unit="%" />} />
+                  <Tooltip content={<ChartTooltip unit="%" />} />
                   {activeGpus.map((gpu: any, i: number) => {
                      const color = getDynamicColor(`gpu_util_${i}`);
                      return <Line key={i} type="monotone" dataKey={`gpu_${i}_utilization`} stroke={color} strokeWidth={2} dot={false} name={gpu.model || `GPU ${i}`} />
@@ -622,7 +605,7 @@ export default function ServerDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="time" hide />
                   <YAxis domain={[0, 100]} hide />
-                  <Tooltip content={<CustomTooltip unit="%" />} />
+                  <Tooltip content={<ChartTooltip unit="%" />} />
                   {activeGpus.map((gpu: any, i: number) => {
                      const color = getDynamicColor(`gpu_vram_${i}`);
                      return <Line key={i} type="monotone" dataKey={`gpu_${i}_vram`} stroke={color} strokeWidth={2} dot={false} name={gpu.model || `GPU ${i}`} />
@@ -636,7 +619,7 @@ export default function ServerDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="time" hide />
                   <YAxis hide />
-                  <Tooltip content={<CustomTooltip unit=" °C" />} />
+                  <Tooltip content={<ChartTooltip unit=" °C" />} />
                   {activeGpus.map((gpu: any, i: number) => {
                      const color = getDynamicColor(`gpu_temp_${i}`);
                      return <Line key={i} type="monotone" dataKey={`gpu_${i}_temp`} stroke={color} strokeWidth={2} dot={false} name={gpu.model || `GPU ${i}`} />
@@ -665,7 +648,7 @@ export default function ServerDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="time" hide />
                   <YAxis hide />
-                  <Tooltip content={<CustomTooltip unit=" W" />} />
+                  <Tooltip content={<ChartTooltip unit=" W" />} />
                 </AreaChart>
               </ChartCard>
               

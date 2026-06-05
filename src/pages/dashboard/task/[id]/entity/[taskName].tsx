@@ -24,6 +24,7 @@ import {
 } from "../../../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../../components/TimeRangePicker";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
+import { ChartTooltip } from "@/components/ChartTooltip";
 import {
   AreaChart,
   Area,
@@ -183,39 +184,6 @@ const FloatingTooltip = ({ children, content }: { children: React.ReactNode; con
 
 // --- COMPONENTS ---
 
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-  unit = "",
-  labelFormatter,
-}: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">
-          {labelFormatter ? labelFormatter(label) : label}
-        </p>
-        {payload.map((entry: any, idx: number) => (
-          <div
-            key={idx}
-            className="flex items-center gap-2"
-            style={{ color: entry.color || entry.stroke || entry.fill }}
-          >
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono">
-              {typeof entry.value === "number"
-                ? entry.value.toFixed(0)
-                : entry.value}
-              {unit}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 // Context for Expanding Cards
 const ChartContext = createContext<{
@@ -256,7 +224,7 @@ const ChartCard = ({ title, children, actions }: any) => {
         className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? "fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl" : "h-[400px]"}`}
       >
         {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
           <div className="w-full h-full relative">{children}</div>
         </CardContent>
       </Card>
@@ -698,17 +666,7 @@ export default function TaskEntityDetail() {
                 <XAxis dataKey="rawTime" hide />
                 <YAxis hide />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                  }}
-                  labelFormatter={axisFormatter}
-                  content={
-                    <CustomTooltip
-                      labelFormatter={axisFormatter}
-                      unit=" runs"
-                    />
-                  }
+                  content={<ChartTooltip labelFormatter={axisFormatter} unit=" runs" />}
                 />
                 <Area
                   type="monotone"

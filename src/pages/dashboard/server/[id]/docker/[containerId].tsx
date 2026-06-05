@@ -7,29 +7,9 @@ import { Card, CardHeader, CardTitle, Badge, Button, CardContent, Spinner } from
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, Box, Maximize, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { ChartTooltip } from '@/components/ChartTooltip';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
-
-// --- Custom Tooltip ---
-const CustomTooltip = ({ active, payload, label, unit = '%' }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" style={{ color: entry.color || entry.stroke || entry.fill }}>
-            <div className="w-2 h-2 rounded-full" style={{
-                backgroundColor: entry.color || entry.stroke || entry.fill,
-              }} />
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono">{typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}{unit}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const ChartCard = ({ title, children, color, isMono }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -132,7 +112,7 @@ export default function DockerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip unit="%" />} />
+              <Tooltip content={<ChartTooltip unit="%" />} />
               <Area type="monotone" dataKey="cpu" stroke={getColor("#8b5cf6")} fill={getFill("#8b5cf6")} fillOpacity={0.2} />
             </AreaChart>
           </ChartCard>
@@ -142,7 +122,7 @@ export default function DockerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip unit="%" />} />
+              <Tooltip content={<ChartTooltip unit="%" />} />
               <Area type="monotone" dataKey="memPercent" stroke={getColor("#3b82f6")} fill={getFill("#3b82f6")} fillOpacity={0.2} />
             </AreaChart>
           </ChartCard>
@@ -152,7 +132,7 @@ export default function DockerDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip unit=" MB" />} />
+              <Tooltip content={<ChartTooltip unit=" MB" />} />
               <Area type="monotone" stackId="1" dataKey="memUsed" stroke={getColor("#ef4444")} fill={getFill("#ef4444")} name="Used" />
               <Area type="monotone" stackId="1" dataKey="memFree" stroke={getColor("#10b981")} fill={getFill("#10b981")} fillOpacity={0.2} name="Free" />
             </AreaChart>

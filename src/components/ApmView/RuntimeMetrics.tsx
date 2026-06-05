@@ -8,26 +8,10 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Maximize, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { formatAxisDate } from '@/lib/formatAxisDate';
+import { ChartTooltip } from '@/components/ChartTooltip';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
-const CustomTooltip = ({ active, payload, label, unit = '', labelFormatter }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{labelFormatter ? labelFormatter(label) : label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2"
-            style={{ color: entry.color || entry.stroke || entry.fill }}>
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono">{typeof entry.value === 'number' ? entry.value?.toFixed(2) : entry.value}{unit}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 // --- Maximizable Chart Card (matches ApmView ChartCard pattern exactly) ---
 const ChartCard = ({ title, children, actions }: any) => {
@@ -49,7 +33,7 @@ const ChartCard = ({ title, children, actions }: any) => {
   const Content = (
     <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-[400px]'}`}>
       {Header}
-      <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+      <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
         <div className="w-full h-full relative">{children}</div>
       </CardContent>
     </Card>
@@ -200,7 +184,7 @@ export default function RuntimeMetrics({ serviceId, range, spanMs }: RuntimeMetr
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} unit="ms" />} />
+              <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} unit="ms" />} />
               <Area type="monotone" dataKey="eventLoopLagMs" stroke={getColor('#3b82f6')} fill="url(#colorLag)" strokeWidth={2} name="Lag" />
               <Area type="monotone" dataKey="eventLoopLagP99Ms" stroke={getColor('#ef4444')} fill="transparent" strokeWidth={1} strokeDasharray="4 4" name="P99 Lag" />
               <Line type="monotone" dataKey="eventLoopUtilizationPercent" stroke={getColor('#8b5cf6')} strokeWidth={1.5} dot={false} name="ELU %" yAxisId={0} />
@@ -220,7 +204,7 @@ export default function RuntimeMetrics({ serviceId, range, spanMs }: RuntimeMetr
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} unit="MB" />} />
+              <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} unit=" MB" />} />
               <Area type="monotone" dataKey="rssMB" stroke={getColor('#f59e0b')} fill="url(#colorRss)" strokeWidth={1.5} name="RSS" />
               <Area type="monotone" dataKey="heapTotalMB" stroke={getColor('#6b7280')} fill="transparent" strokeWidth={1} strokeDasharray="4 4" name="Heap Total" />
               <Area type="monotone" dataKey="heapUsedMB" stroke={getColor('#10b981')} fill="url(#colorHeap)" strokeWidth={2} name="Heap Used" />
@@ -230,7 +214,7 @@ export default function RuntimeMetrics({ serviceId, range, spanMs }: RuntimeMetr
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} />} />
+              <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} />} />
               <Bar dataKey="gcMinorCount" fill={getColor('#3b82f6')} name="Minor (Scavenge)" stackId="gc" radius={[0, 0, 0, 0]} />
               <Bar dataKey="gcMajorCount" fill={getColor('#ef4444')} name="Major (Mark-Sweep)" stackId="gc" radius={[2, 2, 0, 0]} />
               <Line type="monotone" dataKey="gcTotalDurationMs" stroke={getColor('#f59e0b')} strokeWidth={2} dot={false} name="GC Duration (ms)" yAxisId={0} />
@@ -250,7 +234,7 @@ export default function RuntimeMetrics({ serviceId, range, spanMs }: RuntimeMetr
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} unit="ms" />} />
+              <Tooltip content={<ChartTooltip labelFormatter={axisFormatter} unit="ms" />} />
               <Area type="monotone" dataKey="cpuUserMs" stroke={getColor('#3b82f6')} fill="url(#colorCpuUser)" strokeWidth={2} name="User CPU" stackId="cpu" />
               <Area type="monotone" dataKey="cpuSystemMs" stroke={getColor('#ef4444')} fill="url(#colorCpuSystem)" strokeWidth={1.5} name="System CPU" stackId="cpu" />
             </AreaChart>

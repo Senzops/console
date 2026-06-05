@@ -6,7 +6,7 @@ import { useTheme } from '../../../../lib/theme';
 import { Badge, Button, Spinner } from '../../../../components/Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
 import { ArrowLeft, CloudLightning, Activity, RefreshCw } from 'lucide-react';
-import { ChartCard, CustomTooltip, fetcher, StatCard } from '.';
+import { ChartCard, ChartTooltip, fetcher, StatCard } from '.';
 
 export default function NginxDetail() {
   const router = useRouter();
@@ -72,7 +72,7 @@ export default function NginxDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip unit=" rps" />} />
+              <Tooltip content={<ChartTooltip unit=" rps" />} />
               <Area type="monotone" dataKey="reqPerSec" stroke={getColor("#10b981")} strokeWidth={2} fill={isMono ? getColor("#10b981") : "url(#colorNginx)"} name="Req/Sec" animationDuration={1500} />
             </AreaChart>
           </ChartCard>
@@ -81,7 +81,7 @@ export default function NginxDetail() {
             <BarChart data={chartData} className="outline-none">
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
-              <Tooltip content={<CustomTooltip unit="" />} />
+              <Tooltip content={<ChartTooltip unit="" />} />
               <Bar dataKey="reading" stackId="a" fill={getColor("#3b82f6")} name="Reading" animationDuration={1500} />
               <Bar dataKey="writing" stackId="a" fill={getColor("#10b981")} name="Writing" animationDuration={1500} />
               <Bar dataKey="waiting" stackId="a" fill={getColor("#f59e0b")} name="Waiting" animationDuration={1500} />

@@ -6,6 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
+import { ChartTooltip } from "@/components/ChartTooltip";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize, Search, Pencil, Gauge } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -38,25 +39,6 @@ const formatUptime = (seconds: number) => {
 };
 
 // --- Custom Tooltip (Standard UI) ---
-const CustomTooltip = ({ active, payload, label, suffix = '', formatter }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2 mb-1" style={{ color: entry.color || entry.stroke || entry.fill }}>
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.stroke || entry.fill }} />
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono font-medium text-foreground">
-               {entry.value === null ? 'No Data' : (formatter ? formatter(entry.value) : `${Number(entry.value).toFixed(2)}${suffix}`)}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 // --- Reusable Chart Card (Standard UI) ---
 const ChartCard = ({ title, children, className = "h-[300px]" }: any) => {
@@ -103,6 +85,12 @@ const DynamicChart = ({ title, className, data, type = 'area', series, tooltipSu
   const { isMono } = useTheme();
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
 
+  const vf = tooltipFormatter
+    ? (v: number) => (v === null ? 'No Data' : tooltipFormatter(v))
+    : tooltipSuffix
+      ? (v: number) => (v === null ? 'No Data' : `${Number(v).toFixed(2)}${tooltipSuffix}`)
+      : undefined;
+
   return (
     <ChartCard title={title} className={className}>
        {type === 'area' ? (
@@ -118,7 +106,7 @@ const DynamicChart = ({ title, className, data, type = 'area', series, tooltipSu
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip suffix={tooltipSuffix} formatter={tooltipFormatter} />} />
+              <Tooltip content={<ChartTooltip valueFormatter={vf} />} />
               {series.map((s:any) => {
                  const style = s.style || 'gradient';
                  let fill = `url(#color-${s.key})`;
@@ -126,14 +114,14 @@ const DynamicChart = ({ title, className, data, type = 'area', series, tooltipSu
                  if (style === 'solid') fill = getColor(s.color);
 
                  return (
-                     <Area 
+                     <Area
                         key={s.key}
-                        type="monotone" 
-                        dataKey={s.key} 
-                        stroke={getColor(s.color)} 
+                        type="monotone"
+                        dataKey={s.key}
+                        stroke={getColor(s.color)}
                         fill={fill}
                         fillOpacity={style === 'solid' ? (s.opacity || 0.6) : 0.6}
-                        name={s.name} 
+                        name={s.name}
                         strokeWidth={2}
                         stackId={s.stackId}
                         strokeDasharray={s.dashed ? "4 4" : undefined}
@@ -146,13 +134,13 @@ const DynamicChart = ({ title, className, data, type = 'area', series, tooltipSu
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="time" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip suffix={tooltipSuffix} formatter={tooltipFormatter} />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
+              <Tooltip content={<ChartTooltip valueFormatter={vf} />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
               {series.map((s:any) => (
-                 <Bar 
+                 <Bar
                     key={s.key}
-                    dataKey={s.key} 
-                    fill={getColor(s.color)} 
-                    name={s.name} 
+                    dataKey={s.key}
+                    fill={getColor(s.color)}
+                    name={s.name}
                     stackId={s.stackId}
                     radius={s.radius}
                  />

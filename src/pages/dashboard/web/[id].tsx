@@ -6,6 +6,7 @@ import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
+import { ChartTooltip } from "@/components/ChartTooltip";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, X, RefreshCw, Search, Maximize, ChartNoAxesCombined, Pencil } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -48,25 +49,7 @@ const getCountryName = (code: string) => {
   } catch { return code; }
 };
 
-const CustomTooltip = ({ active, payload, label, unit = '' }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center gap-2" style={{ color: entry.color || entry.stroke || entry.fill }}>
-            <div className="w-2 h-2 rounded-full" style={{
-                backgroundColor: entry.color || entry.stroke || entry.fill,
-              }} />
-            <span className="capitalize">{entry.name}:</span>
-            <span className="font-mono">{formatNumber(entry.value)}{unit}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
+const webValueFormatter = (value: number) => formatNumber(value);
 
 const ChartCard = ({ title, children, actions }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -126,7 +109,7 @@ const DistributionCard = ({ title, children, actions }: any) => {
     <DistributionContext.Provider value={{ isMaximized, toggle }}>
       <Card className={`flex flex-col ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95' : 'h-[400px]'}`}>
         {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0 overflow-hidden">
+        <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
           {/* Container for content ensuring it fills space */}
           <div className="w-full h-full relative">
             {children}
@@ -357,7 +340,7 @@ export default function WebDetail() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
             <XAxis dataKey="time" hide />
             <YAxis hide />
-            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: "var(--radius)" }} />
+            <Tooltip content={<ChartTooltip valueFormatter={webValueFormatter} />} />
             <Area type="monotone" dataKey="views" stroke={getColor("#3b82f6")} fill={"url(#colorViews)"} strokeWidth={2} name="Page Views" />
             <Area type="monotone" dataKey="visitors" stroke={getColor("#8b5cf6")} fill="none" strokeWidth={2} strokeDasharray="5 5" name="Visitors" />
           </AreaChart>
@@ -449,7 +432,7 @@ export default function WebDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" />
               <YAxis hide />
-              <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
+              <Tooltip cursor={{ fill: 'transparent' }} content={<ChartTooltip valueFormatter={webValueFormatter} />} />
               <Bar dataKey="count" fill={getColor("#f59e0b")} radius={[4, 4, 0, 0]} name="Hits" />
             </BarChart>
           </ChartCard>
@@ -459,7 +442,7 @@ export default function WebDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#666" interval={3} />
               <YAxis hide />
-              <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
+              <Tooltip cursor={{ fill: 'transparent' }} content={<ChartTooltip valueFormatter={webValueFormatter} />} />
               <Bar dataKey="count" fill={getColor("#8b5cf6")} radius={[2, 2, 0, 0]} name="Hits" />
             </BarChart>
           </ChartCard>

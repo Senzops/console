@@ -5,7 +5,8 @@ import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../components/TimeRangePicker';
-import { getDisplayLabel } from '@/lib/formatAxisDate';
+import { getDisplayLabel, formatAxisDate, getTimeSpanMs } from '@/lib/formatAxisDate';
+import { ChartTooltip } from '@/components/ChartTooltip';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil, ShieldAlert, ShieldCheck, Timer, Zap } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -74,27 +75,6 @@ const getDaysColor = (days: number) => {
   return 'text-emerald-500';
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
-        <p className="font-semibold text-foreground mb-1">{new Date(label).toLocaleString(undefined, {
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit'
-        })}</p>
-        <div className="flex items-center gap-2" style={{ color: payload[0].color || payload[0].stroke || payload[0].fill }}>
-          <div className="w-2 h-2 rounded-full" style={{
-                backgroundColor: payload[0].color || payload[0].stroke || payload[0].fill,
-              }} />
-          <span>Latency: <span className="font-mono">{payload[0].value}ms</span></span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 // --- Reusable Chart Card ---
 const ChartCard = ({ title, children }: any) => {
@@ -460,7 +440,9 @@ export default function MonitorDetail() {
   const { isMono } = useTheme();
 
   const [timeRange, setTimeRange] = usePersistedTimeRange(7);
+  const spanMs = getTimeSpanMs(timeRange);
   const displayRange = timeRange.type === 'relative' ? timeRange.range : getDisplayLabel(timeRange);
+  const monitorAxisFormatter = useMemo(() => (str: string) => formatAxisDate(str, spanMs), [spanMs]);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
@@ -636,7 +618,7 @@ export default function MonitorDetail() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
             <XAxis dataKey="createdAt" hide />
             <YAxis hide />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<ChartTooltip labelFormatter={monitorAxisFormatter} unit="ms" />} />
             <Area type="monotone" dataKey="latency" stroke={getColor("#3b82f6")} fill={"url(#colorLatency)"} strokeWidth={2} name="Latency" />
           </AreaChart>
         </ChartCard>
