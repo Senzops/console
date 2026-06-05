@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useMemo, createContext, useContext, useCallback } from 'react';
+import React, { useState, useMemo, createContext, useContext } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
@@ -15,6 +15,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { useServiceModal } from '@/components/ServiceModals/context';
+import { formatAxisDate, getTimeSpanMs, getBucketIntervalSeconds } from '@/lib/formatAxisDate';
 import RuntimeMetrics from './RuntimeMetrics';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -390,7 +391,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const { openModal } = useServiceModal();
 
   const rangeQuery = buildTimeRangeQuery(timeRange);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
 
   const endpoint = `/apm/${serviceId}/stats?${rangeQuery}` + (route ? `&route=${encodeURIComponent(route)}` : '');
   const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
@@ -417,7 +418,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
     const allStatusCodes = new Set<string>();
     
     const processed = data.graph.map((point: any) => {
-      const interval = (displayRange === '30m' || displayRange === '1h') ? 60 : 3600;
+      const interval = getBucketIntervalSeconds(spanMs);
       
       // Flatten statusBreakdown for Recharts
       // Input: statusBreakdown: [{ code: 200, count: 5 }, { code: 404, count: 2 }]
@@ -442,21 +443,11 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
     // Sort codes for legend consistency
     const sortedCodes = Array.from(allStatusCodes).sort().map(c => parseInt(c));
     return { data: processed, codes: sortedCodes };
-  }, [data?.graph, displayRange]);
+  }, [data?.graph, spanMs]);
 
-  const formatAxisDate = useCallback(
-    (str: string) => {
-      if (!str) return '';
-      const date = new Date(str);
-
-      return date.toLocaleString(undefined, {
-        month: (displayRange === '30m' || displayRange === '1h') ? undefined : 'short',
-        day: (displayRange === '30m' || displayRange === '1h') ? undefined : 'numeric',
-        hour: 'numeric',
-        minute: (displayRange === '30m' || displayRange === '1h') ? '2-digit' : undefined,
-      });
-    },
-    [displayRange]
+  const axisFormatter = useMemo(
+    () => (str: string) => formatAxisDate(str, spanMs),
+    [spanMs]
   );
 
 
@@ -527,7 +518,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="rawTime" hide />
                       <YAxis hide />
-                      <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit=" rps" />} />
+                      <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} unit=" rps" />} />
                       <Area type="monotone" dataKey="rps" stroke={getColor("#f97316")} fill={("url(#colorRps)")} strokeWidth={2} name="RPS" />
                   </AreaChart>
               </ResponsiveContainer>
@@ -545,7 +536,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="rawTime" hide />
                     <YAxis hide />
-                    <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} unit="ms" />} />
+                    <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} unit="ms" />} />
                     <Area type="monotone" dataKey="avgLatency" stroke={getColor("#3b82f6")} fill={"url(#colorAvgLatency)"} strokeWidth={2} name="Avg" />
                     <Area type="monotone" dataKey="maxLatency" stroke={getColor("#ef4444")} fill="transparent" strokeWidth={1} name="Max" strokeDasharray="4 4" />
                   </AreaChart>
@@ -574,7 +565,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                             <defs><linearGradient id="colorErr" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor("#ef4444")} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor("#ef4444")} stopOpacity={0} /></linearGradient></defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                             <XAxis dataKey="rawTime" hide />
-                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
+                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} />} />
                             <Area type="monotone" dataKey="errors" stroke={getColor("#ef4444")} fill={("url(#colorErr)")} strokeWidth={2} name="Errors" />
                         </AreaChart>
                     ) : (
@@ -582,7 +573,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
                         <BarChart data={formattedGraph.data}>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                             <XAxis dataKey="rawTime" hide />
-                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={formatAxisDate} content={<CustomTooltip labelFormatter={formatAxisDate} />} />
+                            <Tooltip contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))'}} labelFormatter={axisFormatter} content={<CustomTooltip labelFormatter={axisFormatter} />} />
                             <Bar dataKey="codes2xx" stackId="a" fill={getColor("#10b981")} name="2xx" />
                             <Bar dataKey="codes3xx" stackId="a" fill={getColor("#3b82f6")} name="3xx" />
                             <Bar dataKey="codes4xx" stackId="a" fill={getColor("#f97316")} name="4xx" />
@@ -626,7 +617,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
         </div>
 
         {/* 5. Runtime Health Metrics */}
-        <RuntimeMetrics serviceId={serviceId} range={rangeQuery} />
+        <RuntimeMetrics serviceId={serviceId} range={rangeQuery} spanMs={spanMs} />
 
         {/* 6. Recent Invocations (Trace List) */}
         <InvocationsList invocations={invocations} serviceId={serviceId} onRefresh={() => mutateInvocations()} isRefreshing={isValidatingInvocations} />

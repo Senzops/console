@@ -24,6 +24,7 @@ import {
   cn,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { formatAxisDate as formatAxisDateUtil, getTimeSpanMs } from "@/lib/formatAxisDate";
 import {
   AreaChart,
   Area,
@@ -503,24 +504,13 @@ export const SchemaExplorer = ({ target, schemaData }: any) => {
 };
 
 // --- Recharts Tooltip Formatting ---
-const formatAxisDate = (str: string, displayRange: string) => {
-  if (!str) return "";
-  const date = new Date(str);
-  return date.toLocaleString(undefined, {
-    month: (displayRange === "30m" || displayRange === "1h") ? undefined : "short",
-    day: (displayRange === "30m" || displayRange === "1h") ? undefined : "numeric",
-    hour: "numeric",
-    minute:"2-digit",
-  });
-};
-
-const CustomTooltip = ({ active, payload, label, range }: any) => {
+const CustomTooltip = ({ active, payload, label, spanMs }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs z-50">
         {label && (
           <p className="font-semibold text-foreground mb-1">
-            {formatAxisDate(label, range)}
+            {formatAxisDateUtil(label, spanMs)}
           </p>
         )}
         {payload.map((entry: any, idx: number) => (
@@ -788,7 +778,7 @@ const ChartContainer = ({
 };
 
 // --- Sub-Component: Chart Renderer ---
-const ChartRenderer = ({ data, config, visualization, range, isMono, headerActionsRef, isParentHovered }: any) => {
+const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActionsRef, isParentHovered }: any) => {
   const activeViz = visualization || config?.viz || "table";
 
   // Enterprise Interactive State
@@ -1092,7 +1082,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
       >
         <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
           <PieChart className="focus:outline-none" style={{ outline: "none" }}>
-            <RechartsTooltip content={<CustomTooltip range={range} />} />
+            <RechartsTooltip content={<CustomTooltip spanMs={spanMs} />} />
             <Pie
               data={sortedPieData.filter(d => !hiddenSeries.has(String(d[nameKey])))}
               dataKey={valueKey}
@@ -1168,7 +1158,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
             <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.4} />
             <PolarAngleAxis dataKey={timeKey} tick={false} />
             <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-            <RechartsTooltip content={<CustomTooltip range={range} />} />
+            <RechartsTooltip content={<CustomTooltip spanMs={spanMs} />} />
             {legendKeys.map((k, i) => {
               const isHighlighted = hoveredSeries === k;
               const isDimmed = hoveredSeries && hoveredSeries !== k;
@@ -1258,7 +1248,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
             <YAxis hide />
             <RechartsTooltip
               contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-              content={<CustomTooltip range={range} />}
+              content={<CustomTooltip spanMs={spanMs} />}
             />
             {legendKeys.map((k, i) => {
               const isHighlighted = hoveredSeries === k;
@@ -1295,7 +1285,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
             <YAxis hide />
             <RechartsTooltip
               contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-              content={<CustomTooltip range={range} />}
+              content={<CustomTooltip spanMs={spanMs} />}
               cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
             />
             {legendKeys.map((k, i) => {
@@ -1322,7 +1312,7 @@ const ChartRenderer = ({ data, config, visualization, range, isMono, headerActio
             <YAxis hide />
             <RechartsTooltip
               contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-              content={<CustomTooltip range={range} />}
+              content={<CustomTooltip spanMs={spanMs} />}
             />
             {legendKeys.map((k, i) => {
               const isHighlighted = hoveredSeries === k;
@@ -1353,7 +1343,7 @@ const WidgetWrapper = ({
   widget,
   layoutNode,
   rangeQuery,
-  displayRange,
+  spanMs,
   isEditing,
   isMono,
   onEdit,
@@ -1457,7 +1447,7 @@ const WidgetWrapper = ({
               data={data.data}
               config={widget.config}
               visualization={widget.visualization}
-              range={displayRange}
+              spanMs={spanMs}
               isMono={isMono}
               headerActionsRef={headerActionsRef}
               isParentHovered={isHovered}
@@ -1504,7 +1494,7 @@ export default function CustomDashboardView() {
 
   const [timeRange, setTimeRange] = usePersistedTimeRange(8);
   const rangeQuery = buildTimeRangeQuery(timeRange);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -1877,7 +1867,7 @@ export default function CustomDashboardView() {
                   widget={widget}
                   layoutNode={node}
                   rangeQuery={rangeQuery}
-                  displayRange={displayRange}
+                  spanMs={spanMs}
                   isEditing={isEditing}
                   isMono={isMono}
                   onEdit={openEditWidget}
@@ -2239,7 +2229,7 @@ export default function CustomDashboardView() {
                           data={previewData?.data}
                           config={builderForm.config}
                           visualization={builderForm.visualization}
-                          range={displayRange}
+                          spanMs={spanMs}
                           isMono={isMono}
                         />
                       </div>

@@ -5,6 +5,7 @@ import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../components/TimeRangePicker';
+import { getDisplayLabel } from '@/lib/formatAxisDate';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, Pencil, ShieldAlert, ShieldCheck, Timer, Zap } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -459,7 +460,7 @@ export default function MonitorDetail() {
   const { isMono } = useTheme();
 
   const [timeRange, setTimeRange] = usePersistedTimeRange(7);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : getDisplayLabel(timeRange);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();

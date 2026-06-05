@@ -20,6 +20,7 @@ import {
   SelectItem,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
 import {
   AreaChart,
   Area,
@@ -167,7 +168,8 @@ export default function GlobalErrorsDashboard() {
   const { isMono } = useTheme();
 
   const [timeRange, setTimeRange] = usePersistedTimeRange(30);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : getDisplayLabel(timeRange);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("unresolved");
   const [serviceFilter, setServiceFilter] = useState("all");
@@ -216,30 +218,11 @@ export default function GlobalErrorsDashboard() {
 
   const chartData = useMemo(() => {
     if (!data?.trend) return [];
-    return data?.trend.map((point: any) => {
-      const d = new Date(point.time);
-      let timeStr;
-      if (displayRange === "7d" || displayRange === "30d") {
-        timeStr = d.toLocaleDateString([], {
-          month: "short",
-          day: "numeric",
-        });
-      } else if (displayRange === "24h") {
-        timeStr = d.toLocaleDateString([], {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      } else {
-        timeStr = d.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-      return { ...point, time: timeStr };
-    });
-  }, [data?.trend, displayRange]);
+    return data.trend.map((point: any) => ({
+      ...point,
+      time: formatAxisDate(point.time, spanMs),
+    }));
+  }, [data?.trend, spanMs]);
 
   if (!data && !error && isLoading)
     return (
@@ -323,17 +306,11 @@ export default function GlobalErrorsDashboard() {
             title="Error Velocity"
             value={(
               (data?.stats?.totalErrors || 0) /
-              (displayRange === "30m"
-                ? 30
-                : (displayRange === "1h")
-                ? 60
-                : displayRange === "24h"
-                  ? 24
-                  : displayRange === "7d"
-                    ? 168
-                    : 720)
+              (spanMs <= 2 * 60 * 60_000
+                ? spanMs / 60_000
+                : spanMs / (60 * 60_000))
             ).toFixed(1)}
-            subtext={(displayRange === "30m" || displayRange === "1h") ? "Errors per minute" : "Errors per hour"}
+            subtext={spanMs <= 2 * 60 * 60_000 ? "Errors per minute" : "Errors per hour"}
             icon={Clock}
             color="text-purple-500"
           />

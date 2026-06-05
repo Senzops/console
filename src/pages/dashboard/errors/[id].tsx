@@ -14,6 +14,7 @@ import {
   DataError,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
 import {
   AreaChart,
   Area,
@@ -182,7 +183,8 @@ export default function ErrorDetailPage() {
   const { isMono } = useTheme();
 
   const [timeRange, setTimeRange] = usePersistedTimeRange(30);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
+  const displayRange = timeRange.type === 'relative' ? timeRange.range : getDisplayLabel(timeRange);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const { data, error, mutate, isValidating } = useSWR(
@@ -204,30 +206,11 @@ export default function ErrorDetailPage() {
 
   const chartData = useMemo(() => {
     if (!data?.trend) return [];
-    return data.trend.map((point: any) => {
-      const d = new Date(point.time);
-      let timeStr;
-      if (displayRange === "7d" || displayRange === "30d") {
-        timeStr = d.toLocaleDateString([], {
-          month: "short",
-          day: "numeric",
-        });
-      } else if (displayRange === "24h") {
-        timeStr = d.toLocaleDateString([], {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      } else {
-        timeStr = d.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-      return { ...point, time: timeStr };
-    });
-  }, [data?.trend, displayRange]);
+    return data.trend.map((point: any) => ({
+      ...point,
+      time: formatAxisDate(point.time, spanMs),
+    }));
+  }, [data?.trend, spanMs]);
 
   if (!data && !error)
     return (

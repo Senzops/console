@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button, Spinner } from '../Co
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Line } from 'recharts';
 import { Maximize, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { formatAxisDate } from '@/lib/formatAxisDate';
 
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
@@ -68,9 +69,10 @@ const ChartCard = ({ title, children, actions }: any) => {
 interface RuntimeMetricsProps {
   serviceId: string;
   range: string;
+  spanMs: number;
 }
 
-export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps) {
+export default function RuntimeMetrics({ serviceId, range, spanMs }: RuntimeMetricsProps) {
   const { token } = useAuth();
   const { isMono } = useTheme();
   const [chartMode, setChartMode] = useState<'eventloop' | 'memory' | 'gc' | 'cpu'>('eventloop');
@@ -82,20 +84,9 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
     { refreshInterval: 15000 },
   );
 
-  const formatAxisDate = useCallback(
-    (str: string) => {
-      if (!str) return '';
-      const date = new Date(str);
-      if (isNaN(date.getTime())) return str;
-      const short=(range?.includes('30m') || range?.includes('1h'));
-      return date.toLocaleString(undefined, {
-        month: short ? undefined : 'short',
-        day: short ? undefined : 'numeric',
-        hour: 'numeric',
-        minute: short ? '2-digit' : undefined,
-      });
-    },
-    [range],
+  const axisFormatter = useMemo(
+    () => (str: string) => formatAxisDate(str, spanMs),
+    [spanMs],
   );
 
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;
@@ -209,7 +200,7 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={formatAxisDate} unit="ms" />} />
+              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} unit="ms" />} />
               <Area type="monotone" dataKey="eventLoopLagMs" stroke={getColor('#3b82f6')} fill="url(#colorLag)" strokeWidth={2} name="Lag" />
               <Area type="monotone" dataKey="eventLoopLagP99Ms" stroke={getColor('#ef4444')} fill="transparent" strokeWidth={1} strokeDasharray="4 4" name="P99 Lag" />
               <Line type="monotone" dataKey="eventLoopUtilizationPercent" stroke={getColor('#8b5cf6')} strokeWidth={1.5} dot={false} name="ELU %" yAxisId={0} />
@@ -229,7 +220,7 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={formatAxisDate} unit="MB" />} />
+              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} unit="MB" />} />
               <Area type="monotone" dataKey="rssMB" stroke={getColor('#f59e0b')} fill="url(#colorRss)" strokeWidth={1.5} name="RSS" />
               <Area type="monotone" dataKey="heapTotalMB" stroke={getColor('#6b7280')} fill="transparent" strokeWidth={1} strokeDasharray="4 4" name="Heap Total" />
               <Area type="monotone" dataKey="heapUsedMB" stroke={getColor('#10b981')} fill="url(#colorHeap)" strokeWidth={2} name="Heap Used" />
@@ -239,7 +230,7 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={formatAxisDate} />} />
+              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} />} />
               <Bar dataKey="gcMinorCount" fill={getColor('#3b82f6')} name="Minor (Scavenge)" stackId="gc" radius={[0, 0, 0, 0]} />
               <Bar dataKey="gcMajorCount" fill={getColor('#ef4444')} name="Major (Mark-Sweep)" stackId="gc" radius={[2, 2, 0, 0]} />
               <Line type="monotone" dataKey="gcTotalDurationMs" stroke={getColor('#f59e0b')} strokeWidth={2} dot={false} name="GC Duration (ms)" yAxisId={0} />
@@ -259,7 +250,7 @@ export default function RuntimeMetrics({ serviceId, range }: RuntimeMetricsProps
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="rawTime" hide />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip labelFormatter={formatAxisDate} unit="ms" />} />
+              <Tooltip content={<CustomTooltip labelFormatter={axisFormatter} unit="ms" />} />
               <Area type="monotone" dataKey="cpuUserMs" stroke={getColor('#3b82f6')} fill="url(#colorCpuUser)" strokeWidth={2} name="User CPU" stackId="cpu" />
               <Area type="monotone" dataKey="cpuSystemMs" stroke={getColor('#ef4444')} fill="url(#colorCpuSystem)" strokeWidth={1.5} name="System CPU" stackId="cpu" />
             </AreaChart>

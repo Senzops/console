@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useCallback, createContext } from "react";
+import React, { useState, useMemo, createContext } from "react";
 import useSWR from "swr";
 import { format } from "date-fns";
 import { api, useAuth } from "../../../lib/auth";
+import { formatAxisDate } from "@/lib/formatAxisDate";
 import { useTheme } from "../../../lib/theme";
 import {
   Card,
@@ -372,10 +373,10 @@ export default function McpSettingsDashboard() {
     }));
   }, [usageData]);
 
-  const formatAxisDate = useCallback((str: string) => {
-    if (!str) return "";
-    return format(new Date(str), "MMM d, HH:mm");
-  }, []);
+  const axisFormatter = useMemo(
+    () => (str: string) => formatAxisDate(str, 7 * 24 * 60 * 60_000),
+    [],
+  );
 
   // --- Handlers ---
   const handleGenerateKey = async () => {
@@ -588,9 +589,9 @@ export default function McpSettingsDashboard() {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      labelFormatter={formatAxisDate}
+                      labelFormatter={axisFormatter}
                       content={
-                        <CustomTooltip labelFormatter={formatAxisDate} />
+                        <CustomTooltip labelFormatter={axisFormatter} />
                       }
                     />
                     <Area

@@ -5,6 +5,7 @@ import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users, Clock, Trash2, AlertTriangle, X, RefreshCw, Maximize, Search, Pencil, ShieldCheck, UserPlus, UserX, Flame } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -308,7 +309,7 @@ export default function FirebaseDetail() {
 
   const { openModal } = useServiceModal();
   const [timeRange, setTimeRange] = usePersistedTimeRange(7);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -338,16 +339,11 @@ export default function FirebaseDetail() {
     if (!data?.history) return [];
     return data.history.map((point: any) => ({
         ...point,
-        time: new Date(point.time).toLocaleTimeString([], {
-          month: (displayRange === '30m' || displayRange === '1h') ? undefined : 'short',
-          day: (displayRange === '30m' || displayRange === '1h') ? undefined : 'numeric',
-          hour: 'numeric',
-          minute: displayRange !== '7d' ? '2-digit' : undefined,
-        }),
+        time: formatAxisDate(point.time, spanMs),
         verificationRate: point.totalUsers ? ((point.emailVerifiedCount / point.totalUsers) * 100) : 0,
         mfaRate: point.totalUsers ? ((point.mfaEnrolledCount / point.totalUsers) * 100) : 0,
     }));
-  }, [data?.history]);
+  }, [data?.history, spanMs]);
 
   if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-amber-500" /><p className="text-muted-foreground">Connecting to Firebase...</p></div></>;
   if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;

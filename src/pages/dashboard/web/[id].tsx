@@ -5,6 +5,7 @@ import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Globe, Users, Clock, ArrowUpRight, Trash2, AlertTriangle, X, RefreshCw, Search, Maximize, ChartNoAxesCombined, Pencil } from 'lucide-react';
 import { useServiceModal } from '@/components/ServiceModals/context';
@@ -234,7 +235,7 @@ export default function WebDetail() {
   const { isMono } = useTheme();
 
   const [timeRange, setTimeRange] = usePersistedTimeRange(32);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
@@ -281,14 +282,9 @@ export default function WebDetail() {
     if (!data?.graph) return [];
     return data.graph.map((point: any) => ({
       ...point,
-      time: new Date(point.time).toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: (displayRange === '3d' || displayRange === '7d') ? undefined : '2-digit'
-      })
+      time: formatAxisDate(point.time, spanMs),
     }));
-  }, [data?.graph, displayRange]);
+  }, [data?.graph, spanMs]);
 
   const localTrafficHours = useMemo(() => {
     if (!data?.traffic?.hours) return [];

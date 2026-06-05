@@ -2,7 +2,6 @@ import React, {
   useState,
   useMemo,
   useEffect,
-  useCallback,
   createContext,
 } from "react";
 import { useRouter } from "next/router";
@@ -22,6 +21,7 @@ import {
   Dialog,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import {
   AreaChart,
   Area,
@@ -215,7 +215,7 @@ export default function GlobalLogsDashboard() {
 
   // Local State
   const [timeRange, setTimeRange] = usePersistedTimeRange(7);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState(initSearch || "");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -262,18 +262,9 @@ export default function GlobalLogsDashboard() {
   const totalLogs = data?.pagination?.total || 0;
   const logVelocity = useMemo(() => {
     if (!totalLogs) return 0;
-    const mins =
-      displayRange === "30m"
-        ? 30
-        : displayRange === "1h"
-        ? 60
-        : displayRange === "24h"
-          ? 1440
-          : displayRange === "7d"
-            ? 10080
-            : 43200;
+    const mins = spanMs / 60_000;
     return (totalLogs / mins).toFixed(1);
-  }, [totalLogs, displayRange]);
+  }, [totalLogs, spanMs]);
 
   const errorCount = useMemo(() => {
     if (!data?.logs) return 0;
@@ -301,18 +292,9 @@ export default function GlobalLogsDashboard() {
     }));
   }, [data?.trend]);
 
-  const formatAxisDate = useCallback(
-    (str: string) => {
-      if (!str) return "";
-      const date = new Date(str);
-      return date.toLocaleString(undefined, {
-        month: (displayRange === "30m" || displayRange === "1h") ? undefined : "short",
-        day: (displayRange === "30m" || displayRange === "1h") ? undefined : "numeric",
-        hour: "numeric",
-        minute: (displayRange === "30m" || displayRange === "1h") ? "2-digit" : undefined,
-      });
-    },
-    [displayRange],
+  const axisFormatter = useMemo(
+    () => (str: string) => formatAxisDate(str, spanMs),
+    [spanMs],
   );
 
   // Drawer Management: Resolves from table data FIRST, falls back to direct API lookup
@@ -513,8 +495,8 @@ export default function GlobalLogsDashboard() {
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                   }}
-                  labelFormatter={formatAxisDate}
-                  content={<CustomTooltip labelFormatter={formatAxisDate} />}
+                  labelFormatter={axisFormatter}
+                  content={<CustomTooltip labelFormatter={axisFormatter} />}
                 />
                 <Area
                   type="monotone"

@@ -23,6 +23,7 @@ import {
   DataError,
 } from "../../../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import {
   AreaChart,
   Area,
@@ -487,7 +488,7 @@ export default function TaskEntityDetail() {
 
   const [timeRange, setTimeRange] = usePersistedTimeRange(30);
   const rangeQuery = buildTimeRangeQuery(timeRange);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
 
   const endpoint = `/task/${id}/entity/${encodeURIComponent(String(taskName))}?${rangeQuery}`;
   const { data, error, mutate, isValidating } = useSWR(
@@ -507,18 +508,9 @@ export default function TaskEntityDetail() {
     });
   }, [data?.trend]);
 
-  const formatAxisDate = useCallback(
-    (str: string) => {
-      if (!str) return "";
-      const date = new Date(str);
-      return date.toLocaleString(undefined, {
-        month: (displayRange === "30m" || displayRange === "1h") ? undefined : "short",
-        day: (displayRange === "30m" || displayRange === "1h") ? undefined : "numeric",
-        hour: "numeric",
-        minute: (displayRange === "30m" || displayRange === "1h") ? "2-digit" : undefined,
-      });
-    },
-    [displayRange],
+  const axisFormatter = useMemo(
+    () => (str: string) => formatAxisDate(str, spanMs),
+    [spanMs],
   );
 
   if (!data && !error)
@@ -710,10 +702,10 @@ export default function TaskEntityDetail() {
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                   }}
-                  labelFormatter={formatAxisDate}
+                  labelFormatter={axisFormatter}
                   content={
                     <CustomTooltip
-                      labelFormatter={formatAxisDate}
+                      labelFormatter={axisFormatter}
                       unit=" runs"
                     />
                   }

@@ -5,6 +5,7 @@ import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Database, Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, HardDrive, Zap, Lock, ScanLine, Network, Maximize, Search, Pencil, Gauge } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -253,7 +254,7 @@ export default function DatabaseDetail() {
   
   const { openModal } = useServiceModal();
   const [timeRange, setTimeRange] = usePersistedTimeRange(7);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -285,17 +286,11 @@ export default function DatabaseDetail() {
     if (!data?.history) return [];
     return data.history.map((point: any) => ({
         ...point,
-        time: new Date(point.time).toLocaleTimeString([], {
-          month: (displayRange === '30m' || displayRange === '1h') ? undefined : 'short',
-          day: (displayRange === '30m' || displayRange === '1h') ? undefined : 'numeric',
-          hour: 'numeric',
-          minute: displayRange !== '7d' ? '2-digit' : undefined,
-        }),
-        // Convert network from Bytes/s to KB/s for chart
+        time: formatAxisDate(point.time, spanMs),
         netInKB: point.netIn ? point.netIn / 1024 : 0,
         netOutKB: point.netOut ? point.netOut / 1024 : 0
     }));
-  }, [data?.history]);
+  }, [data?.history, spanMs]);
 
   if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Database...</p></div></>;
   if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;

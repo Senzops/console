@@ -4,7 +4,6 @@ import React, {
   useMemo,
   createContext,
   useContext,
-  useCallback,
 } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
@@ -22,6 +21,7 @@ import {
   DataError,
 } from "../../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import {
   AreaChart,
   Area,
@@ -586,7 +586,7 @@ export default function RumDashboard() {
   const { openModal } = useServiceModal();
   const [timeRange, setTimeRange] = usePersistedTimeRange(8);
   const rangeQuery = buildTimeRangeQuery(timeRange);
-  const displayRange = timeRange.type === 'relative' ? timeRange.range : '24h';
+  const spanMs = getTimeSpanMs(timeRange);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -630,24 +630,9 @@ export default function RumDashboard() {
     });
   }, [data?.trend]);
 
-  const formatAxisDate = useCallback(
-    (str: string) => {
-      if (!str) return "";
-      const date = new Date(str);
-      return date.toLocaleString(undefined, {
-        month:
-          displayRange === "24h" || displayRange === "7d" || displayRange === "30d"
-            ? "short"
-            : undefined,
-        day:
-          displayRange === "24h" || displayRange === "7d" || displayRange === "30d"
-            ? "numeric"
-            : undefined,
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    },
-    [displayRange],
+  const axisFormatter = useMemo(
+    () => (str: string) => formatAxisDate(str, spanMs),
+    [spanMs],
   );
 
   if (!data && !error)
@@ -853,8 +838,8 @@ export default function RumDashboard() {
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                   }}
-                  labelFormatter={formatAxisDate}
-                  content={<CustomTooltip labelFormatter={formatAxisDate} />}
+                  labelFormatter={axisFormatter}
+                  content={<CustomTooltip labelFormatter={axisFormatter} />}
                 />
                 <Area
                   type="monotone"
@@ -929,8 +914,8 @@ export default function RumDashboard() {
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                   }}
-                  labelFormatter={formatAxisDate}
-                  content={<CustomTooltip labelFormatter={formatAxisDate} />}
+                  labelFormatter={axisFormatter}
+                  content={<CustomTooltip labelFormatter={axisFormatter} />}
                 />
                 <Area
                   type="monotone"
@@ -1006,8 +991,8 @@ export default function RumDashboard() {
                       backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                     }}
-                    labelFormatter={formatAxisDate}
-                    content={<CustomTooltip labelFormatter={formatAxisDate} />}
+                    labelFormatter={axisFormatter}
+                    content={<CustomTooltip labelFormatter={axisFormatter} />}
                   />
                   <Area
                     type="monotone"
@@ -1059,8 +1044,8 @@ export default function RumDashboard() {
                       backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                     }}
-                    labelFormatter={formatAxisDate}
-                    content={<CustomTooltip labelFormatter={formatAxisDate} />}
+                    labelFormatter={axisFormatter}
+                    content={<CustomTooltip labelFormatter={axisFormatter} />}
                   />
                   <Area
                     type="monotone"
