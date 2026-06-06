@@ -47,6 +47,13 @@ import {
   Bug,
   Cpu,
   Globe,
+  Brain,
+  Sparkles,
+  Loader2,
+  RotateCcw,
+  Target,
+  Lightbulb,
+  AlertCircle,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -224,6 +231,7 @@ export default function IncidentDetailPage() {
   const [severityModalOpen, setSeverityModalOpen] = useState(false);
   const [newSeverity, setNewSeverity] = useState("");
   const [isTimelineMaximized, setIsTimelineMaximized] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const { data, error, mutate, isValidating } = useSWR(
     token && id ? `/alerts/incidents/${id}` : null,
@@ -258,6 +266,38 @@ export default function IncidentDetailPage() {
       toast.error("Failed to update severity.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleTriggerAnalysis = async () => {
+    setIsAnalyzing(true);
+    try {
+      await api.post(`/alerts/incidents/${id}/analysis`);
+      toast.success("AI analysis started. Results will appear shortly.");
+      // Poll for results
+      const pollInterval = setInterval(async () => {
+        const updated = await mutate();
+        if (
+          updated?.incident?.aiAnalysis?.status === "completed" ||
+          updated?.incident?.aiAnalysis?.status === "failed"
+        ) {
+          clearInterval(pollInterval);
+          setIsAnalyzing(false);
+        }
+      }, 3000);
+      // Safety timeout: stop polling after 45s
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setIsAnalyzing(false);
+        mutate();
+      }, 45000);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to start analysis.";
+      toast.error(msg);
+      setIsAnalyzing(false);
     }
   };
 
@@ -563,6 +603,14 @@ export default function IncidentDetailPage() {
           </SummaryCell>
         </div>
 
+        {/* AI Analysis Card */}
+        <AiAnalysisCard
+          analysis={incident.aiAnalysis}
+          isAnalyzing={isAnalyzing}
+          onTriggerAnalysis={handleTriggerAnalysis}
+          incidentStatus={incident.status}
+        />
+
         {/* Condition & Policy */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {condition._id && (
@@ -804,5 +852,316 @@ function DetailRow({
       </span>
       <div className="text-right">{children}</div>
     </div>
+  );
+}
+
+// --- AI Analysis Card ---
+
+const CONFIDENCE_CONFIG: Record<
+  string,
+  { color: string; bgColor: string; borderColor: string; label: string }
+> = {
+  high: {
+    color: "text-emerald-500",
+    bgColor: "bg-emerald-500/10",
+    borderColor: "border-emerald-500/20",
+    label: "HIGH",
+  },
+  medium: {
+    color: "text-amber-500",
+    bgColor: "bg-amber-500/10",
+    borderColor: "border-amber-500/20",
+    label: "MEDIUM",
+  },
+  low: {
+    color: "text-gray-500",
+    bgColor: "bg-gray-500/10",
+    borderColor: "border-gray-500/20",
+    label: "LOW",
+  },
+};
+
+function AiAnalysisCard({
+  analysis,
+  isAnalyzing,
+  onTriggerAnalysis,
+  incidentStatus,
+}: {
+  analysis: any;
+  isAnalyzing: boolean;
+  onTriggerAnalysis: () => void;
+  incidentStatus: string;
+}) {
+  // No analysis yet — show CTA
+  if (!analysis) {
+    return (
+      <Card className="border-border/60 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
+          <CardHeader className="p-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
+            </CardTitle>
+            <Badge
+              variant="outline"
+              className="text-[9px] uppercase tracking-wider bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
+            >
+              Business+
+            </Badge>
+          </CardHeader>
+        </div>
+        <CardContent className="p-6">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-500/10 mx-auto">
+              <Sparkles className="h-6 w-6 text-indigo-500" />
+            </div>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Run AI-powered analysis to investigate root cause, identify affected
+              services, and get actionable recommendations.
+            </p>
+            <Button
+              onClick={onTriggerAnalysis}
+              disabled={isAnalyzing}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white h-9 text-xs"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-3.5 w-3.5 mr-2" />
+                  Run Analysis
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Pending state
+  if (analysis.status === "pending" || isAnalyzing) {
+    return (
+      <Card className="border-border/60 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
+          <CardHeader className="p-4">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
+            </CardTitle>
+          </CardHeader>
+        </div>
+        <CardContent className="p-8">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
+            <p className="text-sm text-muted-foreground">
+              Investigating incident... analyzing traces, logs, and metrics.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Skipped state
+  if (analysis.status === "skipped") {
+    return (
+      <Card className="border-border/60 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
+          <CardHeader className="p-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
+            </CardTitle>
+            <Badge variant="outline" className="text-[9px] uppercase tracking-wider">
+              Skipped
+            </Badge>
+          </CardHeader>
+        </div>
+        <CardContent className="p-4">
+          <p className="text-sm text-muted-foreground">
+            {analysis.error || "AI analysis was skipped for this incident."}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 h-8 text-xs"
+            onClick={onTriggerAnalysis}
+            disabled={isAnalyzing}
+          >
+            <RotateCcw className="h-3 w-3 mr-1.5" />
+            Retry Analysis
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Failed state
+  if (analysis.status === "failed") {
+    return (
+      <Card className="border-border/60 shadow-sm overflow-hidden border-destructive/20">
+        <div className="bg-destructive/5 border-b border-border/40">
+          <CardHeader className="p-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Brain className="h-4 w-4 text-destructive" /> AI Incident Analysis
+            </CardTitle>
+            <Badge
+              variant="outline"
+              className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive border-destructive/20"
+            >
+              Failed
+            </Badge>
+          </CardHeader>
+        </div>
+        <CardContent className="p-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Analysis failed: {analysis.error || "Unknown error"}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={onTriggerAnalysis}
+            disabled={isAnalyzing}
+          >
+            <RotateCcw className="h-3 w-3 mr-1.5" />
+            Retry Analysis
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Completed state — full analysis display
+  const confConfig = CONFIDENCE_CONFIG[analysis.confidence] || CONFIDENCE_CONFIG.low;
+  const findings = analysis.findings || {};
+
+  return (
+    <Card className="border-border/60 shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
+        <CardHeader className="p-4 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={`text-[9px] uppercase tracking-wider font-bold ${confConfig.bgColor} ${confConfig.color} ${confConfig.borderColor}`}
+            >
+              {confConfig.label} confidence
+            </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onTriggerAnalysis}
+              disabled={isAnalyzing}
+              title="Re-run analysis"
+            >
+              <RotateCcw className={`h-3 w-3 ${isAnalyzing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+        </CardHeader>
+      </div>
+      <CardContent className="p-0">
+        {/* Summary */}
+        <div className="px-5 py-4 border-b border-border/40 bg-card">
+          <p className="text-sm text-foreground leading-relaxed font-medium">
+            {analysis.summary}
+          </p>
+        </div>
+
+        {/* Root Cause */}
+        {findings.rootCause && (
+          <div className="px-5 py-4 border-b border-border/40">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-3.5 w-3.5 text-destructive" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Root Cause
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {findings.rootCause}
+            </p>
+          </div>
+        )}
+
+        {/* Affected Services */}
+        {findings.affectedServices?.length > 0 && (
+          <div className="px-5 py-4 border-b border-border/40">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Affected Services
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {findings.affectedServices.map((s: string, i: number) => (
+                <Badge key={i} variant="outline" className="text-[10px] font-mono bg-destructive/5 text-destructive border-destructive/20">
+                  {s}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Correlated Events */}
+        {findings.correlatedEvents?.length > 0 && (
+          <div className="px-5 py-4 border-b border-border/40">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="h-3.5 w-3.5 text-blue-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Correlated Events
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {findings.correlatedEvents.map((e: string, i: number) => (
+                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                  <span className="text-muted-foreground/50 mt-1 shrink-0">&bull;</span>
+                  <span>{e}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Recommended Actions */}
+        {findings.recommendedActions?.length > 0 && (
+          <div className="px-5 py-4 border-b border-border/40">
+            <div className="flex items-center gap-2 mb-2">
+              <Lightbulb className="h-3.5 w-3.5 text-emerald-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Recommended Actions
+              </span>
+            </div>
+            <ol className="space-y-2">
+              {findings.recommendedActions.map((a: string, i: number) => (
+                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2.5">
+                  <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-500 rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <span>{a}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Meta */}
+        <div className="px-5 py-3 bg-muted/20 flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>
+            {analysis.model} &middot; {analysis.toolCallsUsed} tool calls &middot;{" "}
+            {((analysis.tokensUsed?.input || 0) + (analysis.tokensUsed?.output || 0)).toLocaleString()} tokens
+          </span>
+          {analysis.analyzedAt && (
+            <span>
+              {format(new Date(analysis.analyzedAt), "MMM d, HH:mm:ss")} &middot;{" "}
+              {(analysis.durationMs / 1000).toFixed(1)}s
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

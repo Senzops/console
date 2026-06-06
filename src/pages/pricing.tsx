@@ -176,6 +176,46 @@ const COMPARE_FEATURES = [
     ],
   },
   {
+    category: "AI & Intelligence",
+    items: [
+      {
+        name: "AI Incident Analysis",
+        tooltip:
+          "Automated root cause investigation powered by AI when alerts fire. Analyzes traces, logs, errors, and infrastructure to identify the cause.",
+        starter: false,
+        pro: false,
+        business: "500 / month",
+        enterprise: "Unlimited",
+      },
+      {
+        name: "AI-Enriched Notifications",
+        tooltip:
+          "Alert notifications include an AI-generated summary with root cause, affected services, and recommended actions.",
+        starter: false,
+        pro: false,
+        business: true,
+        enterprise: true,
+      },
+      {
+        name: "Anomaly Detection",
+        tooltip: "AI-driven detection of unusual metric deviations without manual threshold configuration.",
+        starter: false,
+        pro: false,
+        business: true,
+        enterprise: true,
+      },
+      {
+        name: "AI Assistant",
+        tooltip:
+          "Natural language interface to query your observability data, explore metrics, and get insights.",
+        starter: false,
+        pro: true,
+        business: true,
+        enterprise: true,
+      },
+    ],
+  },
+  {
     category: "Security & Compliance",
     items: [
       {
