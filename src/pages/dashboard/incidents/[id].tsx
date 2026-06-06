@@ -895,42 +895,38 @@ function AiAnalysisCard({
   // No analysis yet — show CTA
   if (!analysis) {
     return (
-      <Card className="border-border/60 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
-          <CardHeader className="p-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
-            </CardTitle>
-            <Badge
-              variant="outline"
-              className="text-[9px] uppercase tracking-wider bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
-            >
-              Business+
-            </Badge>
-          </CardHeader>
-        </div>
-        <CardContent className="p-6">
-          <div className="text-center space-y-3">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-500/10 mx-auto">
-              <Sparkles className="h-6 w-6 text-indigo-500" />
-            </div>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Run AI-powered analysis to investigate root cause, identify affected
-              services, and get actionable recommendations.
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="p-4 border-b border-border/40 bg-card/50 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Brain className="h-4 w-4 text-foreground" /> AI Incident Analysis
+          </CardTitle>
+          <Badge
+            variant="outline"
+            className="text-[9px] uppercase tracking-wider"
+          >
+            Business+
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              Run AI-powered analysis to investigate root cause and get
+              actionable recommendations.
             </p>
             <Button
               onClick={onTriggerAnalysis}
               disabled={isAnalyzing}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white h-9 text-xs"
+              size="sm"
+              className="h-8 text-xs shrink-0"
             >
               {isAnalyzing ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                  Analyzing...
+                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                  Analyzing…
                 </>
               ) : (
                 <>
-                  <Brain className="h-3.5 w-3.5 mr-2" />
+                  <Sparkles className="h-3 w-3 mr-1.5" />
                   Run Analysis
                 </>
               )}
@@ -944,20 +940,29 @@ function AiAnalysisCard({
   // Pending state
   if (analysis.status === "pending" || isAnalyzing) {
     return (
-      <Card className="border-border/60 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
-          <CardHeader className="p-4">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
-            </CardTitle>
-          </CardHeader>
-        </div>
-        <CardContent className="p-8">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
-            <p className="text-sm text-muted-foreground">
-              Investigating incident... analyzing traces, logs, and metrics.
-            </p>
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="p-4 border-b border-border/40 bg-card/50 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Brain className="h-4 w-4 text-foreground" /> AI Incident Analysis
+          </CardTitle>
+          <Badge
+            variant="outline"
+            className="text-[9px] uppercase tracking-wider bg-amber-500/10 text-amber-500 border-amber-500/20"
+          >
+            Analyzing
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-muted-foreground animate-spin shrink-0" />
+            <div>
+              <p className="text-sm text-foreground font-medium">
+                Investigating incident…
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Analyzing traces, logs, errors, and infrastructure metrics.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -967,31 +972,34 @@ function AiAnalysisCard({
   // Skipped state
   if (analysis.status === "skipped") {
     return (
-      <Card className="border-border/60 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
-          <CardHeader className="p-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
-            </CardTitle>
-            <Badge variant="outline" className="text-[9px] uppercase tracking-wider">
-              Skipped
-            </Badge>
-          </CardHeader>
-        </div>
-        <CardContent className="p-4">
-          <p className="text-sm text-muted-foreground">
-            {analysis.error || "AI analysis was skipped for this incident."}
-          </p>
-          <Button
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="p-4 border-b border-border/40 bg-card/50 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Brain className="h-4 w-4 text-foreground" /> AI Incident Analysis
+          </CardTitle>
+          <Badge
             variant="outline"
-            size="sm"
-            className="mt-3 h-8 text-xs"
-            onClick={onTriggerAnalysis}
-            disabled={isAnalyzing}
+            className="text-[9px] uppercase tracking-wider"
           >
-            <RotateCcw className="h-3 w-3 mr-1.5" />
-            Retry Analysis
-          </Button>
+            Skipped
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              {analysis.error || "Analysis was skipped for this incident."}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs shrink-0"
+              onClick={onTriggerAnalysis}
+              disabled={isAnalyzing}
+            >
+              <RotateCcw className="h-3 w-3 mr-1.5" />
+              Retry
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -1000,74 +1008,75 @@ function AiAnalysisCard({
   // Failed state
   if (analysis.status === "failed") {
     return (
-      <Card className="border-border/60 shadow-sm overflow-hidden border-destructive/20">
-        <div className="bg-destructive/5 border-b border-border/40">
-          <CardHeader className="p-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Brain className="h-4 w-4 text-destructive" /> AI Incident Analysis
-            </CardTitle>
-            <Badge
-              variant="outline"
-              className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive border-destructive/20"
-            >
-              Failed
-            </Badge>
-          </CardHeader>
-        </div>
-        <CardContent className="p-4 space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Analysis failed: {analysis.error || "Unknown error"}
-          </p>
-          <Button
+      <Card className="border-border/60 shadow-sm border-destructive/20">
+        <CardHeader className="p-4 border-b border-destructive/10 bg-destructive/5 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Brain className="h-4 w-4 text-destructive" /> AI Incident Analysis
+          </CardTitle>
+          <Badge
             variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={onTriggerAnalysis}
-            disabled={isAnalyzing}
+            className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive border-destructive/20"
           >
-            <RotateCcw className="h-3 w-3 mr-1.5" />
-            Retry Analysis
-          </Button>
+            Failed
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              {analysis.error || "Analysis failed. Please try again."}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs shrink-0"
+              onClick={onTriggerAnalysis}
+              disabled={isAnalyzing}
+            >
+              <RotateCcw className="h-3 w-3 mr-1.5" />
+              Retry
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   // Completed state — full analysis display
-  const confConfig = CONFIDENCE_CONFIG[analysis.confidence] || CONFIDENCE_CONFIG.low;
+  const confConfig =
+    CONFIDENCE_CONFIG[analysis.confidence] || CONFIDENCE_CONFIG.low;
   const findings = analysis.findings || {};
 
   return (
-    <Card className="border-border/60 shadow-sm overflow-hidden">
-      <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-indigo-500/5 border-b border-border/40">
-        <CardHeader className="p-4 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Brain className="h-4 w-4 text-indigo-500" /> AI Incident Analysis
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className={`text-[9px] uppercase tracking-wider font-bold ${confConfig.bgColor} ${confConfig.color} ${confConfig.borderColor}`}
-            >
-              {confConfig.label} confidence
-            </Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onTriggerAnalysis}
-              disabled={isAnalyzing}
-              title="Re-run analysis"
-            >
-              <RotateCcw className={`h-3 w-3 ${isAnalyzing ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
-        </CardHeader>
-      </div>
+    <Card className="border-border/60 shadow-sm">
+      <CardHeader className="p-4 border-b border-border/40 bg-card/50 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Brain className="h-4 w-4 text-foreground" /> AI Incident Analysis
+        </CardTitle>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className={`text-[9px] uppercase tracking-wider font-bold ${confConfig.bgColor} ${confConfig.color} ${confConfig.borderColor}`}
+          >
+            {confConfig.label} confidence
+          </Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onTriggerAnalysis}
+            disabled={isAnalyzing}
+            title="Re-run analysis"
+          >
+            <RotateCcw
+              className={`h-3 w-3 ${isAnalyzing ? "animate-spin" : ""}`}
+            />
+          </Button>
+        </div>
+      </CardHeader>
       <CardContent className="p-0">
         {/* Summary */}
-        <div className="px-5 py-4 border-b border-border/40 bg-card">
-          <p className="text-sm text-foreground leading-relaxed font-medium">
+        <div className="px-5 py-4 border-b border-border/40">
+          <p className="text-sm text-foreground leading-relaxed">
             {analysis.summary}
           </p>
         </div>
@@ -1098,7 +1107,11 @@ function AiAnalysisCard({
             </div>
             <div className="flex flex-wrap gap-1.5">
               {findings.affectedServices.map((s: string, i: number) => (
-                <Badge key={i} variant="outline" className="text-[10px] font-mono bg-destructive/5 text-destructive border-destructive/20">
+                <Badge
+                  key={i}
+                  variant="outline"
+                  className="text-[10px] font-mono"
+                >
                   {s}
                 </Badge>
               ))}
@@ -1117,8 +1130,13 @@ function AiAnalysisCard({
             </div>
             <ul className="space-y-1.5">
               {findings.correlatedEvents.map((e: string, i: number) => (
-                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                  <span className="text-muted-foreground/50 mt-1 shrink-0">&bull;</span>
+                <li
+                  key={i}
+                  className="text-sm text-muted-foreground flex items-start gap-2"
+                >
+                  <span className="text-muted-foreground/40 mt-1 shrink-0">
+                    •
+                  </span>
                   <span>{e}</span>
                 </li>
               ))}
@@ -1137,8 +1155,11 @@ function AiAnalysisCard({
             </div>
             <ol className="space-y-2">
               {findings.recommendedActions.map((a: string, i: number) => (
-                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2.5">
-                  <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-500 rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
+                <li
+                  key={i}
+                  className="text-sm text-muted-foreground flex items-start gap-2.5"
+                >
+                  <span className="text-[10px] font-bold bg-muted/50 text-muted-foreground rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
                     {i + 1}
                   </span>
                   <span>{a}</span>
@@ -1149,15 +1170,15 @@ function AiAnalysisCard({
         )}
 
         {/* Meta */}
-        <div className="px-5 py-3 bg-muted/20 flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>
-            {analysis.model} &middot; {analysis.toolCallsUsed} tool calls &middot;{" "}
-            {((analysis.tokensUsed?.input || 0) + (analysis.tokensUsed?.output || 0)).toLocaleString()} tokens
+        <div className="px-5 py-3 bg-muted/10 flex items-center justify-between text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <Sparkles className="h-3 w-3" />
+            AI-generated &middot; {analysis.toolCallsUsed} tool calls &middot;{" "}
+            {(analysis.durationMs / 1000).toFixed(1)}s
           </span>
           {analysis.analyzedAt && (
             <span>
-              {format(new Date(analysis.analyzedAt), "MMM d, HH:mm:ss")} &middot;{" "}
-              {(analysis.durationMs / 1000).toFixed(1)}s
+              {format(new Date(analysis.analyzedAt), "MMM d, HH:mm:ss")}
             </span>
           )}
         </div>
