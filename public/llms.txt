@@ -1,0 +1,92 @@
+# Senzor
+
+> Senzor is an open-source, privacy-first observability platform for modern engineering teams. It unifies infrastructure monitoring, application performance monitoring, distributed tracing, log management, error tracking, uptime monitoring, web analytics, real user monitoring, and AI-powered operational intelligence into a single platform. All data is hosted in the EU with full GDPR compliance.
+
+## Services
+
+- [Infrastructure Monitoring](https://senzor.dev/features/server): Real-time server, container, and VM monitoring for CPU, memory, disk I/O, and network throughput. Uses a lightweight bash agent deployed as a systemd service or Docker container. Supports Linux (Ubuntu, Debian, CentOS, RHEL, Alpine). Includes Nginx and Traefik integration.
+- [Database Observability](https://senzor.dev/features/database): Query latency profiling, active connection monitoring, and operations-per-second tracking. Supports MongoDB and Redis.
+- [Firebase Monitoring](https://senzor.dev/features/firebase): Agentless Firebase Authentication monitoring. Tracks user growth, daily and monthly active users, MFA enrollment rates, email verification rates, and auth provider distribution using encrypted credential polling.
+- [Web Analytics](https://senzor.dev/features/web-analytics): Cookie-less, GDPR-compliant traffic analytics. Tracks page views, unique visitors, referrers, geographic distribution, and device breakdowns without storing personal data.
+- [Real User Monitoring](https://senzor.dev/features/rum): Browser-side performance monitoring capturing Core Web Vitals (LCP, FID, CLS), network call latency, frontend JavaScript exceptions, and rage click detection. Deployed via a lightweight JavaScript SDK.
+- [Application Performance Monitoring](https://senzor.dev/features/apm): Distributed tracing across microservices with automatic framework instrumentation, end-to-end trace waterfall visualizations, and database and external API call profiling. Supports OpenTelemetry OTLP ingestion.
+- [Background Task Monitoring](https://senzor.dev/features/tasks): Monitors queues, cron jobs, and background workers. Tracks execution times, failure rates, retry behaviors, queue depth, and dead-letter queue detection. Supports OpenTelemetry OTLP ingestion.
+- [Global Error Tracking](https://senzor.dev/features/errors): Automatic exception capture with intelligent fingerprinting, full stack trace rendering, cross-service impact analysis, and resolution state tracking.
+- [Centralized Log Management](https://senzor.dev/features/logs): High-throughput log ingestion via HTTP API. Advanced MQL (Monitoring Query Language) filtering engine with automatic trace correlation and live-tail streaming.
+- [Uptime Monitoring](https://senzor.dev/features/uptime): High-frequency synthetic HTTP checks verifying external endpoint availability. Tracks global response times and records downtime incidents.
+- [Alerts and Incident Routing](https://senzor.dev/features/alerts): Multi-condition threshold-based alert policies across all telemetry streams. Routes incidents via Webhooks, Slack, and Email. Supports MQL-based custom alert triggers and incident lifecycle management.
+- [MCP Server](https://senzor.dev/features/mcp): Model Context Protocol (MCP) server enabling AI agents to query, summarize, and analyze telemetry data using natural language. Supports SSE transport. Compatible with Claude Code, Cursor, and other MCP-capable clients.
+- [Native OpenTelemetry Support](https://senzor.dev/features/opentelemetry): Vendor-neutral OTLP HTTP-compatible endpoints for traces and metrics. Supports Go, Java, Python, and Rust applications. Automatic translation of OTLP payloads into Senzor dashboard schemas with standard Semantic Conventions support.
+- [Saved Views](https://senzor.dev/features/views): Custom dashboards aggregating metrics, logs, and traces across the entire stack. Drag-and-drop widget canvas with cross-service data aggregation and strict tenant data isolation.
+
+## Technical Architecture
+
+- **Deployment**: Available as a managed cloud service (EU-hosted) or self-hosted via Docker Compose and Kubernetes.
+- **API Base URL**: `https://api.senzor.dev/api`
+- **Data Ingestion**: Outbound-only telemetry over HTTPS (port 443). SDKs use in-memory ring buffers with exponential backoff retry to prevent data loss during connectivity issues.
+- **Correlation**: Logs, metrics, and traces are automatically correlated. An APM trace failure links directly to associated server logs and RUM sessions.
+- **Query Language**: MQL (Monitoring Query Language) for filtering and querying across all telemetry types.
+- **Data Tier**: Pooled globally across workspaces rather than per-service limits.
+
+## Integrations
+
+- **OpenTelemetry**: Native OTLP HTTP endpoints for traces and metrics ingestion from any OpenTelemetry-compatible application or collector.
+- **MCP (Model Context Protocol)**: SSE-based MCP server for AI agent integration. Configurable via Claude Code CLI, Cursor, or any MCP-compatible client.
+- **Notification Channels**: Slack, Email, and Webhooks for alert routing.
+- **Server Agent**: Supports Nginx status monitoring and Traefik API integration.
+- **Log Ingestion**: HTTP API accepting JSON payloads with structured log levels, messages, and custom attributes.
+
+## Security and Compliance
+
+- **GDPR**: Senzor acts as a Data Processor under GDPR. All infrastructure is hosted in the European Union.
+- **Encryption**: AES-256 encryption at rest. TLS 1.3 encryption in transit.
+- **Authentication**: Firebase Authentication with email OTP on login and optional TOTP-based multi-factor authentication.
+- **Access Control**: Role-based access control (RBAC) with tenant data isolation. Granular API key permissions for MCP and log ingestion.
+- **Data Retention**: Tied to billing plan. Starter: 3 days, Pro: 15 days, Business: 30 days. Data is cryptographically expunged after TTL expiry.
+- **PII Policy**: Users are prohibited from transmitting clear-text PII or PHI within custom log messages or traces.
+
+## Plans
+
+Senzor offers five tiers: Free, Starter, Pro, Business, and Enterprise. All plans include access to every service. Plans differ in data retention (3 to 30 days), ingestion volume, and support level. See the pricing page for current details.
+
+## What We Do Not Do
+
+Senzor does not provide CDN services, DNS hosting, cloud compute, CI/CD pipelines, code deployment, APM for frontend-only applications without a backend, or synthetic browser testing. Senzor does not sell, share, or monetize user telemetry data.
+
+## Documentation
+
+- [Getting Started](https://senzor.dev/docs): Platform introduction, core concepts, and onboarding guide.
+- [Infrastructure Monitoring Setup](https://senzor.dev/docs/server): Server agent installation via bash script, Docker Compose, or non-interactive CI mode.
+- [Database Observability Setup](https://senzor.dev/docs/database): MongoDB and Redis connection monitoring configuration.
+- [Firebase Monitoring Setup](https://senzor.dev/docs/firebase): Agentless Firebase Auth credential configuration.
+- [Web Analytics Setup](https://senzor.dev/docs/web-analytics): JavaScript tracking snippet installation and domain allowlisting.
+- [Real User Monitoring Setup](https://senzor.dev/docs/rum): Browser SDK installation for React, Next.js, Vue, Svelte, Angular, Astro, and plain HTML.
+- [APM Setup](https://senzor.dev/docs/apm): OpenTelemetry SDK configuration for Node.js, Python, Go, Java, and Rust.
+- [Background Task Monitoring Setup](https://senzor.dev/docs/tasks): OpenTelemetry-based task and queue worker instrumentation.
+- [Error Tracking Setup](https://senzor.dev/docs/errors): Exception capture configuration across backend services.
+- [Log Management Setup](https://senzor.dev/docs/logs): HTTP log ingestion API reference and structured logging guide.
+- [Uptime Monitoring Setup](https://senzor.dev/docs/uptime): Endpoint registration and check frequency configuration.
+- [MCP Server Setup](https://senzor.dev/docs/mcp): MCP SSE endpoint configuration for Claude Code, Cursor, and other AI clients.
+- [Alerts Setup](https://senzor.dev/docs/alerts): Alert policy creation, condition configuration, and notification channel routing.
+- [OpenTelemetry Setup](https://senzor.dev/docs/opentelemetry): OTLP collector configuration and SDK integration guide.
+- [FAQ](https://senzor.dev/docs/faq): Frequently asked questions about security, compliance, architecture, and billing.
+- [Self-Hosting Guide](https://github.com/Senzops/.github/blob/dev/SELF_HOSTING.md): Docker Compose and Kubernetes deployment manifests for on-premise installation.
+
+## Key Information
+
+- [Homepage](https://senzor.dev): Product overview and feature descriptions.
+- [Live Demo](https://senzor.dev/demo): Interactive demo environment with sample telemetry data.
+- [Pricing](https://senzor.dev/pricing): Plan comparison and current pricing.
+- [GitHub](https://github.com/Senzops): Open-source repositories, server agent source code, and community discussions.
+- [Privacy Policy](https://senzor.dev/privacy): Data handling and privacy practices.
+- [GDPR Compliance](https://senzor.dev/gdpr): EU data protection compliance details.
+- [Cookie Policy](https://senzor.dev/cookie): Cookie usage and consent practices.
+- [Terms of Service](https://senzor.dev/terms): Usage terms and conditions.
+
+## Contact
+
+- General: ops@senzor.dev
+- Privacy: privacy@senzor.dev
+- Support: support@senzor.dev
+- LinkedIn: https://linkedin.com/company/senzor-platforms
+- GitHub: https://github.com/Senzops
