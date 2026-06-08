@@ -129,14 +129,11 @@ export const Navbar = ({
                 loading ? "pointer-events-none" : ""
               )}
             >
-              <span
-                className={cn(
-                  "transition-opacity duration-500 ease-in-out",
-                  loading ? "opacity-0" : "opacity-100"
-                )}
-              >
-                {user ? "Dashboard" : "Sign In"}
-              </span>
+              {loading ? (
+                <Spinner className="h-4 w-4" />
+              ) : (
+                user ? "Dashboard" : "Sign In"
+              )}
             </Button>
           </Link>
         </div>
