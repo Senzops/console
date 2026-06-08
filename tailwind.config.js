@@ -3,6 +3,7 @@ module.exports = {
   // 1. Point to your files so Tailwind knows where to look for classes
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./remotion/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {

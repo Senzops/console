@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\" && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "remotion:studio": "remotion studio remotion/index.ts",
+    "remotion:render": "remotion render remotion/index.ts LaunchVideo out/senzor-launch.mp4 --codec=h264",
+    "remotion:preview": "remotion render remotion/index.ts LaunchVideo out/senzor-preview.mp4 --codec=h264 --scale=0.5"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.82",
@@ -40,6 +43,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-simple-maps": "^3.0.6",
+    "@remotion/cli": "4.0.473",
+    "@remotion/google-fonts": "4.0.473",
+    "@remotion/player": "4.0.473",
+    "@remotion/tailwind": "4.0.473",
+    "ajv": "^8.20.0",
+    "remotion": "4.0.473",
     "autoprefixer": "^10.4.20",
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
