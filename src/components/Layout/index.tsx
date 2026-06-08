@@ -361,7 +361,24 @@ export const Footer = () => {
             &copy; {new Date().getFullYear()} Senzor Platforms Inc. All rights
             reserved.
           </p>
-          <p>Made with 🤍 for Developers</p>
+          <div className="flex flex-wrap justify-center md:justify-end gap-x-4 gap-y-2">
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6.25" /><path d="M8 4v4l2.5 1.5" /></svg>
+              99.9% Uptime
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 1.5l5.5 2.5v4c0 3.5-2.5 5.5-5.5 7-3-1.5-5.5-3.5-5.5-7V4z" /><path d="M6 8l1.5 1.5L10 6" /></svg>
+              GDPR Compliant
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 8a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0z" /><circle cx="5.5" cy="7" r="0.5" fill="currentColor" stroke="none" /><circle cx="8" cy="7" r="0.5" fill="currentColor" stroke="none" /><circle cx="10.5" cy="7" r="0.5" fill="currentColor" stroke="none" /><path d="M5.5 7h5" /><path d="M4.5 9.5h7" /></svg>
+              EU Hosted
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7.5" width="10" height="6" rx="1.5" /><path d="M5.5 7.5V5a2.5 2.5 0 0 1 5 0v2.5" /></svg>
+              Encrypted
+            </span>
+          </div>
         </div>
       </div>
     </footer>
