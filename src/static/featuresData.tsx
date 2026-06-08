@@ -67,7 +67,7 @@ const DiagramFrame = ({
   className?: string;
 }) => (
   <div
-    className={`w-full h-full bg-card border border-border/50 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow duration-300 ${className}`}
+    className={`w-full h-full bg-card border border-border/50 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-lg hover:scale-[1.015] hover:border-border transition-all duration-300 ease-out ${className}`}
   >
     {children}
   </div>
@@ -190,7 +190,7 @@ const StatCard = ({
 /** Shimmer overlay that sweeps across a container for a polished live-data feel */
 const ShimmerOverlay = () => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-xl">
-    <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-foreground/[0.03] to-transparent animate-[diag-shimmer_4s_ease-in-out_infinite]" />
+    <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-foreground/[0.03] to-transparent animate-[diag-shimmer_6s_cubic-bezier(0.4,0,0.2,1)_infinite]" />
   </div>
 );
 
