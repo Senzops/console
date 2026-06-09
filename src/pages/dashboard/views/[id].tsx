@@ -191,193 +191,288 @@ const getStringHash = (str: string) => {
 
 // Enterprise Aggregation Pipeline Defaults
 const DEFAULT_QUERIES: Record<string, string> = {
-  logs: '[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "service": "$serviceModel" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  apm: '[\n  { "$match": { "duration": { "$gt": 1000 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  vps: '[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 50 } } },\n  { "$project": { "time": "$createdAt", "cpu": "$metrics.cpu.usagePercent", "ram": "$metrics.memory.usagePercent", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  database: '[\n  { "$match": { "latency.read.avg": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "readLatency": "$latency.read.avg", "connections": "$connections.current", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  uptime: '[\n  { "$match": { "status": "down" } },\n  { "$project": { "time": "$createdAt", "url": "$service.url", "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  rum: '[\n  { "$match": { "vitals.lcp": { "$gt": 2500 } } },\n  { "$project": { "time": "$createdAt", "browser": 1, "lcp": "$vitals.lcp", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  task: '[\n  { "$match": { "status": "failed" } },\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  errors: '[\n  { "$match": { "status": "unresolved" } },\n  { "$project": { "time": "$lastSeen", "errorClass": 1, "message": 1, "totalCount": 1, "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  runtime: '[\n  { "$match": { "eventLoopLagMs": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "eventLoopLagMs": 1, "heapUsedPercent": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  web: '[\n  { "$match": { "type": "pageview" } },\n  { "$project": { "time": "$createdAt", "path": 1, "browser": 1, "country": 1, "device": 1, "duration": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
-  firebase: '[\n  { "$project": { "time": "$timestamp", "totalUsers": "$auth.totalUsers", "dau": "$auth.activeUsersDaily", "mau": "$auth.activeUsersMonthly", "signups": "$auth.newSignups24h", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  apm: '[\n  { "$match": { "duration": { "$gt": 1000 } } },\n  { "$project": { "time": "$timestamp", "method": 1, "route": 1, "status": 1, "duration": 1, "country": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  logs: '[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "level": 1, "message": 1, "serviceModel": 1, "traceId": 1, "attributes": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  rum: '[\n  { "$match": { "vitals.lcp": { "$gt": 2500 } } },\n  { "$project": { "time": "$createdAt", "lcp": "$vitals.lcp", "inp": "$vitals.inp", "cls": "$vitals.cls", "fcp": "$vitals.fcp", "path": 1, "browser": 1, "device": 1, "country": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  vps: '[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 50 } } },\n  { "$project": { "time": "$createdAt", "cpu": "$metrics.cpu.usagePercent", "ram": "$metrics.memory.usagePercent", "disk": "$metrics.disk.usagePercent", "load": "$metrics.load.1m", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  database: '[\n  { "$match": { "latency.read.avg": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "readLatency": "$latency.read.avg", "writeLatency": "$latency.write.avg", "connections": "$connections.current", "opsQuery": "$ops.query", "memoryMB": "$memory.resident", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  uptime: '[\n  { "$match": { "status": "down" } },\n  { "$project": { "time": "$createdAt", "status": 1, "latency": 1, "statusCode": 1, "service": "$service.name", "url": "$service.url" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  task: '[\n  { "$match": { "status": "failed" } },\n  { "$project": { "time": "$timestamp", "taskName": 1, "taskType": 1, "duration": 1, "attempts": 1, "queueDelay": 1, "isDeadLetter": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  errors: '[\n  { "$match": { "status": "unresolved" } },\n  { "$project": { "time": "$lastSeen", "errorClass": 1, "message": 1, "totalCount": 1, "status": 1, "firstSeen": 1, "serviceModel": 1 } },\n  { "$sort": { "totalCount": -1 } },\n  { "$limit": 100 }\n]',
+  runtime: '[\n  { "$match": { "eventLoopLagMs": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "eventLoopLagMs": 1, "eventLoopLagP99Ms": 1, "heapUsedPercent": 1, "gcTotalDurationMs": 1, "activeHandles": 1, "rssBytes": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  web: '[\n  { "$match": { "type": "pageview" } },\n  { "$project": { "time": "$createdAt", "path": 1, "title": 1, "referrer": 1, "channel": 1, "browser": 1, "device": 1, "country": 1, "duration": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  firebase: '[\n  { "$project": { "time": "$timestamp", "totalUsers": "$auth.totalUsers", "dau": "$auth.activeUsersDaily", "mau": "$auth.activeUsersMonthly", "signups": "$auth.newSignups24h", "mfaEnrolled": "$auth.mfaEnrolledCount", "recentSignIns": "$auth.recentSignIns1h", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
 // Universal Pipeline Templates
 const QUICK_TEMPLATES: Record<string, any[]> = {
   apm: [
     {
-      label: "Avg Latency (Area)",
+      label: "Avg Latency",
       config: { viz: "area" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "value": { "$avg": "$duration" }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Avg ms": { "$avg": "$duration" }\n  }},\n  { "$project": { "time": "$_id", "Avg ms": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Errors by Service (Bar)",
+      label: "Error Rate",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "total": { "$sum": 1 },\n    "errors": { "$sum": { "$cond": [{ "$gte": ["$status", 500] }, 1, 0] } }\n  }},\n  { "$project": {\n    "time": "$_id",\n    "Error Rate %": { "$round": [{ "$multiply": [{ "$divide": ["$errors", "$total"] }, 100] }, 2] },\n    "_id": 0\n  }},\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "5xx by Service",
       config: { viz: "bar" },
-      query: `[\n  { "$match": { "status": { "$gte": 500 } } },\n  { "$group": { "_id": "$service.name", "value": { "$sum": 1 } } },\n  { "$project": { "time": "$_id", "name": "$_id", "value": 1, "_id": 0 } }\n]`,
+      query: `[\n  { "$match": { "status": { "$gte": 500 } } },\n  { "$group": { "_id": "$service.name", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "count": -1 } }\n]`,
     },
     {
-      label: "Slow Traces (Table)",
+      label: "Throughput by Route",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": { "_id": "$route", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "count": -1 } },\n  { "$limit": 20 }\n]`,
+    },
+    {
+      label: "Slow Traces",
       config: { viz: "table" },
-      query: `[\n  { "$match": { "duration": { "$gt": 1500 } } },\n  { "$project": { "time": "$timestamp", "route": 1, "duration": 1, "service": "$service.name", "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
+      query: `[\n  { "$match": { "duration": { "$gt": 1500 } } },\n  { "$project": { "time": "$timestamp", "method": 1, "route": 1, "status": 1, "duration": 1, "country": 1, "service": "$service.name" } },\n  { "$sort": { "duration": -1 } },\n  { "$limit": 100 }\n]`,
     },
   ],
   logs: [
     {
-      label: "Errors Trend (Line)",
+      label: "Errors Trend",
       config: { viz: "line" },
-      query: `[\n  { "$match": { "level": "error" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "value": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+      query: `[\n  { "$match": { "level": "error" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "count": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Recent Errors (Table)",
-      config: { viz: "table" },
-      query: `[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "service": "$serviceModel" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
+      label: "Log Volume",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "count": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Severity Split (Pie)",
+      label: "Top Error Messages",
+      config: { viz: "bar" },
+      query: `[\n  { "$match": { "level": "error" } },\n  { "$group": { "_id": "$message", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "count": -1 } },\n  { "$limit": 20 }\n]`,
+    },
+    {
+      label: "Severity Split",
       config: { viz: "pie" },
-      query: `[\n  { "$group": { "_id": "$level", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
-    }
+      query: `[\n  { "$group": { "_id": "$level", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } }\n]`,
+    },
+    {
+      label: "Recent Errors",
+      config: { viz: "table" },
+      query: `[\n  { "$match": { "level": "error" } },\n  { "$project": { "time": "$timestamp", "message": 1, "serviceModel": 1, "traceId": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
+    },
+  ],
+  rum: [
+    {
+      label: "Core Web Vitals",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "LCP": { "$avg": "$vitals.lcp" },\n    "INP": { "$avg": "$vitals.inp" },\n    "FCP": { "$avg": "$vitals.fcp" }\n  }},\n  { "$project": { "time": "$_id", "LCP": 1, "INP": 1, "FCP": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "LCP Trend",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "LCP": { "$avg": "$vitals.lcp" }\n  }},\n  { "$project": { "time": "$_id", "LCP": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Frustration Signals",
+      config: { viz: "bar" },
+      query: `[\n  { "$match": { "$or": [{ "frustration.rageClicks": { "$gt": 0 } }, { "frustration.deadClicks": { "$gt": 0 } }] } },\n  { "$group": {\n    "_id": "$path",\n    "Rage Clicks": { "$sum": "$frustration.rageClicks" },\n    "Dead Clicks": { "$sum": "$frustration.deadClicks" }\n  }},\n  { "$project": { "name": "$_id", "Rage Clicks": 1, "Dead Clicks": 1, "_id": 0 } },\n  { "$sort": { "Rage Clicks": -1 } },\n  { "$limit": 20 }\n]`,
+    },
+    {
+      label: "Browsers",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": { "_id": "$browser", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } }\n]`,
+    },
   ],
   vps: [
     {
-      label: "Resource Usage (Area)",
+      label: "Resource Usage",
       config: { viz: "area" },
       query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "CPU": { "$avg": "$metrics.cpu.usagePercent" },\n    "RAM": { "$avg": "$metrics.memory.usagePercent" }\n  }},\n  { "$project": { "time": "$_id", "CPU": 1, "RAM": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "High CPU Nodes (Bar)",
+      label: "Disk Usage",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "Disk %": { "$avg": "$metrics.disk.usagePercent" }\n  }},\n  { "$project": { "time": "$_id", "Disk %": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "High CPU Nodes",
       config: { viz: "bar" },
-      query: `[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 80 } } },\n  { "$group": { "_id": "$service.name", "CPU": { "$avg": "$metrics.cpu.usagePercent" } } },\n  { "$project": { "time": "$_id", "name": "$_id", "value": "$CPU", "_id": 0 } }\n]`
+      query: `[\n  { "$match": { "metrics.cpu.usagePercent": { "$gt": 80 } } },\n  { "$group": { "_id": "$service.name", "Avg CPU": { "$avg": "$metrics.cpu.usagePercent" } } },\n  { "$project": { "name": "$_id", "Avg CPU": 1, "_id": 0 } },\n  { "$sort": { "Avg CPU": -1 } }\n]`,
+    },
+    {
+      label: "Load Average",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "1m": { "$avg": "$metrics.load.1m" },\n    "5m": { "$avg": "$metrics.load.5m" },\n    "15m": { "$avg": "$metrics.load.15m" }\n  }},\n  { "$project": { "time": "$_id", "1m": 1, "5m": 1, "15m": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
   ],
   database: [
     {
-      label: "Latency Trend (Line)",
+      label: "Latency Trend",
       config: { viz: "line" },
       query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Read": { "$avg": "$latency.read.avg" },\n    "Write": { "$avg": "$latency.write.avg" }\n  }},\n  { "$project": { "time": "$_id", "Read": 1, "Write": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Active Connections (Area)",
+      label: "Connections",
       config: { viz: "area" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Connections": { "$avg": "$connections.current" }\n  }},\n  { "$project": { "time": "$_id", "Connections": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
-    }
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Current": { "$avg": "$connections.current" },\n    "Available": { "$avg": "$connections.available" }\n  }},\n  { "$project": { "time": "$_id", "Current": 1, "Available": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Operations",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Queries": { "$sum": "$ops.query" },\n    "Inserts": { "$sum": "$ops.insert" },\n    "Updates": { "$sum": "$ops.update" },\n    "Deletes": { "$sum": "$ops.delete" }\n  }},\n  { "$project": { "time": "$_id", "Queries": 1, "Inserts": 1, "Updates": 1, "Deletes": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Storage Growth",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Data MB": { "$avg": "$storage.dataSize" },\n    "Index MB": { "$avg": "$storage.indexSize" }\n  }},\n  { "$project": { "time": "$_id", "Data MB": 1, "Index MB": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Memory Usage",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Resident MB": { "$avg": "$memory.resident" },\n    "Virtual MB": { "$avg": "$memory.virtual" }\n  }},\n  { "$project": { "time": "$_id", "Resident MB": 1, "Virtual MB": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
   ],
   uptime: [
     {
-      label: "Downtime Events (Table)",
+      label: "Downtime Events",
       config: { viz: "table" },
-      query: `[\n  { "$match": { "status": "down" } },\n  { "$project": { "time": "$createdAt", "service": "$service.name", "url": "$service.url", "statusCode": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`
+      query: `[\n  { "$match": { "status": "down" } },\n  { "$project": { "time": "$createdAt", "service": "$service.name", "url": "$service.url", "statusCode": 1, "latency": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
     },
     {
-      label: "Ping Latency (Area)",
+      label: "Ping Latency",
       config: { viz: "area" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "Latency": { "$avg": "$latency" }\n  }},\n  { "$project": { "time": "$_id", "Latency": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
-    }
-  ],
-  rum: [
-    {
-      label: "LCP Trend (Line)",
-      config: { viz: "line" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "LCP": { "$avg": "$vitals.lcp" }\n  }},\n  { "$project": { "time": "$_id", "LCP": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "Latency": { "$avg": "$latency" }\n  }},\n  { "$project": { "time": "$_id", "Latency": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Browsers (Pie)",
+      label: "Latency by Monitor",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": { "_id": "$service.name", "Avg Latency": { "$avg": "$latency" } } },\n  { "$project": { "name": "$_id", "Avg Latency": 1, "_id": 0 } },\n  { "$sort": { "Avg Latency": -1 } }\n]`,
+    },
+    {
+      label: "Status Distribution",
       config: { viz: "pie" },
-      query: `[\n  { "$group": { "_id": "$browser", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
-    }
+      query: `[\n  { "$group": { "_id": "$status", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } }\n]`,
+    },
   ],
   task: [
     {
-      label: "Failure Trend (Bar)",
+      label: "Failure Trend",
       config: { viz: "bar" },
-      query: `[\n  { "$match": { "status": "failed" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "value": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+      query: `[\n  { "$match": { "status": "failed" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "count": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Slow Tasks (Table)",
+      label: "Queue Delay",
+      config: { viz: "area" },
+      query: `[\n  { "$match": { "queueDelay": { "$gt": 0 } } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Avg Delay": { "$avg": "$queueDelay" },\n    "Max Delay": { "$max": "$queueDelay" }\n  }},\n  { "$project": { "time": "$_id", "Avg Delay": 1, "Max Delay": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Task Types",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": { "_id": "$taskType", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } }\n]`,
+    },
+    {
+      label: "Slow Tasks",
       config: { viz: "table" },
-      query: `[\n  { "$project": { "time": "$timestamp", "taskName": 1, "duration": 1, "service": "$service.name" } },\n  { "$sort": { "duration": -1 } },\n  { "$limit": 100 }\n]`
-    }
+      query: `[\n  { "$project": { "time": "$timestamp", "taskName": 1, "taskType": 1, "duration": 1, "queueDelay": 1, "service": "$service.name" } },\n  { "$sort": { "duration": -1 } },\n  { "$limit": 100 }\n]`,
+    },
   ],
   errors: [
     {
-      label: "Unresolved by Class (Bar)",
+      label: "By Error Class",
       config: { viz: "bar" },
-      query: `[\n  { "$match": { "status": "unresolved" } },\n  { "$group": { "_id": "$errorClass", "value": { "$sum": "$totalCount" } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "value": -1 } }\n]`
+      query: `[\n  { "$match": { "status": "unresolved" } },\n  { "$group": { "_id": "$errorClass", "count": { "$sum": "$totalCount" } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "count": -1 } }\n]`,
     },
     {
-      label: "Error Status (Pie)",
+      label: "Error Velocity",
+      config: { viz: "line" },
+      query: `[\n  { "$match": { "status": "unresolved" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d", "date": "$lastSeen" } },\n    "count": { "$sum": "$totalCount" }\n  }},\n  { "$project": { "time": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Status",
       config: { viz: "pie" },
-      query: `[\n  { "$group": { "_id": "$status", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
+      query: `[\n  { "$group": { "_id": "$status", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } }\n]`,
     },
     {
-      label: "Recent Errors (Table)",
+      label: "Recent Errors",
       config: { viz: "table" },
-      query: `[\n  { "$project": { "time": "$lastSeen", "errorClass": 1, "message": 1, "totalCount": 1, "status": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`
-    }
+      query: `[\n  { "$project": { "time": "$lastSeen", "errorClass": 1, "message": 1, "totalCount": 1, "status": 1, "firstSeen": 1, "serviceModel": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]`,
+    },
   ],
   runtime: [
     {
-      label: "Event Loop Lag (Area)",
+      label: "Event Loop Lag",
       config: { viz: "area" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Lag": { "$avg": "$eventLoopLagMs" },\n    "P99": { "$avg": "$eventLoopLagP99Ms" }\n  }},\n  { "$project": { "time": "$_id", "Lag": 1, "P99": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Lag": { "$avg": "$eventLoopLagMs" },\n    "P99": { "$avg": "$eventLoopLagP99Ms" }\n  }},\n  { "$project": { "time": "$_id", "Lag": 1, "P99": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Heap Usage (Line)",
+      label: "Heap Usage",
       config: { viz: "line" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "HeapUsed": { "$avg": "$heapUsedPercent" }\n  }},\n  { "$project": { "time": "$_id", "HeapUsed": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "HeapUsed": { "$avg": "$heapUsedPercent" }\n  }},\n  { "$project": { "time": "$_id", "HeapUsed": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "GC Pressure (Bar)",
+      label: "Process Memory",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "RSS MB": { "$avg": { "$divide": ["$rssBytes", 1048576] } },\n    "Heap MB": { "$avg": { "$divide": ["$heapUsedBytes", 1048576] } },\n    "External MB": { "$avg": { "$divide": ["$externalBytes", 1048576] } }\n  }},\n  { "$project": { "time": "$_id", "RSS MB": 1, "Heap MB": 1, "External MB": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "GC Pressure",
       config: { viz: "bar" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "GC Duration": { "$sum": "$gcTotalDurationMs" },\n    "Major GCs": { "$sum": "$gcMajorCount" }\n  }},\n  { "$project": { "time": "$_id", "GC Duration": 1, "Major GCs": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
-    }
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "GC Duration": { "$sum": "$gcTotalDurationMs" },\n    "Major GCs": { "$sum": "$gcMajorCount" }\n  }},\n  { "$project": { "time": "$_id", "GC Duration": 1, "Major GCs": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
   ],
   web: [
     {
-      label: "Page Views Trend (Area)",
+      label: "Page Views",
       config: { viz: "area" },
-      query: `[\n  { "$match": { "type": "pageview" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "Views": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "Views": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+      query: `[\n  { "$match": { "type": "pageview" } },\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$createdAt" } },\n    "Views": { "$sum": 1 }\n  }},\n  { "$project": { "time": "$_id", "Views": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Top Pages (Bar)",
+      label: "Top Pages",
       config: { viz: "bar" },
-      query: `[\n  { "$match": { "type": "pageview" } },\n  { "$group": { "_id": "$path", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "value": -1 } },\n  { "$limit": 20 }\n]`
+      query: `[\n  { "$match": { "type": "pageview" } },\n  { "$group": { "_id": "$path", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "count": -1 } },\n  { "$limit": 20 }\n]`,
     },
     {
-      label: "Devices (Pie)",
+      label: "Traffic Channels",
       config: { viz: "pie" },
-      query: `[\n  { "$group": { "_id": "$device", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } }\n]`
+      query: `[\n  { "$match": { "type": "pageview" } },\n  { "$group": { "_id": "$channel", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "count": -1 } }\n]`,
     },
     {
-      label: "Traffic by Country (Map)",
+      label: "Devices",
+      config: { viz: "pie" },
+      query: `[\n  { "$group": { "_id": "$device", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } }\n]`,
+    },
+    {
+      label: "By Country",
       config: { viz: "map" },
-      query: `[\n  { "$group": { "_id": "$country", "value": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "value": 1, "_id": 0 } },\n  { "$sort": { "value": -1 } }\n]`
-    }
+      query: `[\n  { "$group": { "_id": "$country", "count": { "$sum": 1 } } },\n  { "$project": { "name": "$_id", "count": 1, "_id": 0 } },\n  { "$sort": { "count": -1 } }\n]`,
+    },
   ],
   firebase: [
     {
-      label: "User Growth (Area)",
+      label: "User Growth",
       config: { viz: "area" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Total Users": { "$avg": "$auth.totalUsers" }\n  }},\n  { "$project": { "time": "$_id", "Total Users": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Total Users": { "$avg": "$auth.totalUsers" }\n  }},\n  { "$project": { "time": "$_id", "Total Users": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Active Users DAU/MAU (Line)",
+      label: "DAU / MAU",
       config: { viz: "line" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "DAU": { "$avg": "$auth.activeUsersDaily" },\n    "MAU": { "$avg": "$auth.activeUsersMonthly" }\n  }},\n  { "$project": { "time": "$_id", "DAU": 1, "MAU": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "DAU": { "$avg": "$auth.activeUsersDaily" },\n    "MAU": { "$avg": "$auth.activeUsersMonthly" }\n  }},\n  { "$project": { "time": "$_id", "DAU": 1, "MAU": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
     },
     {
-      label: "Auth Providers (Pie)",
+      label: "Security Overview",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "MFA Enrolled": { "$avg": "$auth.mfaEnrolledCount" },\n    "Disabled": { "$avg": "$auth.disabledUsers" },\n    "Sign-ins 1h": { "$avg": "$auth.recentSignIns1h" }\n  }},\n  { "$project": { "time": "$_id", "MFA Enrolled": 1, "Disabled": 1, "Sign-ins 1h": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Auth Providers",
       config: { viz: "pie" },
-      query: `[\n  { "$group": {\n    "_id": null,\n    "Password": { "$sum": "$providers.password" },\n    "Google": { "$sum": "$providers.google" },\n    "Apple": { "$sum": "$providers.apple" },\n    "Phone": { "$sum": "$providers.phone" },\n    "GitHub": { "$sum": "$providers.github" }\n  }},\n  { "$project": { "_id": 0 } },\n  { "$unwind": { "path": { "$objectToArray": "$$ROOT" } } },\n  { "$replaceRoot": { "newRoot": { "name": "$$ROOT.k", "value": "$$ROOT.v" } } }\n]`
+      query: `[\n  { "$group": {\n    "_id": null,\n    "Password": { "$sum": "$providers.password" },\n    "Google": { "$sum": "$providers.google" },\n    "Apple": { "$sum": "$providers.apple" },\n    "Phone": { "$sum": "$providers.phone" },\n    "GitHub": { "$sum": "$providers.github" }\n  }},\n  { "$project": { "_id": 0 } },\n  { "$unwind": { "path": { "$objectToArray": "$$ROOT" } } },\n  { "$replaceRoot": { "newRoot": { "name": "$$ROOT.k", "value": "$$ROOT.v" } } }\n]`,
     },
     {
-      label: "New Signups Trend (Bar)",
+      label: "New Signups",
       config: { viz: "bar" },
-      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Signups": { "$avg": "$auth.newSignups24h" }\n  }},\n  { "$project": { "time": "$_id", "Signups": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`
-    }
-  ]
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Signups": { "$avg": "$auth.newSignups24h" }\n  }},\n  { "$project": { "time": "$_id", "Signups": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+  ],
 };
 
 // --- Reusable Schema Explorer Component ---
@@ -2121,10 +2216,10 @@ export default function CustomDashboardView() {
                         <Terminal className="h-3 w-3 text-primary" /> Aggregation Pipeline (MQL)
                       </span>
                       {QUICK_TEMPLATES[builderForm.target] && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
                           <span
                             className={cn(
-                              "text-[10px]",
+                              "text-[10px] shrink-0",
                               monacoTheme === "light"
                                 ? "text-muted-foreground"
                                 : "text-gray-400",
@@ -2137,7 +2232,7 @@ export default function CustomDashboardView() {
                             <Badge
                               key={i}
                               variant="secondary"
-                              className="cursor-pointer text-[9px] hover:bg-primary hover:text-primary-foreground transition-colors border border-border/60 shadow-sm"
+                              className="cursor-pointer text-[9px] shrink-0 hover:bg-primary hover:text-primary-foreground transition-colors border border-border/60 shadow-sm"
                               onClick={() => applyTemplate(t)}
                             >
                               {t.label}
