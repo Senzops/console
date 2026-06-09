@@ -897,7 +897,7 @@ const ChartRenderer = ({ data, config, visualization, spanMs, isMono, headerActi
       }
       keys = (data && Array.isArray(data)) ? data.map((d: any) => String(d[nK] || "Unknown")) : [];
     } else {
-      keys = itemKeys.filter(k => k !== timeKey && k !== "_id" && k !== "null" && k !== "undefined" && k !== "name" && k !== "value");
+      keys = itemKeys.filter(k => k !== timeKey && k !== "_id" && k !== "null" && k !== "undefined");
     }
 
     return { 
