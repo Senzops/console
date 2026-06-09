@@ -57,6 +57,12 @@ import { toast } from "sonner";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
+const formatWindow = (mins: number) => {
+  if (mins >= 1440) return `${mins / 1440}d`;
+  if (mins >= 60) return `${mins / 60}h`;
+  return `${mins}m`;
+};
+
 // Enterprise Default Alert Pipelines
 const DEFAULT_ALERT_QUERIES: Record<string, string> = {
   apm: '[\n  { "$match": {\n    "$or": [\n      { "duration": { "$gt": 3000 } },\n      { "status": { "$gte": 500 } }\n    ]\n  } }\n]',
@@ -370,7 +376,7 @@ const ConditionsTable = ({
                     COUNT{" "}
                     {({ gt: ">", lt: "<", eq: "==", gte: ">=", lte: "<=", neq: "!=" } as any)[cond.threshold.operator] || cond.threshold.operator}{" "}
                     {cond.threshold.value}{" "}
-                    <span className="opacity-50">in {cond.threshold.windowMins}m</span>
+                    <span className="opacity-50">in {formatWindow(cond.threshold.windowMins)}</span>
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
@@ -1228,10 +1234,16 @@ export default function AlertPolicyDetail() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1">Last 1 Minute</SelectItem>
-                            <SelectItem value="5">Last 5 Minutes</SelectItem>
-                            <SelectItem value="15">Last 15 Minutes</SelectItem>
-                            <SelectItem value="60">Last 1 Hour</SelectItem>
+                            <SelectItem value="1">1 Minute</SelectItem>
+                            <SelectItem value="5">5 Minutes</SelectItem>
+                            <SelectItem value="10">10 Minutes</SelectItem>
+                            <SelectItem value="15">15 Minutes</SelectItem>
+                            <SelectItem value="30">30 Minutes</SelectItem>
+                            <SelectItem value="60">1 Hour</SelectItem>
+                            <SelectItem value="120">2 Hours</SelectItem>
+                            <SelectItem value="240">4 Hours</SelectItem>
+                            <SelectItem value="720">12 Hours</SelectItem>
+                            <SelectItem value="1440">24 Hours</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
