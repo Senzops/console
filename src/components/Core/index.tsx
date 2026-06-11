@@ -536,7 +536,7 @@ export const Badge = ({ className, variant = "default", ...props }: React.HTMLAt
 }
 
 // --- Modal (Dialog) ---
-export const Dialog = ({ open, onClose, children, title }: { open: boolean; onClose: () => void; children: React.ReactNode; title: string }) => {
+export const Dialog = ({ open, onClose, children, title, className }: { open: boolean; onClose: () => void; children: React.ReactNode; title: string; className?: string }) => {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => { setMounted(true); }, []);
 
@@ -544,7 +544,7 @@ export const Dialog = ({ open, onClose, children, title }: { open: boolean; onCl
 
   return createPortal(
     <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
-      <div className="relative w-full max-w-lg max-h-[calc(100vh-2rem)] flex flex-col rounded-xl border bg-card text-card-foreground shadow-lg animate-in fade-in zoom-in-95 duration-200">
+      <div className={cn("relative w-full max-w-lg max-h-[calc(100vh-2rem)] flex flex-col rounded-xl border bg-card text-card-foreground shadow-lg animate-in fade-in zoom-in-95 duration-200", className)}>
         <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-border/50 shrink-0">
           <h3 className="font-semibold leading-none tracking-tight text-lg">{title}</h3>
         </div>
