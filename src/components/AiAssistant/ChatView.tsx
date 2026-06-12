@@ -34,6 +34,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { SenzorAIIcon } from './SenzorAIIcon';
+import { Mascot, type MascotMood } from '@/components/Mascot';
+import { moodFromAssistantState } from '@/components/Mascot/mood';
 import { toast } from 'sonner';
 
 const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
@@ -87,12 +89,16 @@ function PromptIcon({ iconKey, className }: { iconKey: string; className?: strin
   return <Icon className={className} />;
 }
 
-function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
+function WelcomeScreen({
+  onSend,
+  mood = 'greeting',
+}: {
+  onSend: (text: string) => void;
+  mood?: MascotMood;
+}) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-      <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl mb-6">
-        <SenzorAIIcon className="h-10 w-10 text-primary" />
-      </div>
+      <Mascot mood={mood} size="lg" interactive className="mb-6" />
       <h2 className="text-xl font-bold text-foreground mb-2">
         Senzor Intelligence
       </h2>
@@ -430,7 +436,13 @@ export function ChatView() {
                   <span className="text-xs text-muted-foreground">Loading conversation...</span>
                 </div>
               ) : displayMessages.length === 0 ? (
-                <WelcomeScreen onSend={sendMessage} />
+                <WelcomeScreen
+                  onSend={sendMessage}
+                  mood={moodFromAssistantState(
+                    { engineStatus, isGenerating },
+                    'greeting',
+                  )}
+                />
               ) : (
                 <div className="py-4">
                   {displayMessages.map((msg, idx) => {

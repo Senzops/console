@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { Navbar, Footer } from "../components/Layout";
 import { Button, cn } from "../components/Core";
 import { NetworkBackground } from "../components/NetworkBackground";
+import { Mascot } from "../components/Mascot";
 import { useAuth } from "../lib/auth";
 
 export default function Custom404() {
@@ -19,6 +20,7 @@ export default function Custom404() {
 
         <div className="relative z-10 w-full max-w-2xl text-center space-y-8">
           <div className="space-y-4">
+            <Mascot mood="searching" size="xl" interactive className="mx-auto" />
             <h1 className="text-7xl md:text-8xl font-bold font-display tracking-tighter text-foreground">
               404
             </h1>

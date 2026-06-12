@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+
+  :root,
+  [data-theme="dark"] {
     /* Default (Dark / Zinc) */
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
