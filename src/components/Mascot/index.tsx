@@ -309,6 +309,26 @@ export function Mascot({
           <line className={styles.crateTape} x1="60" y1="71" x2="60" y2="93" />
           <line className={styles.crateTape} x1="42" y1="82" x2="78" y2="82" />
         </g>
+
+        {/* Front arms: drawn above the body and props so hands visibly grip
+            what the bot interacts with. Hidden by default; interacting moods
+            (thinking, working, searching, lifting) swap the back arms out. */}
+        <rect
+          className={cn(styles.arm, styles.armFrontL)}
+          x="17"
+          y="58"
+          width="13"
+          height="19"
+          rx="6.5"
+        />
+        <rect
+          className={cn(styles.arm, styles.armFrontR)}
+          x="90"
+          y="58"
+          width="13"
+          height="19"
+          rx="6.5"
+        />
       </g>
 
       {/* Sleeping z's */}

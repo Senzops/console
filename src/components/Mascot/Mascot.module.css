@@ -200,6 +200,8 @@
 .docu,
 .laptop,
 .crate,
+.armFrontL,
+.armFrontR,
 .z {
   opacity: 0;
 }
@@ -218,6 +220,10 @@
   transform: rotate(1.5deg);
 }
 .mascot[data-mood='thinking'] .armR {
+  opacity: 0;
+}
+.mascot[data-mood='thinking'] .armFrontR {
+  opacity: 1;
   transform-origin: 15% 13%;
   transform: rotate(-165deg);
 }
@@ -235,13 +241,19 @@
 .mascot[data-mood='working'] .face {
   transform: translate(0, 1.5px);
 }
-.mascot[data-mood='working'] .armL {
-  transform-origin: 85% 13%;
-  transform: rotate(-45deg);
-}
+.mascot[data-mood='working'] .armL,
 .mascot[data-mood='working'] .armR {
+  opacity: 0;
+}
+.mascot[data-mood='working'] .armFrontL {
+  opacity: 1;
+  transform-origin: 85% 13%;
+  transform: rotate(-54deg);
+}
+.mascot[data-mood='working'] .armFrontR {
+  opacity: 1;
   transform-origin: 15% 13%;
-  transform: rotate(45deg);
+  transform: rotate(54deg);
 }
 
 /* searching: holds a log sheet and reads it line by line. */
@@ -258,6 +270,10 @@
   transform: translate(-2px, 1px);
 }
 .mascot[data-mood='searching'] .armL {
+  opacity: 0;
+}
+.mascot[data-mood='searching'] .armFrontL {
+  opacity: 1;
   transform-origin: 85% 13%;
   transform: rotate(-30deg);
 }
@@ -278,11 +294,17 @@
 .mascot[data-mood='lifting'] .eyeR {
   transform: scaleY(0.4);
 }
-.mascot[data-mood='lifting'] .armL {
+.mascot[data-mood='lifting'] .armL,
+.mascot[data-mood='lifting'] .armR {
+  opacity: 0;
+}
+.mascot[data-mood='lifting'] .armFrontL {
+  opacity: 1;
   transform-origin: 85% 13%;
   transform: rotate(-58deg);
 }
-.mascot[data-mood='lifting'] .armR {
+.mascot[data-mood='lifting'] .armFrontR {
+  opacity: 1;
   transform-origin: 15% 13%;
   transform: rotate(58deg);
 }
@@ -475,7 +497,7 @@
   .animated[data-mood='thinking'] .bot {
     animation: thinkBreathe 4s ease-in-out infinite;
   }
-  .animated[data-mood='thinking'] .armR {
+  .animated[data-mood='thinking'] .armFrontR {
     transform-origin: 15% 13%;
     animation: scratch 3.2s ease-in-out infinite;
   }
@@ -500,11 +522,11 @@
   }
 
   /* working: typing wiggle, flickering code output, busy LED. */
-  .animated[data-mood='working'] .armL {
+  .animated[data-mood='working'] .armFrontL {
     transform-origin: 85% 13%;
     animation: typeL 0.8s ease-in-out infinite;
   }
-  .animated[data-mood='working'] .armR {
+  .animated[data-mood='working'] .armFrontR {
     transform-origin: 15% 13%;
     animation: typeR 0.8s ease-in-out 0.4s infinite;
   }
@@ -798,20 +820,20 @@
 @keyframes typeL {
   0%,
   100% {
-    transform: rotate(-45deg);
+    transform: rotate(-54deg);
   }
   50% {
-    transform: rotate(-38deg);
+    transform: rotate(-47deg);
   }
 }
 
 @keyframes typeR {
   0%,
   100% {
-    transform: rotate(45deg);
+    transform: rotate(54deg);
   }
   50% {
-    transform: rotate(38deg);
+    transform: rotate(47deg);
   }
 }
 
