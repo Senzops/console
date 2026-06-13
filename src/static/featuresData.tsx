@@ -11,6 +11,9 @@ import {
   BellRing,
   AlertOctagon,
   Bot,
+  Brain,
+  Wrench,
+  Sparkles,
   Zap,
   CheckCircle2,
   Search,
@@ -1298,6 +1301,65 @@ const DiagramFirebase = () => (
   </DiagramFrame>
 );
 
+/** AI Assistant — agentic investigation trace mirroring the real AgentTimeline */
+const AI_AGENT_STEPS = [
+  { icon: Brain, color: "text-blue-400", label: "Reasoning over traces + logs", dur: null },
+  { icon: Wrench, color: "text-amber-400", label: "apm_get_trace_detail", dur: "120ms" },
+  { icon: CheckCircle2, color: "text-emerald-400", label: "3 slow spans · p99 412ms", dur: null },
+  { icon: Wrench, color: "text-amber-400", label: "logs_query", dur: "84ms" },
+] as const;
+
+const DiagramAiAssistant = () => (
+  <DiagramFrame className="relative">
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.06)_0%,transparent_70%)]" />
+    <FrameHeader
+      title="incident-investigation"
+      icon={<Sparkles className="w-3.5 h-3.5 text-violet-500" />}
+      badge={{
+        label: "Investigating",
+        style: "bg-violet-500/10 text-violet-500 border-violet-500/20",
+        pulse: true,
+      }}
+    />
+    <div className="flex-1 p-3 flex flex-col gap-2.5 relative">
+      {/* Natural-language query */}
+      <div className="self-end max-w-[82%] bg-violet-500/10 border border-violet-500/20 rounded-lg rounded-br-sm px-2.5 py-1.5 animate-[diag-fade-in-up_0.3s_ease-out_both]">
+        <span className="text-[10px] text-foreground/80 font-mono leading-snug">
+          Why did checkout latency spike at 14:30?
+        </span>
+      </div>
+
+      {/* Transparent reasoning + tool-call trace */}
+      <div className="bg-background border border-border/50 rounded-lg p-2 flex flex-col gap-0.5 shadow-sm">
+        {AI_AGENT_STEPS.map((step, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2 px-1.5 py-1 rounded-md animate-[diag-fade-in-up_0.3s_ease-out_both]"
+            style={{ animationDelay: `${0.12 + i * 0.1}s` }}
+          >
+            <step.icon className={`w-3.5 h-3.5 shrink-0 ${step.color}`} />
+            <span className="text-[10px] font-mono text-muted-foreground truncate flex-1">
+              {step.label}
+            </span>
+            {step.dur && (
+              <span className="text-[9px] font-mono text-muted-foreground/50 shrink-0">
+                {step.dur}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Grounded answer */}
+      <div className="mt-auto bg-violet-500/5 border-l-2 border-violet-500 rounded-r-md pl-2.5 pr-2 py-1.5 animate-[diag-fade-in-up_0.3s_ease-out_both] [animation-delay:0.55s]">
+        <span className="text-[10px] text-foreground/90 font-medium leading-snug">
+          Root cause: DB connection pool exhausted under load.
+        </span>
+      </div>
+    </div>
+  </DiagramFrame>
+);
+
 // ============================================================================
 // DIAGRAM RENDERER
 // ============================================================================
@@ -1324,6 +1386,8 @@ export const renderDiagram = (id: string): React.ReactNode => {
       return <DiagramErrors />;
     case "logs":
       return <DiagramLogs />;
+    case "ai-assistant":
+      return <DiagramAiAssistant />;
     case "mcp":
       return <DiagramMcp />;
     case "alerts":
@@ -1521,6 +1585,22 @@ export const FEATURES_DATA: FeatureData[] = [
     diagramId: "uptime",
     href: "/features/uptime",
     colorClasses: "text-green-500 bg-green-500/10 border-green-500/20",
+  },
+  {
+    id: "ai-assistant",
+    title: "AI Assistant",
+    subtitle: "Investigate incidents in plain English.",
+    description:
+      "Ask questions about your telemetry and let the built-in agent investigate for you. It reasons step by step, queries your traces, logs, metrics, and errors with live tool calls, and returns a grounded answer — with every reasoning step and data source kept visible and auditable. Run it on a fully in-browser model for total privacy, your own cloud key, or a self-hosted endpoint.",
+    points: [
+      "Agentic root-cause investigation across your full stack",
+      "Transparent, auditable reasoning and tool-call trace",
+      "Run locally in-browser, bring your own key, or self-host",
+      "Optional history — keep conversations off the server",
+    ],
+    diagramId: "ai-assistant",
+    href: "/features/ai-assistant",
+    colorClasses: "text-violet-500 bg-violet-500/10 border-violet-500/20",
   },
   {
     id: "mcp",

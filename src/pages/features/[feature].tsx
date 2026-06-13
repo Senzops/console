@@ -5,6 +5,7 @@ import { Navbar, Footer } from "../../components/Layout";
 import { Button, cn } from "../../components/Core";
 import { AnimatedBackground } from "../../components/AnimatedBackground";
 import { FEATURES_DATA, renderDiagram } from "../../static/featuresData";
+import { Mascot } from "../../components/Mascot";
 import {
   ArrowRight,
   CheckCircle2,
@@ -134,6 +135,11 @@ export default function FeaturePage({ feature }: FeaturePageProps) {
               <div className="relative z-10 w-full h-full flex items-center justify-center">
                 {renderDiagram(feature.diagramId)}
               </div>
+              {feature.id === "ai-assistant" && (
+                <div className="absolute z-20 -bottom-6 left-1 sm:-left-4 md:-left-10">
+                  <Mascot mood="greeting" size="lg" interactive />
+                </div>
+              )}
             </div>
           </div>
         </section>

@@ -39,7 +39,7 @@ const LIFECYCLE_STAGES = [
     label: "Respond",
     caption: "Investigate & resolve",
     accent: "#f97316",
-    services: ["Alerts & Incidents", "MCP Server", "Saved Views"],
+    services: ["Alerts & Incidents", "AI Assistant", "MCP Server", "Saved Views"],
   },
 ] as const;
 
