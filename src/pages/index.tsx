@@ -8,104 +8,93 @@ import { ArrowRight, Check, ChevronRight } from "lucide-react";
 import { useAuth } from "../lib/auth";
 
 // ============================================================================
-// LAYERED ARCHITECTURE MAPPING DIAGRAM (Redesigned Enterprise Flow)
+// PRODUCT LIFECYCLE BAND
 // ============================================================================
-const ArchitectureFlowDiagram = () => (
-  <div className="w-full max-w-6xl mx-auto my-16 border border-border/40 rounded-2xl bg-card overflow-hidden relative flex flex-col shadow-sm">
-    {/* Subtle Grid Background */}
-    <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+const LIFECYCLE_STAGES = [
+  {
+    label: "Build",
+    caption: "Develop & instrument",
+    accent: "#3b82f6",
+    services: ["OpenTelemetry", "APM", "Error Tracking", "Background Tasks"],
+  },
+  {
+    label: "Deploy",
+    caption: "Ship & validate",
+    accent: "#8b5cf6",
+    services: ["Uptime Monitoring", "Log Management"],
+  },
+  {
+    label: "Operate",
+    caption: "Run in production",
+    accent: "#10b981",
+    services: [
+      "Infrastructure",
+      "Database",
+      "Firebase",
+      "Web Analytics",
+      "Real User Monitoring",
+    ],
+  },
+  {
+    label: "Respond",
+    caption: "Investigate & resolve",
+    accent: "#f97316",
+    services: ["Alerts & Incidents", "MCP Server", "Saved Views"],
+  },
+] as const;
 
-    <div className="relative z-10 p-8 md:p-12">
-      <div className="flex flex-col md:flex-row gap-6 md:gap-12 items-center justify-between">
-        {/* Phase 1: Edge & Client */}
-        <div className="flex-1 w-full bg-blue-500/5 border border-blue-500/20 p-6 rounded-xl relative group">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-500"></div> Edge &
-            Client
-          </div>
-          <div className="space-y-3">
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
-              Web Analytics
-            </div>
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
-              Real User Monitoring (RUM)
-            </div>
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
-              Synthetic Uptime Checks
-            </div>
-          </div>
-          {/* Connecting line to middle */}
-          <div className="hidden md:block absolute top-1/2 -right-12 w-12 h-px bg-border">
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rotate-45 border-t border-r border-border"></div>
-          </div>
-        </div>
+const ProductLifecycleBand = () => (
+  <div className="max-w-6xl mx-auto px-4 relative z-10">
+    <div className="relative">
+      {/* Connecting timeline — spans the centers of the first and last stage
+          markers (each column is equal width, so 12.5% from each edge). */}
+      <div
+        aria-hidden
+        className="hidden lg:block absolute top-[7px] left-[12.5%] right-[12.5%] h-px bg-border"
+      />
+      {/* Directional markers between stages (25% / 50% / 75% of the band). */}
+      {[25, 50, 75].map((left) => (
+        <ChevronRight
+          key={left}
+          aria-hidden
+          className="hidden lg:block absolute top-[7px] w-3.5 h-3.5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/40"
+          style={{ left: `${left}%` }}
+        />
+      ))}
 
-        {/* Phase 2: Application Core */}
-        <div className="flex-1 w-full bg-orange-500/5 border border-orange-500/20 p-6 rounded-xl relative">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-orange-500 mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-orange-500"></div>{" "}
-            Application Core
-          </div>
-          <div className="space-y-3">
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm flex justify-between">
-              APM Traces{" "}
-              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 rounded flex items-center">
-                OTLP
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-14">
+        {LIFECYCLE_STAGES.map((stage, i) => (
+          <div key={stage.label} className="flex flex-col items-center">
+            {/* Stage marker — masks the timeline behind it. */}
+            <span
+              className="block w-3.5 h-3.5 rounded-full bg-background border-2 relative z-10"
+              style={{ borderColor: stage.accent }}
+            />
+            {/* Stage header */}
+            <div className="mt-5 text-center">
+              <span className="block text-[11px] font-mono tracking-widest text-muted-foreground/50">
+                {String(i + 1).padStart(2, "0")}
               </span>
+              <h3 className="mt-1.5 text-lg font-bold font-display tracking-tight text-foreground">
+                {stage.label}
+              </h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {stage.caption}
+              </p>
             </div>
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
-              Global Error Tracking
-            </div>
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm flex justify-between">
-              Background Tasks{" "}
-              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 rounded flex items-center">
-                OTLP
-              </span>
-            </div>
-          </div>
-          {/* Connecting line to right */}
-          <div className="hidden md:block absolute top-1/2 -right-12 w-12 h-px bg-border">
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rotate-45 border-t border-r border-border"></div>
-          </div>
-        </div>
-
-        {/* Phase 3: Infrastructure */}
-        <div className="flex-1 w-full bg-emerald-500/5 border border-emerald-500/20 p-6 rounded-xl relative">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>{" "}
-            Infrastructure
-          </div>
-          <div className="space-y-3">
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
-              Server / VPS Monitoring
-            </div>
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
-              Database Telemetry
-            </div>
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm">
-              Firebase Monitoring
-            </div>
-            <div className="bg-card border border-border p-3 rounded-lg text-sm font-medium shadow-sm text-muted-foreground border-dashed">
-              3rd Party Integrations
+            {/* Services available at this stage */}
+            <div className="mt-6 w-full max-w-[210px] flex flex-col gap-2">
+              {stage.services.map((service) => (
+                <div
+                  key={service}
+                  className="text-sm text-center text-muted-foreground bg-card border border-border/60 rounded-lg px-3 py-2 transition-colors hover:border-border hover:text-foreground"
+                >
+                  {service}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Platform Foundation (Cross-cutting) */}
-    <div className="relative z-10 bg-muted/20 border-t border-border/40 p-6 px-8 md:px-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        Senzor Platform Foundation
-      </div>
-      <div className="flex flex-wrap items-center gap-4 text-sm font-medium">
-        <span className="text-foreground">Log Management</span>
-        <span className="text-muted-foreground">•</span>
-        <span className="text-foreground">Dashboards</span>
-        <span className="text-muted-foreground">•</span>
-        <span className="text-foreground">Alerts</span>
-        <span className="text-muted-foreground">•</span>
-        <span className="text-foreground">MCP AI Server</span>
+        ))}
       </div>
     </div>
   </div>
@@ -169,18 +158,50 @@ export default function Home() {
           </div>
         </section>
 
-        {/* --- LIFECYCLE ARCHITECTURE MAPPING --- */}
-        <section className="px-4 py-24 border-b border-border/30 bg-muted/5 relative overflow-hidden">
-          <div className="text-center max-w-3xl mx-auto mb-8 relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold font-display tracking-tight mb-4 text-foreground">
-              Full-Stack Observability Across the Development Lifecycle
-            </h2>
-            <p className="text-muted-foreground text-lg leading-relaxed">
-              From the client&apos;s browser to the deepest database query, Senzor
-              provides native instrumentation and seamless data correlation.
-            </p>
+        {/* --- PROBLEM / SOLUTION --- */}
+        <section className="px-4 py-24 border-b border-border/30 relative overflow-hidden">
+          <div className="max-w-5xl mx-auto relative z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20">
+              <div className="space-y-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                  The Problem
+                </p>
+                <h2 className="text-2xl md:text-3xl font-bold font-display tracking-tight text-foreground leading-snug">
+                  Single-point tools create hidden complexity
+                </h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Multiple monitoring accounts, scattered telemetry, and costs
+                  that grow exponentially as you scale. Teams waste hours
+                  context-switching between siloed dashboards while real signals
+                  drown in alert noise.
+                </p>
+              </div>
+              <div className="space-y-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                  The Solution
+                </p>
+                <h2 className="text-2xl md:text-3xl font-bold font-display tracking-tight text-foreground leading-snug">
+                  One platform designed to work together from the start
+                </h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Senzor unifies infrastructure monitoring, application
+                  performance, user experience analytics, and incident response.
+                  No data stitching, no webhook logic — correlated telemetry by
+                  default with native OpenTelemetry support.
+                </p>
+              </div>
+            </div>
           </div>
-          <ArchitectureFlowDiagram />
+        </section>
+
+        {/* --- PRODUCT LIFECYCLE COVERAGE --- */}
+        <section className="px-4 py-24 border-b border-border/30 bg-muted/5 relative overflow-hidden">
+          <div className="text-center max-w-3xl mx-auto mb-12 relative z-10">
+            <h2 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-foreground">
+              Where Senzor Fits in Your Product Lifecycle
+            </h2>
+          </div>
+          <ProductLifecycleBand />
         </section>
 
         {/* --- FEATURES & SERVICES (JSON DRIVEN) --- */}

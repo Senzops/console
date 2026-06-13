@@ -441,6 +441,18 @@ export const SidebarSection = ({
     return true;
   });
 
+  // Auto-collapse when items finish loading and the list is empty (only if user hasn't explicitly toggled)
+  useEffect(() => {
+    if (Array.isArray(items) && items.length === 0) {
+      const saved = typeof window !== "undefined"
+        ? sessionStorage.getItem(`sidebar-section-${title}`)
+        : null;
+      if (saved === null) {
+        setIsExpanded(false);
+      }
+    }
+  }, [items, title]);
+
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
