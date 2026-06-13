@@ -126,14 +126,15 @@ export default function Home() {
             <h1 className="text-5xl md:text-7xl font-bold font-display tracking-tight text-foreground leading-[1.1]">
               Unified Visibility.
               <br />
-              Uncompromised Control.
+              <span className="text-foreground-secondary">
+                Uncompromised Control.
+              </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Gain complete observability into your microservices,
-              infrastructure, and user experience. One cohesive control plane to
-              monitor, troubleshoot, and scale your engineering operations
-              securely.
+            <p className="text-base md:text-lg text-foreground-tertiary max-w-2xl mx-auto leading-relaxed">
+              Gain complete observability across your applications,
+              infrastructure, and user experience — one cohesive control plane
+              to monitor, troubleshoot, and scale with confidence.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">

@@ -9,6 +9,8 @@
     /* Default (Dark / Zinc) */
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
+    --foreground-secondary: 240 6% 76%;
+    --foreground-tertiary: 240 5% 58%;
     --card: 240 10% 6.5%;
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 6.5%;
@@ -34,6 +36,8 @@
   [data-theme="light"] {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
+    --foreground-secondary: 240 8% 26%;
+    --foreground-tertiary: 240 5% 44%;
     --card: 255 20% 99%;
     --card-foreground: 240 10% 3.9%;
     --popover: 255 20% 99%;
@@ -60,6 +64,8 @@
     /* #2E3440 */
     --foreground: 218 27% 92%;
     /* #D8DEE9 */
+    --foreground-secondary: 218 22% 78%;
+    --foreground-tertiary: 218 20% 64%;
     --card: 222 16% 28%;
     /* #3B4252 */
     --card-foreground: 218 27% 92%;
@@ -91,6 +97,8 @@
     /* Warm off-white */
     --foreground: 24 10% 25%;
     /* Dark Brown */
+    --foreground-secondary: 24 9% 36%;
+    --foreground-tertiary: 24 7% 48%;
     --card: 40 25% 94%;
     /* Slightly darker beige */
     --card-foreground: 24 10% 25%;
