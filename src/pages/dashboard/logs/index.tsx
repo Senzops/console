@@ -1,37 +1,25 @@
-import React, {
-  useState,
-  useMemo,
-  useEffect,
-  createContext,
-} from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import useSWR from "swr";
+import { toast } from "sonner";
 import { api, useAuth } from "../../../lib/auth";
 import { useTheme } from "../../../lib/theme";
 import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
   Badge,
   Input,
   Button,
   Spinner,
   DataError,
-  Dialog,
 } from "../../../components/Core";
-import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
-import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
-import { ChartTooltip } from "@/components/ChartTooltip";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-} from "recharts";
+  TimeRangePicker,
+  buildTimeRangeQuery,
+  usePersistedTimeRange,
+} from "../../../components/TimeRangePicker";
+import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import {
   Search,
   ChevronLeft,
@@ -39,882 +27,462 @@ import {
   Terminal,
   X,
   Key,
-  ExternalLink,
-  Info,
-  AlertTriangle,
-  XCircle,
-  Bug,
   Activity,
-  Copy,
-  Check,
+  XCircle,
   RefreshCw,
-  Maximize,
-  ArrowUp,
-  ArrowDown,
   Box,
+  Radio,
+  Download,
+  HelpCircle,
+  FileJson,
+  FileText,
 } from "lucide-react";
 import { SmartAnimatedValue } from "@/components/Tween";
-import { createPortal } from "react-dom";
+import { LogKeyManager } from "@/components/logs/LogKeyManager";
+import { LogFacetsPopover } from "@/components/logs/LogFacetsPopover";
+import { LogDetailDrawer } from "@/components/logs/LogDetailDrawer";
+import { LogVolumeChart } from "@/components/logs/LogVolumeChart";
+import { SavedViews } from "@/components/logs/SavedViews";
+import { LogColumnsMenu, readColumns, writeColumns, columnLabel, getColumnValue } from "@/components/logs/LogColumnsMenu";
+import { SEVERITIES, getLevelColors, formatNumber, logSeverity } from "@/components/logs/shared";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
-const formatNumber = (num: number) => {
-  if (num >= 1000000) return (num / 1000000).toFixed(2) + "M";
-  if (num >= 1000) return (num / 1000).toFixed(2) + "K";
-  return num.toString();
-};
-
-// --- Context & Wrappers ---
-const ChartContext = createContext<{
-  isMaximized: boolean;
-  toggle: () => void;
-}>({ isMaximized: false, toggle: () => {} });
-
-const ChartCard = ({ title, children, actions }: any) => {
-  const [isMaximized, setIsMaximized] = useState(false);
-  const toggle = () => setIsMaximized(!isMaximized);
-
-  const Header = (
-    <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0 border-b border-border/40 mb-2 h-14 shrink-0">
-      <div className="flex items-center gap-4">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
-        {actions}
+const StatCard = ({ title, value, sub, icon: Icon, color, isMono }: any) => (
+  <Card>
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between space-y-0 pb-2">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        <Icon className={`h-4 w-4 ${isMono ? "text-[hsl(var(--chart-mono))]" : color}`} />
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
-        onClick={toggle}
-      >
-        {isMaximized ? (
-          <X className="h-4 w-4" />
-        ) : (
-          <Maximize className="h-4 w-4" />
-        )}
-      </Button>
-    </CardHeader>
-  );
+      <div className="text-2xl font-bold text-foreground"><SmartAnimatedValue value={value} /></div>
+      {sub && <p className="text-xs text-muted-foreground mt-1 font-medium">{sub}</p>}
+    </CardContent>
+  </Card>
+);
 
-  const Content = (
-    <ChartContext.Provider value={{ isMaximized, toggle }}>
-      <Card
-        className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? "fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl" : "h-[300px]"}`}
-      >
-        {Header}
-        <CardContent className="flex-1 min-h-0 relative px-0 pb-0">
-          <div className="w-full h-full relative">{children}</div>
-        </CardContent>
-      </Card>
-    </ChartContext.Provider>
-  );
-  return (
-    <>
-      {isMaximized &&
-        createPortal(
-          <div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
-            onClick={() => setIsMaximized(false)}
-          />,
-          document.body,
-        )}
-      {isMaximized ? createPortal(Content, document.body) : Content}
-    </>
+const QUERY_EXAMPLES = [
+  ["level:error", "Single severity"],
+  ["level:(error OR fatal)", "Multiple severities"],
+  ["status:>=500", "Numeric range"],
+  ["userId:123 env:production", "Combine fields (AND)"],
+  ["message:\"connection refused\"", "Exact phrase"],
+  ["path:/api/*", "Wildcard"],
+  ["NOT level:debug", "Negation"],
+  ["userId:*", "Field exists"],
+];
+
+// Loading/success/error toast using the app's proven toast.custom pattern
+// (matches the AI assistant): a single fixed-id toast updated in place.
+const EXPORT_TOAST_ID = "log-export";
+const exportToast = (state: "loading" | "success" | "error", msg: string) => {
+  const duration = state === "loading" ? Infinity : state === "success" ? 3000 : 5000;
+  toast.custom(
+    () => (
+      <div className="flex items-center gap-3 w-full">
+        {state === "loading" && <div className="h-5 w-5 shrink-0 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+        {state === "success" && <svg className="h-5 w-5 shrink-0 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
+        {state === "error" && <svg className="h-5 w-5 shrink-0 text-destructive" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6M9 9l6 6" /></svg>}
+        <span className="text-xs font-semibold text-foreground">{msg}</span>
+      </div>
+    ),
+    { id: EXPORT_TOAST_ID, duration, className: "!max-w-[360px]" },
   );
 };
 
-const StatCard = ({ title, value, sub, icon: Icon, color, isMono }: any) => {
-  const iconClass = isMono ? "text-[hsl(var(--chart-mono))]" : color;
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between space-y-0 pb-2">
-          <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            {title}
-          </p>
-          <Icon className={`h-4 w-4 ${iconClass}`} />
-        </div>
-        <div className="text-2xl font-bold text-foreground">
-          <SmartAnimatedValue value={value} />
-        </div>
-        {sub && (
-          <p className="text-xs text-muted-foreground mt-1 font-medium">
-            {sub}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
-// --- Helpers ---
-const getLevelColors = (level: string) => {
-  switch (level.toLowerCase()) {
-    case "error":
-    case "fatal":
-      return {
-        bg: "bg-destructive/10",
-        border: "border-destructive/20",
-        text: "text-destructive",
-        icon: XCircle,
-      };
-    case "warn":
-      return {
-        bg: "bg-yellow-500/10",
-        border: "border-yellow-500/20",
-        text: "text-yellow-500",
-        icon: AlertTriangle,
-      };
-    case "debug":
-      return {
-        bg: "bg-purple-500/10",
-        border: "border-purple-500/20",
-        text: "text-purple-500",
-        icon: Bug,
-      };
-    case "info":
-    default:
-      return {
-        bg: "bg-blue-500/10",
-        border: "border-blue-500/20",
-        text: "text-blue-500",
-        icon: Info,
-      };
-  }
-};
-
-
-// --- Main Dashboard ---
 export default function GlobalLogsDashboard() {
   const router = useRouter();
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  // URL State
   const logId = router.query.logId as string | undefined;
   const initSearch = router.query.search as string | undefined;
 
-  // Local State
   const [timeRange, setTimeRange] = usePersistedTimeRange(7);
   const spanMs = getTimeSpanMs(timeRange);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState(initSearch || "");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(initSearch || "");
+  const [severities, setSeverities] = useState<Set<string>>(new Set());
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
+  const [liveTail, setLiveTail] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [columns, setColumns] = useState<string[]>(() => readColumns());
+  const helpRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const pendingEdge = useRef<"first" | "last" | null>(null);
 
-  // Copy states
-  const [copiedRaw, setCopiedRaw] = useState(false);
-  const [copiedMsg, setCopiedMsg] = useState(false);
-  const [copiedKey, setCopiedKey] = useState(false);
+  const updateColumns = (cols: string[]) => { setColumns(cols); writeColumns(cols); };
 
-  // Debounce Search
+  // Debounce free-text search
   useEffect(() => {
     const handler = setTimeout(() => {
-      if (debouncedSearch !== searchInput) {
-        setDebouncedSearch(searchInput);
-        setPage(1);
-      }
+      if (debouncedSearch !== searchInput) { setDebouncedSearch(searchInput); setPage(1); }
     }, 400);
     return () => clearTimeout(handler);
   }, [searchInput, debouncedSearch]);
 
-  // Main Table Fetch
-  const endpoint = `/logs?${buildTimeRangeQuery(timeRange)}&search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=100`;
-  const { data, error, isLoading, mutate, isValidating } = useSWR(
-    token ? endpoint : null,
+  // Close popovers on outside click
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) setShowHelp(false);
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setShowExport(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  // Effective query = severity chips + free-text
+  const effectiveSearch = useMemo(() => {
+    const sevs = [...severities];
+    const sevClause = sevs.length ? `level:(${sevs.join(" OR ")})` : "";
+    return [sevClause, debouncedSearch.trim()].filter(Boolean).join(" ");
+  }, [severities, debouncedSearch]);
+
+  const baseQuery = `${buildTimeRangeQuery(timeRange)}&search=${encodeURIComponent(effectiveSearch)}`;
+  const endpoint = `/logs?${baseQuery}&page=${page}&limit=100`;
+
+  const { data, error, isLoading, mutate, isValidating } = useSWR(token ? endpoint : null, fetcher, {
+    keepPreviousData: true,
+    refreshInterval: liveTail ? 4000 : 0,
+  });
+
+  // Trend only returns on page 1. When browsing deeper pages, fetch it from a
+  // lightweight page-1 request so the chart stays populated (SWR dedupes/caches).
+  const { data: trendData } = useSWR(
+    token && page > 1 ? `/logs?${baseQuery}&page=1&limit=1` : null,
     fetcher,
     { keepPreviousData: true },
   );
+  const trend: any[] = (page <= 1 ? data?.trend : trendData?.trend) || [];
 
-  const { data: keyData } = useSWR(
-    token && isKeyModalOpen ? "/logs/key" : null,
-    fetcher,
-  );
-
-  // Fallback Single Log Fetch (Handles hard refreshes or when log shifts off current page)
   const { data: singleLogData, isLoading: isSingleLoading } = useSWR(
     token && logId ? `/logs/${logId}` : null,
     fetcher,
     { revalidateOnFocus: false },
   );
 
-  // Stats Calculations
-  const totalLogs = data?.pagination?.total || 0;
+  // Lightweight ingestion-health probe to flag drops on the Ingestion button.
+  const { data: ingestStats } = useSWR(token ? "/logs/ingest-stats?hours=24" : null, fetcher, { refreshInterval: 60000 });
+  const hasDrops = (ingestStats?.totals?.dropped || 0) > 0;
+
+  // Stats
+  const totalLogs = data?.pagination?.total ?? data?.logs?.length ?? 0;
   const logVelocity = useMemo(() => {
     if (!totalLogs) return 0;
     const mins = spanMs / 60_000;
-    return (totalLogs / mins).toFixed(1);
+    return mins > 0 ? (totalLogs / mins).toFixed(1) : "0";
   }, [totalLogs, spanMs]);
+  const errorCount = useMemo(() => (data?.logs || []).filter((l: any) => ["error", "fatal"].includes(logSeverity(l))).length, [data?.logs]);
+  const uniqueServices = useMemo(() => new Set((data?.logs || []).map((l: any) => l.serviceId?._id || l.serviceId).filter(Boolean)).size, [data?.logs]);
 
-  const errorCount = useMemo(() => {
-    if (!data?.logs) return 0;
-    return data.logs.filter(
-      (l: any) => l.level === "error" || l.level === "fatal",
-    ).length;
-  }, [data?.logs]);
+  const chartData = trend.map((p: any) => ({ ...p, rawTime: p._id }));
+  const axisFormatter = (str: string) => formatAxisDate(str, spanMs);
 
-  const uniqueServices = useMemo(() => {
-    if (!data?.logs) return 0;
-    const services = new Set(
-      data.logs
-        .map((l: any) => l.serviceId?._id || l.serviceId)
-        .filter(Boolean),
-    );
-    return services.size;
-  }, [data?.logs]);
+  // Attribute keys present in the current page — offered as optional columns.
+  const attrKeys = (() => {
+    const s = new Set<string>();
+    for (const l of data?.logs || []) for (const k of Object.keys(l.attributes || {})) s.add(k);
+    return Array.from(s).sort().slice(0, 40);
+  })();
 
-  // Graph Parsing
-  const chartData = useMemo(() => {
-    if (!data?.trend) return [];
-    return data.trend.map((point: any) => ({
-      ...point,
-      rawTime: point._id,
-    }));
-  }, [data?.trend]);
-
-  const axisFormatter = useMemo(
-    () => (str: string) => formatAxisDate(str, spanMs),
-    [spanMs],
-  );
-
-  // Drawer Management: Resolves from table data FIRST, falls back to direct API lookup
+  // Drawer log resolution
   const selectedLog = useMemo(() => {
     if (!logId) return null;
-    // Fast path: find in currently loaded table
-    const fromTable = data?.logs?.find((l: any) => l._id === logId);
-    if (fromTable) return fromTable;
-    // Fallback path: use the specific /api/logs/:id endpoint response
-    return singleLogData?.log || null;
+    return data?.logs?.find((l: any) => l._id === logId) || singleLogData?.log || null;
   }, [logId, data?.logs, singleLogData]);
 
-  // Prev/Next Navigation Logic (Requires log to be present in currently loaded page data)
-  const currentIndex = useMemo(() => {
-    if (!logId || !data?.logs) return -1;
-    return data.logs.findIndex((l: any) => l._id === logId);
-  }, [logId, data?.logs]);
+  const totalPages = data?.pagination?.pages || 1;
+  const currentIndex = logId && data?.logs ? data.logs.findIndex((l: any) => l._id === logId) : -1;
+  // Prev/next span page boundaries (when not live-tailing).
+  const hasPrev = currentIndex > 0 || (!liveTail && page > 1);
+  const hasNext = (currentIndex !== -1 && !!data?.logs && currentIndex < data.logs.length - 1) || (!liveTail && page < totalPages);
 
-  const hasPrev = currentIndex > 0;
-  const hasNext =
-    currentIndex !== -1 && data?.logs && currentIndex < data.logs.length - 1;
-
-  const navigateLog = (direction: "prev" | "next") => {
+  const openLog = (id: string) => router.push({ query: { ...router.query, logId: id } }, undefined, { shallow: true });
+  const navigateLog = (dir: "prev" | "next") => {
     if (!data?.logs) return;
-    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex >= 0 && newIndex < data.logs.length) {
-      router.push(
-        { query: { ...router.query, logId: data.logs[newIndex]._id } },
-        undefined,
-        { shallow: true },
-      );
-    }
+    const ni = dir === "prev" ? currentIndex - 1 : currentIndex + 1;
+    if (ni >= 0 && ni < data.logs.length) { openLog(data.logs[ni]._id); return; }
+    // Cross page boundary: load the adjacent page and select its edge row.
+    if (dir === "prev" && page > 1) { pendingEdge.current = "last"; setPage((p) => p - 1); }
+    else if (dir === "next" && page < totalPages) { pendingEdge.current = "first"; setPage((p) => p + 1); }
   };
 
+  // After a cross-page navigation, select the appropriate edge row once it loads.
+  useEffect(() => {
+    if (!pendingEdge.current || !data?.logs?.length) return;
+    const target = pendingEdge.current === "first" ? data.logs[0] : data.logs[data.logs.length - 1];
+    pendingEdge.current = null;
+    if (target) openLog(target._id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.logs]);
   const closeDrawer = () => {
-    const q = { ...router.query };
-    delete q.logId;
+    const q = { ...router.query }; delete q.logId;
     router.push({ query: q }, undefined, { shallow: true });
   };
 
-  const copyToClipboard = (text: string, type: "raw" | "msg" | "key") => {
-    navigator.clipboard.writeText(text);
-    if (type === "raw") {
-      setCopiedRaw(true);
-      setTimeout(() => setCopiedRaw(false), 2000);
-    }
-    if (type === "msg") {
-      setCopiedMsg(true);
-      setTimeout(() => setCopiedMsg(false), 2000);
-    }
-    if (type === "key") {
-      setCopiedKey(true);
-      setTimeout(() => setCopiedKey(false), 2000);
+  const toggleSeverity = (sev: string) => {
+    setSeverities((prev) => { const n = new Set(prev); if (n.has(sev)) n.delete(sev); else n.add(sev); return n; });
+    setPage(1);
+  };
+
+  const addFilter = (field: string, value: string, negate = false) => {
+    const base = /\s/.test(value) ? `${field}:"${value}"` : `${field}:${value}`;
+    const clause = negate ? `-${base}` : base;
+    setSearchInput((prev) => (prev.includes(clause) ? prev : `${prev} ${clause}`.trim()));
+    setPage(1);
+  };
+
+  const onZoom = (start: string, end: string) => {
+    setTimeRange({ type: "custom", start, end });
+    setPage(1);
+  };
+
+  const doExport = async (format: "ndjson" | "csv") => {
+    setShowExport(false);
+    exportToast("loading", `Exporting ${format.toUpperCase()}…`);
+    try {
+      const res = await api.get(`/logs/export?${baseQuery}&format=${format}`, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `logs-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.${format}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      exportToast("success", "Export ready");
+    } catch {
+      exportToast("error", "Export failed");
     }
   };
 
-  const getTraceLink: any = (log: any) => {
+  const getTraceLink = (log: any): string | null => {
     if (!log.traceId || !log.serviceId) return null;
-    if (log.serviceModel === "TaskService")
-      return `/dashboard/task/${log.serviceId._id || log.serviceId}/run/${log.traceId}`;
-    if (log.serviceModel === "RumService")
-      return `/dashboard/rum/${log.serviceId._id || log.serviceId}/trace/${log.traceId}`;
-    return `/dashboard/apm/${log.serviceId._id || log.serviceId}/trace/${log.traceId}`;
+    const sid = log.serviceId._id || log.serviceId;
+    if (log.serviceModel === "TaskService") return `/dashboard/task/${sid}/run/${log.traceId}`;
+    if (log.serviceModel === "RumService") return `/dashboard/rum/${sid}/trace/${log.traceId}`;
+    return `/dashboard/apm/${sid}/trace/${log.traceId}`;
   };
 
   if (!data && !error && isLoading) {
     return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Querying Log Events...</p>
-        </div>
-      </>
+      <div className="h-full flex flex-col items-center justify-center gap-4">
+        <Spinner className="h-8 w-8 text-emerald-500" />
+        <p className="text-muted-foreground">Querying Log Events...</p>
+      </div>
     );
   }
 
   if (error) {
-    return (
-      <>
-        <div className="h-full flex items-center justify-center p-8">
-          <DataError onRetry={() => mutate()} />
-        </div>
-      </>
-    );
+    return <div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div>;
   }
 
-  const getColor = (defaultColor: string) =>
-    isMono ? "hsl(var(--chart-mono))" : defaultColor;
+  const getColor = (c: string) => (isMono ? "hsl(var(--chart-mono))" : c);
 
   return (
     <>
-      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-24 relative">
-        {/* --- Header & Range Control --- */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border border-border/60">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
-                <Terminal className="h-5 w-5" />
+      <div className="p-6 md:p-8 space-y-6 max-w-[1600px] mx-auto pb-24 relative">
+        {/* Header — identity row + toolbar row (responsive, no justify-between whitespace) */}
+        <div className="bg-card/50 rounded-xl border border-border/60">
+          {/* Row 1: identity + primary mode toggle */}
+          <div className="flex items-center justify-between gap-4 p-4 border-b border-border/50">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 shrink-0"><Terminal className="h-5 w-5" /></div>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground leading-tight">Log Management</h1>
+                <p className="text-xs text-muted-foreground truncate">Centralized, searchable logging across APM, RUM, and custom events.</p>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Log Management
-              </h1>
             </div>
-            <p className="text-xs text-muted-foreground pl-12 font-mono">
-              Centralized, searchable logging for APM, RUM, and Custom Events.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant={liveTail ? "default" : "outline"}
               size="sm"
-              className="h-9"
-              onClick={() => setIsKeyModalOpen(true)}
+              className={`h-9 shrink-0 ${liveTail ? "bg-emerald-600 hover:bg-emerald-600/90 text-white" : ""}`}
+              onClick={() => { setLiveTail((v) => !v); setPage(1); }}
             >
-              <Key className="h-4 w-4 mr-2" /> Ingestion Key
-            </Button>
-            <TimeRangePicker value={timeRange} onChange={(val) => { setTimeRange(val); setPage(1); }} maxRetentionDays={7} />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => mutate()}
-              disabled={isValidating}
-              className="h-9 w-9 shrink-0"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`}
-              />
+              <Radio className={`h-4 w-4 sm:mr-2 ${liveTail ? "animate-pulse" : ""}`} />
+              <span className="hidden sm:inline">{liveTail ? "Live" : "Live Tail"}</span>
             </Button>
           </div>
-        </div>
 
-        {/* --- Stats Cards --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            title="Total Logs"
-            value={formatNumber(totalLogs)}
-            sub="Logs in range"
-            icon={Terminal}
-            color="text-blue-500"
-            isMono={isMono}
-          />
-          <StatCard
-            title="Log Velocity"
-            value={logVelocity}
-            sub="Logs per minute"
-            icon={Activity}
-            color="text-purple-500"
-            isMono={isMono}
-          />
-          <StatCard
-            title="Error Count"
-            value={errorCount}
-            sub="In current view"
-            icon={XCircle}
-            color="text-destructive"
-            isMono={isMono}
-          />
-          <StatCard
-            title="Active Services"
-            value={uniqueServices}
-            sub="In current view"
-            icon={Box}
-            color="text-emerald-500"
-            isMono={isMono}
-          />
-        </div>
+          {/* Row 2: actions toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <SavedViews currentSearch={searchInput} onApply={(s) => { setSearchInput(s); setDebouncedSearch(s); setPage(1); }} />
 
-        {/* --- Trend Graph --- */}
-        <ChartCard title="Log Volume">
-          <div className="p-4 w-full h-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorLogs" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor={getColor("#3b82f6")}
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={getColor("#3b82f6")}
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border))"
-                  vertical={false}
-                  opacity={0.3}
-                />
-                <XAxis dataKey="rawTime" hide />
-                <YAxis hide />
-                <RechartsTooltip
-                  content={<ChartTooltip labelFormatter={axisFormatter} />}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke={getColor("#3b82f6")}
-                  fill={"url(#colorLogs)"}
-                  strokeWidth={2}
-                  name="Logs"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        {/* --- Data Table --- */}
-        <Card className="border-border/60 shadow-sm flex flex-col">
-          <CardHeader className="p-4 border-b border-border/40 bg-card/50">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder='Search logs... e.g., level:error message:"timeout" userId:123'
-                className="pl-9 pr-9 h-10 w-full bg-background border-border/80 font-mono text-sm"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-              {searchInput && (
-                <button
-                  onClick={() => setSearchInput("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 overflow-auto bg-card">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-muted/30 border-b border-border/40">
-                <tr>
-                  <th className="px-4 py-3 font-semibold w-32">Timestamp</th>
-                  <th className="px-4 py-3 font-semibold w-24">Level</th>
-                  <th className="px-4 py-3 font-semibold">Message</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {data?.logs?.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="px-6 py-12 text-center text-muted-foreground font-medium"
-                    >
-                      No logs found matching your query.
-                    </td>
-                  </tr>
-                ) : (
-                  data?.logs?.map((log: any) => {
-                    const colors = getLevelColors(log.level);
-                    const isSelected = logId === log._id;
-                    return (
-                      <tr
-                        key={log._id}
-                        onClick={() =>
-                          router.push(
-                            { query: { ...router.query, logId: log._id } },
-                            undefined,
-                            { shallow: true },
-                          )
-                        }
-                        className={`hover:bg-muted/40 transition-colors cursor-pointer group ${isSelected ? "bg-muted/20" : ""}`}
-                      >
-                        <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
-                          {new Date(log.timestamp).toLocaleString([], {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge
-                            variant="outline"
-                            className={`${colors.bg} ${colors.border} ${colors.text} uppercase text-[9px] font-bold px-1.5`}
-                          >
-                            {log.level}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-foreground font-mono text-xs truncate max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl">
-                          {log.message}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </CardContent>
-
-          {/* Pagination */}
-          {data?.pagination?.pages > 1 && (
-            <div className="p-4 border-t border-border/40 bg-card/50 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground font-medium">
-                Page {page} of {data.pagination.pages} ({data.pagination.total}{" "}
-                logs)
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="h-8"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+              <div className="relative" ref={exportRef}>
+                <Button variant="outline" size="sm" className="h-9" onClick={() => setShowExport((v) => !v)}>
+                  <Download className="h-4 w-4 mr-2" /> Export
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setPage((p) => Math.min(data.pagination.pages, p + 1))
-                  }
-                  disabled={page === data.pagination.pages}
-                  className="h-8"
-                >
-                  Next <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* --- New Relic Style Log Drawer --- */}
-      {logId && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-background/50 backdrop-blur-sm"
-            onClick={closeDrawer}
-          />
-
-          <div className="relative w-full max-w-2xl h-full bg-card border-l border-border/80 shadow-2xl flex flex-col animate-in slide-in-from-right-full duration-300 ease-out">
-            <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/20 shrink-0">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={closeDrawer}
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-full mr-2"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-                {selectedLog ? (
-                  <div className="flex items-center gap-3">
-                    <Badge
-                      variant="outline"
-                      className={`${getLevelColors(selectedLog.level).bg} ${getLevelColors(selectedLog.level).text} ${getLevelColors(selectedLog.level).border} uppercase font-bold text-xs`}
-                    >
-                      {selectedLog.level}
-                    </Badge>
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {new Date(selectedLog.timestamp).toLocaleString()}
-                    </span>
+                {showExport && (
+                  <div className="absolute left-0 mt-2 w-44 rounded-lg border border-border/60 bg-card shadow-xl z-50 overflow-hidden">
+                    <button onClick={() => doExport("ndjson")} className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted/50"><FileJson className="h-4 w-4 text-blue-500" /> NDJSON</button>
+                    <button onClick={() => doExport("csv")} className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted/50 border-t border-border/40"><FileText className="h-4 w-4 text-emerald-500" /> CSV</button>
                   </div>
-                ) : (
-                  <span className="text-sm font-medium text-foreground">
-                    Log Details
-                  </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => navigateLog("prev")}
-                  disabled={!hasPrev || isSingleLoading}
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => navigateLog("next")}
-                  disabled={!hasNext || isSingleLoading}
-                >
-                  <ArrowDown className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button variant="outline" size="sm" className="h-9 relative" onClick={() => setIsKeyModalOpen(true)} title={hasDrops ? "Some logs were dropped — view ingestion health" : "Ingestion keys & health"}>
+                <Key className="h-4 w-4 mr-2" /> Ingestion
+                {hasDrops && <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-yellow-500 ring-2 ring-background" />}
+              </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Intelligent Loading State for Deep Links / Hard Refreshes */}
-              {isSingleLoading && !selectedLog ? (
-                <div className="flex flex-col items-center justify-center h-full gap-4">
-                  <Spinner className="h-8 w-8 text-blue-500" />
-                  <p className="text-muted-foreground text-sm">
-                    Loading log data...
-                  </p>
-                </div>
-              ) : selectedLog ? (
-                <>
-                  {/* Distinct Message Block */}
-                  <div className="relative group/message bg-background border border-border/60 rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Message
-                      </h2>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 opacity-0 group-hover/message:opacity-100 transition-opacity"
-                        onClick={() =>
-                          copyToClipboard(selectedLog.message, "msg")
-                        }
-                      >
-                        {copiedMsg ? (
-                          <Check className="h-3 w-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-3 w-3 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-sm font-mono text-foreground break-words leading-relaxed">
-                      {selectedLog.message}
-                    </p>
-                  </div>
-
-                  {/* Context Links */}
-                  {(selectedLog.traceId || selectedLog.serviceId) && (
-                    <div className="flex flex-wrap gap-3">
-                      {getTraceLink(selectedLog) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-blue-500/10 border-blue-500/30 text-blue-500 hover:bg-blue-500/20"
-                          onClick={() => router.push(getTraceLink(selectedLog))}
-                        >
-                          View Trace Details{" "}
-                          <ExternalLink className="h-3.5 w-3.5 ml-2" />
-                        </Button>
-                      )}
-                      {selectedLog.serviceId && (
-                        <Badge
-                          variant="secondary"
-                          className="px-3 py-1.5 text-xs font-medium border border-border/50"
-                        >
-                          Source: {selectedLog.serviceId.name || "Unknown"}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Attributes Viewer */}
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between mb-3 border-b border-border/40 pb-2">
-                      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                        Attributes
-                      </h2>
-                      <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-md border border-border/50">
-                        <button
-                          onClick={() => setViewMode("formatted")}
-                          className={`px-3 py-1 text-xs font-medium rounded transition-all ${viewMode === "formatted" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                          Formatted
-                        </button>
-                        <button
-                          onClick={() => setViewMode("raw")}
-                          className={`px-3 py-1 text-xs font-medium rounded transition-all ${viewMode === "raw" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                          Raw
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="relative group/raw">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="absolute top-2 right-2 h-7 w-7 bg-muted/80 opacity-0 group-hover/raw:opacity-100 transition-opacity z-10"
-                        onClick={() =>
-                          copyToClipboard(
-                            JSON.stringify(
-                              {
-                                level: selectedLog.level,
-                                message: selectedLog.message,
-                                timestamp: selectedLog.timestamp,
-                                ...selectedLog.attributes,
-                              },
-                              null,
-                              2,
-                            ),
-                            "raw",
-                          )
-                        }
-                      >
-                        {copiedRaw ? (
-                          <Check className="h-3.5 w-3.5 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                        )}
-                      </Button>
-
-                      {viewMode === "formatted" ? (
-                        <div className="bg-[#0d1117] border border-border/60 rounded-lg p-4 overflow-x-auto shadow-inner">
-                          <pre className="text-xs font-mono leading-loose whitespace-pre-wrap break-words">
-                            <div className="flex items-start">
-                              <span className="text-[#79c0ff] mr-2">
-                                message:
-                              </span>
-                              <span className="text-[#a5d6ff]">
-                                {selectedLog.message}
-                              </span>
-                            </div>
-                            <div className="flex items-start">
-                              <span className="text-[#79c0ff] mr-2">
-                                level:
-                              </span>
-                              <span className="text-[#a5d6ff]">
-                                {selectedLog.level}
-                              </span>
-                            </div>
-                            <div className="flex items-start">
-                              <span className="text-[#79c0ff] mr-2">
-                                timestamp:
-                              </span>
-                              <span className="text-[#a5d6ff]">
-                                {selectedLog.timestamp}
-                              </span>
-                            </div>
-
-                            {/* Render Destructured Attributes block-style, explicitly without string quotes */}
-                            {Object.entries(selectedLog.attributes || {}).map(
-                              ([key, val]) => (
-                                <div key={key} className="flex items-start">
-                                  <span className="text-[#79c0ff] mr-2">
-                                    {key}:
-                                  </span>
-                                  <span
-                                    className={
-                                      typeof val === "number"
-                                        ? "text-[#79c0ff]"
-                                        : typeof val === "boolean"
-                                          ? "text-[#ff7b72]"
-                                          : "text-[#a5d6ff]"
-                                    }
-                                  >
-                                    {typeof val === "object"
-                                      ? JSON.stringify(val, null, 2)
-                                      : String(val)}
-                                  </span>
-                                </div>
-                              ),
-                            )}
-                          </pre>
-                        </div>
-                      ) : (
-                        <div className="bg-[#0d1117] border border-border/60 rounded-lg p-4 overflow-x-auto shadow-inner">
-                          <pre className="text-xs font-mono text-[#e6edf3]">
-                            {JSON.stringify(
-                              {
-                                message: selectedLog.message,
-                                level: selectedLog.level,
-                                timestamp: selectedLog.timestamp,
-                                ...selectedLog.attributes,
-                              },
-                              null,
-                              2,
-                            )}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-2 h-full">
-                  <XCircle className="h-8 w-8 text-muted-foreground/50" />
-                  <span className="text-sm font-medium text-foreground">
-                    Log not found
-                  </span>
-                  <span className="text-xs">
-                    It may have expired or exists on another page.
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- Ingestion Key Modal --- */}
-      <Dialog
-        open={isKeyModalOpen}
-        onClose={() => setIsKeyModalOpen(false)}
-        title="Global Log Ingestion"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Use this API key to pipe logs from external systems (Docker, AWS,
-            Nginx) directly into your dashboard.
-          </p>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              API Key
-            </label>
-            <div className="relative">
-              <Input
-                readOnly
-                value={keyData?.key || "Loading..."}
-                className="font-mono text-blue-500 pr-10 bg-muted/30"
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute right-1 top-1 h-8 w-8 text-muted-foreground"
-                onClick={() => copyToClipboard(keyData?.key, "key")}
-              >
-                {copiedKey ? (
-                  <Check className="h-4 w-4 text-emerald-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
+            <div className="flex items-center gap-2">
+              <TimeRangePicker value={timeRange} onChange={(val) => { setTimeRange(val); setPage(1); }} maxRetentionDays={7} />
+              <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating} className="h-9 w-9 shrink-0" title="Refresh">
+                <RefreshCw className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`} />
               </Button>
             </div>
           </div>
-          <div className="bg-[#0d1117] rounded-lg p-4 border border-border/50">
-            <div className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-2">
-              Example cURL
-            </div>
-            <pre className="text-[10px] font-mono text-blue-300 whitespace-pre-wrap break-all">
-              curl -X POST https://api.senzor.dev/api/ingest/logs \<br />
-              -H "x-log-api-key: {keyData?.key || "YOUR_KEY"}" \<br />
-              -H "Content-Type: application/json" \<br />
-              -d '&#123;"level":"error", "message":"Payment failed", "userId":
-              123&#125;'
-            </pre>
-          </div>
         </div>
-      </Dialog>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard title="Total Logs" value={formatNumber(totalLogs)} sub="Logs in range" icon={Terminal} color="text-blue-500" isMono={isMono} />
+          <StatCard title="Log Velocity" value={logVelocity} sub="Logs per minute" icon={Activity} color="text-purple-500" isMono={isMono} />
+          <StatCard title="Error Count" value={errorCount} sub="In current view" icon={XCircle} color="text-destructive" isMono={isMono} />
+          <StatCard title="Active Services" value={uniqueServices} sub="In current view" icon={Box} color="text-emerald-500" isMono={isMono} />
+        </div>
+
+        {/* Volume chart */}
+        <LogVolumeChart data={chartData} axisFormatter={axisFormatter} color={getColor("#3b82f6")} onZoom={onZoom} />
+
+        {/* Search + filters toolbar */}
+        <Card className="border-border/60 shadow-sm">
+              <CardHeader className="p-4 space-y-3">
+                <div className="relative w-full" ref={helpRef}>
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder='Search... e.g. level:error status:>=500 message:"timeout"'
+                    className="pl-9 pr-20 h-10 w-full bg-background border-border/80 font-mono text-sm"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {searchInput && (
+                      <button onClick={() => setSearchInput("")} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                    )}
+                    <button onClick={() => setShowHelp((v) => !v)} className="text-muted-foreground hover:text-foreground"><HelpCircle className="h-4 w-4" /></button>
+                  </div>
+                  {showHelp && (
+                    <div className="absolute right-0 mt-2 w-80 rounded-lg border border-border/60 bg-card shadow-xl z-50 p-2">
+                      <p className="text-[11px] text-muted-foreground px-2 py-1.5 font-semibold uppercase tracking-wider">Query syntax</p>
+                      {QUERY_EXAMPLES.map(([ex, desc]) => (
+                        <button key={ex} onClick={() => { setSearchInput((p) => `${p} ${ex}`.trim()); setShowHelp(false); }} className="flex items-center justify-between gap-2 w-full px-2 py-1.5 rounded hover:bg-muted/50 text-left">
+                          <code className="text-[11px] font-mono text-blue-500 truncate">{ex}</code>
+                          <span className="text-[10px] text-muted-foreground shrink-0">{desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {SEVERITIES.map((sev) => {
+                      const active = severities.has(sev);
+                      const c = getLevelColors(sev);
+                      return (
+                        <button
+                          key={sev}
+                          onClick={() => toggleSeverity(sev)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold uppercase transition-all ${active ? `${c.bg} ${c.border} ${c.text}` : "border-border/60 text-muted-foreground hover:text-foreground"}`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${active ? c.dot : "bg-muted-foreground/40"}`} />
+                          {sev}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <LogFacetsPopover queryString={baseQuery} onAddFilter={addFilter} />
+                    <LogColumnsMenu attrKeys={attrKeys} selected={columns} onChange={updateColumns} />
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+
+            {/* Table */}
+            <Card className="border-border/60 shadow-sm flex flex-col">
+              <CardContent className="p-0 overflow-auto bg-card relative">
+                {isValidating && !liveTail && (
+                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 text-[11px] text-muted-foreground bg-card/90 border border-border/50 rounded-full px-2.5 py-1 shadow-sm">
+                    <Spinner className="h-3 w-3 text-blue-500" /> Updating
+                  </div>
+                )}
+                <table className={`w-full text-sm text-left transition-opacity ${isValidating && !liveTail ? "opacity-60" : ""}`}>
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/30 border-b border-border/40">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold w-32">Timestamp</th>
+                      <th className="px-4 py-3 font-semibold w-24">Level</th>
+                      {columns.map((c) => (
+                        <th key={c} className="px-4 py-3 font-semibold whitespace-nowrap">{columnLabel(c)}</th>
+                      ))}
+                      <th className="px-4 py-3 font-semibold">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {data?.logs?.length === 0 ? (
+                      <tr><td colSpan={3 + columns.length} className="px-6 py-12 text-center text-muted-foreground font-medium">No logs found matching your query.</td></tr>
+                    ) : (
+                      data?.logs?.map((log: any) => {
+                        const colors = getLevelColors(logSeverity(log));
+                        const isSelected = logId === log._id;
+                        return (
+                          <tr key={log._id} onClick={() => openLog(log._id)} className={`hover:bg-muted/40 transition-colors cursor-pointer group ${isSelected ? "bg-muted/20" : ""}`}>
+                            <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                              {new Date(log.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline" className={`${colors.bg} ${colors.border} ${colors.text} uppercase text-[9px] font-bold px-1.5`}>{logSeverity(log)}</Badge>
+                            </td>
+                            {columns.map((c) => {
+                              const v = getColumnValue(log, c);
+                              const display = v === undefined || v === null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v);
+                              return (
+                                <td key={c} className="px-4 py-3 font-mono text-[11px] text-muted-foreground whitespace-nowrap max-w-[180px] truncate" title={display}>{display}</td>
+                              );
+                            })}
+                            <td className="px-4 py-3 text-foreground font-mono text-xs truncate max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl">{log.message}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+
+              {/* Pagination (hidden during live tail) */}
+              {!liveTail && data?.pagination?.pages > 1 && (
+                <div className="p-4 border-t border-border/40 bg-card/50 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-medium">Page {page} of {data.pagination.pages} ({data.pagination.total} logs)</span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="h-8"><ChevronLeft className="h-4 w-4 mr-1" /> Prev</Button>
+                    <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(data.pagination.pages, p + 1))} disabled={page === data.pagination.pages} className="h-8">Next <ChevronRight className="h-4 w-4 ml-1" /></Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+      </div>
+
+      {/* Drawer */}
+      {logId && (
+        <LogDetailDrawer
+          log={selectedLog}
+          isLoading={isSingleLoading}
+          onClose={closeDrawer}
+          onNavigate={navigateLog}
+          hasPrev={hasPrev}
+          hasNext={!!hasNext}
+          onSelectLog={openLog}
+          getTraceLink={getTraceLink}
+          onOpenTrace={(href) => router.push(href)}
+          onAddFilter={addFilter}
+        />
+      )}
+
+      {/* Ingestion key manager + integrations */}
+      <LogKeyManager open={isKeyModalOpen} onClose={() => setIsKeyModalOpen(false)} />
     </>
   );
 }
