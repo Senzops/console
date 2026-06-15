@@ -76,10 +76,10 @@ export default function GdprCompliance() {
                   Data Minimization
                 </h3>
                 <p className="text-sm">
-                  Our platform strictly enforces short Time-To-Live (TTL)
+                  Our platform strictly enforces per-document Time-To-Live (TTL)
                   indexes. Telemetry data is automatically expunged from our
-                  databases within 3 to 30 days, minimizing your compliance
-                  footprint.
+                  databases at the end of your plan's retention window (3 to 90
+                  days), minimizing your compliance footprint.
                 </p>
               </div>
             </div>

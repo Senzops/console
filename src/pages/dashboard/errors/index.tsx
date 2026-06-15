@@ -20,6 +20,7 @@ import {
   SelectItem,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
 import { ChartTooltip } from "@/components/ChartTooltip";
 import {
@@ -138,7 +139,8 @@ export default function GlobalErrorsDashboard() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(30);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const spanMs = getTimeSpanMs(timeRange);
   const displayRange = timeRange.type === 'relative' ? timeRange.range : getDisplayLabel(timeRange);
   const [page, setPage] = useState(1);
@@ -242,7 +244,7 @@ export default function GlobalErrorsDashboard() {
             <TimeRangePicker
               value={timeRange}
               onChange={(val) => { setTimeRange(val); setPage(1); }}
-              maxRetentionDays={30}
+              maxRetentionDays={retentionDays}
             />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />

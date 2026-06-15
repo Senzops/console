@@ -5,6 +5,7 @@ import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import { ChartTooltip } from "@/components/ChartTooltip";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
@@ -217,7 +218,8 @@ export default function WebDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(32);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const spanMs = getTimeSpanMs(timeRange);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -312,7 +314,7 @@ export default function WebDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={32} />
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>

@@ -14,6 +14,7 @@ import {
   DataError,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
 import { ChartTooltip } from "@/components/ChartTooltip";
 import {
@@ -153,7 +154,8 @@ export default function ErrorDetailPage() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(30);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const spanMs = getTimeSpanMs(timeRange);
   const displayRange = timeRange.type === 'relative' ? timeRange.range : getDisplayLabel(timeRange);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -278,7 +280,7 @@ export default function ErrorDetailPage() {
           <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto md:items-end mt-2 md:mt-0">
             {/* Time Range Selector */}
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={30} />
+              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto">

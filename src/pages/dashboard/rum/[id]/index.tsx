@@ -21,6 +21,7 @@ import {
   DataError,
 } from "../../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import { ChartTooltip } from "@/components/ChartTooltip";
 import {
@@ -545,7 +546,8 @@ export default function RumDashboard() {
   const { isMono } = useTheme();
 
   const { openModal } = useServiceModal();
-  const [timeRange, setTimeRange] = usePersistedTimeRange(8);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const rangeQuery = buildTimeRangeQuery(timeRange);
   const spanMs = getTimeSpanMs(timeRange);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -703,7 +705,7 @@ export default function RumDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
+              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
               <Button
                 variant="outline"
                 size="icon"

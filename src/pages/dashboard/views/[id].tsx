@@ -24,6 +24,7 @@ import {
   cn,
 } from "../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate as formatAxisDateUtil, getTimeSpanMs } from "@/lib/formatAxisDate";
 import { ChartTooltip } from "@/components/ChartTooltip";
 import {
@@ -1561,7 +1562,8 @@ export default function CustomDashboardView() {
   const { token } = useAuth();
   const { theme, isMono } = useTheme();
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(8);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const rangeQuery = buildTimeRangeQuery(timeRange);
   const spanMs = getTimeSpanMs(timeRange);
   const [isEditing, setIsEditing] = useState(false);
@@ -1876,7 +1878,7 @@ export default function CustomDashboardView() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
             <Button
               variant="outline"
               size="icon"
@@ -2050,7 +2052,7 @@ export default function CustomDashboardView() {
                 </h2>
               </div>
               <div className="flex items-center gap-3">
-                <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
+                <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
                 <Button
                   variant="outline"
                   onClick={runLivePreview}

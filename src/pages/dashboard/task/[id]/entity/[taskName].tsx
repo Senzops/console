@@ -23,6 +23,7 @@ import {
   DataError,
 } from "../../../../../components/Core";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../../components/TimeRangePicker";
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import { ChartTooltip } from "@/components/ChartTooltip";
 import {
@@ -454,7 +455,8 @@ export default function TaskEntityDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(30);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const rangeQuery = buildTimeRangeQuery(timeRange);
   const spanMs = getTimeSpanMs(timeRange);
 
@@ -574,7 +576,7 @@ export default function TaskEntityDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={30} />
+              <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
               <Button
                 variant="outline"
                 size="icon"

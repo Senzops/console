@@ -5,6 +5,7 @@ import { api, useAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../components/TimeRangePicker';
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { getDisplayLabel, formatAxisDate, getTimeSpanMs } from '@/lib/formatAxisDate';
 import { ChartTooltip } from '@/components/ChartTooltip';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -439,7 +440,8 @@ export default function MonitorDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme();
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(7);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const spanMs = getTimeSpanMs(timeRange);
   const displayRange = timeRange.type === 'relative' ? timeRange.range : getDisplayLabel(timeRange);
   const monitorAxisFormatter = useMemo(() => (str: string) => formatAxisDate(str, spanMs), [spanMs]);
@@ -540,7 +542,7 @@ export default function MonitorDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={7} />
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>

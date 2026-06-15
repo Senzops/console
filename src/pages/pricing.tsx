@@ -14,6 +14,7 @@ const PLAN_UI_META: Record<string, any> = {
     description: "Perfect for side projects and MVPs.",
     features: [
       "2 GB pooled ingestion/month",
+      "3-day data retention",
       "1 service per type (APM, RUM, etc.)",
       "1 organization",
       "Community support",
@@ -25,6 +26,7 @@ const PLAN_UI_META: Record<string, any> = {
     description: "For production applications and small teams.",
     features: [
       "15 GB pooled ingestion/month",
+      "15-day data retention",
       "5 services per type",
       "3 organizations",
       "Email support",
@@ -36,6 +38,7 @@ const PLAN_UI_META: Record<string, any> = {
     description: "For scaling engineering organizations.",
     features: [
       "100 GB pooled ingestion/month",
+      "30-day data retention",
       "Unlimited services",
       "10 organizations",
       "Priority support SLA",
@@ -57,6 +60,15 @@ const COMPARE_FEATURES = [
         pro: "15 GB / mo",
         business: "100 GB / mo",
         enterprise: "Custom Volume",
+      },
+      {
+        name: "Data Retention",
+        tooltip:
+          "How long your telemetry stays queryable before automatic deletion. Applied uniformly across every telemetry type (APM, logs, RUM, metrics, and more).",
+        starter: "3 days",
+        pro: "15 days",
+        business: "30 days",
+        enterprise: "90 days",
       },
       {
         name: "Services Limit",

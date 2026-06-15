@@ -175,9 +175,10 @@ export default function PrivacyPolicy() {
                 <strong>Telemetry Data:</strong> Operational telemetry is
                 strictly ephemeral. It is automatically and permanently expunged
                 from our databases on a rolling basis, dictated by your
-                subscription tier's retention policy (e.g., 3, 15, or 30 days).
-                Once the retention window lapses, data is cryptographically
-                unrecoverable.
+                subscription tier's retention policy (3, 15, 30, or 90 days for
+                Starter, Pro, Business, and Enterprise respectively), applied
+                uniformly across all telemetry types. Once the retention window
+                lapses, data is unrecoverable.
               </p>
             </section>
 

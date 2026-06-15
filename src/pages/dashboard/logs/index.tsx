@@ -19,6 +19,7 @@ import {
   buildTimeRangeQuery,
   usePersistedTimeRange,
 } from "../../../components/TimeRangePicker";
+import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
 import {
   Search,
@@ -98,7 +99,8 @@ export default function GlobalLogsDashboard() {
   const logId = router.query.logId as string | undefined;
   const initSearch = router.query.search as string | undefined;
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(7);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const spanMs = getTimeSpanMs(timeRange);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState(initSearch || "");
@@ -328,7 +330,7 @@ export default function GlobalLogsDashboard() {
             </div>
 
             <div className="flex items-center gap-2">
-              <TimeRangePicker value={timeRange} onChange={(val) => { setTimeRange(val); setPage(1); }} maxRetentionDays={7} />
+              <TimeRangePicker value={timeRange} onChange={(val) => { setTimeRange(val); setPage(1); }} maxRetentionDays={retentionDays} />
               <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating} className="h-9 w-9 shrink-0" title="Refresh">
                 <RefreshCw className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`} />
               </Button>

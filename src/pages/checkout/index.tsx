@@ -25,6 +25,7 @@ interface BackendPlan {
   priceAnnual: number;
   maxServicesPerType: number;
   maxIngestionBytes: number;
+  retentionDays: number;
   dodoProductIdMonthly: string | null;
   dodoProductIdAnnual: string | null;
 }
@@ -350,7 +351,8 @@ export default function PaymentPage() {
                                   Up to{" "}
                                   {plan.maxIngestionBytes /
                                     (1024 * 1024 * 1024)}
-                                  GB pooled ingestion.
+                                  GB pooled ingestion · {plan.retentionDays}-day
+                                  retention.
                                 </div>
                               </div>
                               <div className="text-right">

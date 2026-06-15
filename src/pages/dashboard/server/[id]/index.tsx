@@ -5,6 +5,8 @@ import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, cn, DataError } from '../../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../../components/TimeRangePicker';
+import { usePlanRetention } from '@/lib/usePlanRetention';
+import { formatAxisDate, getTimeSpanMs } from '@/lib/formatAxisDate';
 import { ChartTooltip } from '@/components/ChartTooltip';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
 import { Activity, Box, Cpu, HardDrive, Network, Clock, RefreshCw, Trash2, AlertTriangle, X, Maximize, Terminal, Layers, CloudLightning, ArrowRight, Route, Thermometer, Zap, Pencil } from 'lucide-react';
@@ -266,7 +268,8 @@ export default function ServerDetail() {
   const { token } = useAuth();
   const { isMono } = useTheme(); // Get Monochromatic state
 
-  const [timeRange, setTimeRange] = usePersistedTimeRange(1);
+  const retentionDays = usePlanRetention();
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openModal } = useServiceModal();
@@ -298,9 +301,13 @@ export default function ServerDetail() {
     });
   };
 
-  // Find the last real online metric to prevent top cards from flashing 0 during downtime
-  const latestRun = history?.slice().reverse().find((h: any) => h.isOnline !== false) || history?.[history?.length - 1];
-  const latest = latestRun ? latestRun.metrics : {}; 
+  // Prefer the true latest ONLINE snapshot returned by the API (accurate even
+  // when the series is downsampled for long ranges); fall back to deriving it
+  // from history for resilience.
+  const latestRun = data?.latest
+    || history?.slice().reverse().find((h: any) => h.isOnline !== false)
+    || history?.[history?.length - 1];
+  const latest = latestRun ? latestRun.metrics : {};
 
   // Multi-Disk & Hardware Resolution (TS 2345 Fix via explicit cast)
   const diskArray = Array.isArray(latest?.disk) ? latest.disk : (latest?.disk ? [latest.disk] : []);
@@ -315,13 +322,16 @@ export default function ServerDetail() {
   const chartData = useMemo(() => {
     if (!history) return [];
     const sorted = [...history].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    // Format the X-axis label by the selected span so multi-day ranges show the
+    // date, not just HH:MM (which would collapse for daily buckets).
+    const spanMs = getTimeSpanMs(timeRange);
 
     return sorted.map((run: any) => {
       const runDiskArray = Array.isArray(run.metrics?.disk) ? run.metrics.disk : (run.metrics?.disk ? [run.metrics.disk] : []);
       const primaryDisk = runDiskArray[0] || {};
 
       const d: any = {
-        time: new Date(run.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: formatAxisDate(run.createdAt, spanMs),
         cpu: run.metrics.cpu?.usagePercent || 0,
         memUsed: run.metrics.memory?.usagePercent || 0,
         memActive: (run.metrics.memory?.active / (run.metrics.memory?.total || 1)) * 100 || 0,
@@ -358,7 +368,7 @@ export default function ServerDetail() {
 
       return d;
     });
-  }, [history]);
+  }, [history, timeRange]);
 
   if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Server...</p></div></>;
   if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;
@@ -397,7 +407,7 @@ export default function ServerDetail() {
           </div>
 
           <div className="flex items-center gap-2">
-            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={1} />
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>

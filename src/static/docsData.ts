@@ -85,7 +85,7 @@ export const DOCS_DATA: DocsConfig = {
         },
         {
           q: "How long is my telemetry data retained?",
-          a: "Retention is tied to your active billing plan. Starter tier retains data for 3 days, Pro for 15 days, and Business for 30 days. After the TTL expires, data is cryptographically expunged by MongoDB."
+          a: "Retention is tied to your active billing plan and applied uniformly across every telemetry type. Starter retains data for 3 days, Pro for 15 days, Business for 30 days, and Enterprise for 90 days. Each record carries its own expiry, so when your plan changes the retention window for your stored data is adjusted automatically. Once the window lapses, data is permanently expunged by MongoDB."
         }
       ]
     },
