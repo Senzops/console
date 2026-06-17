@@ -18,8 +18,8 @@ import { useServiceModal } from '@/components/ServiceModals/context';
 import { formatAxisDate, getTimeSpanMs, getBucketIntervalSeconds } from '@/lib/formatAxisDate';
 import { ChartTooltip } from '@/components/ChartTooltip';
 import RuntimeMetrics from './RuntimeMetrics';
-
-const fetcher = (url: string) => api.get(url).then(res => res.data);
+import { useShareApi, useShareMode } from '../../lib/share';
+import { ShareButton } from '../ShareModal';
 
 // --- HELPERS ---
 const formatNumber = (num: number) => {
@@ -365,7 +365,11 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const router = useRouter();
   const { token } = useAuth();
   const { isMono } = useTheme();
-  
+  const { fetcher } = useShareApi();
+  const { readOnly } = useShareMode();
+  // In a public share, there's no auth token; the share context authorizes reads.
+  const canFetch = !!(token || readOnly);
+
   const [timeRange, setTimeRange] = usePersistedTimeRange(8);
   const [geoMode, setGeoMode] = useState<'map'|'countries'|'cities'>('map');
   const [sysMode, setSysMode] = useState<'browsers'|'os'|'devices'>('browsers');
@@ -378,10 +382,10 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   const spanMs = getTimeSpanMs(timeRange);
 
   const endpoint = `/apm/${serviceId}/stats?${rangeQuery}` + (route ? `&route=${encodeURIComponent(route)}` : '');
-  const { data, error, mutate, isValidating } = useSWR(token && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
+  const { data, error, mutate, isValidating } = useSWR(canFetch && serviceId ? endpoint : null, fetcher, { refreshInterval: 30000 });
 
    const invocationsEndpoint = `/apm/${serviceId}/invocations?${rangeQuery}` + (route ? `&route=${encodeURIComponent(route)}` : '');
-  const { data: invocations, mutate: mutateInvocations, isValidating: isValidatingInvocations } = useSWR(token && serviceId ? invocationsEndpoint : null, fetcher, { refreshInterval: 30000 });
+  const { data: invocations, mutate: mutateInvocations, isValidating: isValidatingInvocations } = useSWR(canFetch && serviceId ? invocationsEndpoint : null, fetcher, { refreshInterval: 30000 });
 
 
   const handleDelete = async () => {
@@ -478,8 +482,9 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
               <div className="flex items-center gap-2">
                 <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={8} />
                 <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}><RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} /></Button>
-                <Button variant="outline" size="icon" onClick={openEdit}><Pencil className="h-4 w-4" /></Button>
-                <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>
+                {!readOnly && !route && <ShareButton scopeType="apm" scopeId={serviceId} dashboardName={meta.name} />}
+                {!readOnly && <Button variant="outline" size="icon" onClick={openEdit}><Pencil className="h-4 w-4" /></Button>}
+                {!readOnly && <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>}
               </div>
            </div>
         </div>

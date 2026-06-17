@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo } from 'react';
 import useSWR from 'swr';
-import { api, useAuth } from '../../lib/auth';
+import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Button, Spinner } from '../Core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Line } from 'recharts';
@@ -9,8 +9,7 @@ import { Maximize, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { formatAxisDate } from '@/lib/formatAxisDate';
 import { ChartTooltip } from '@/components/ChartTooltip';
-
-const fetcher = (url: string) => api.get(url).then(res => res.data);
+import { useShareApi, useShareMode } from '../../lib/share';
 
 
 // --- Maximizable Chart Card (matches ApmView ChartCard pattern exactly) ---
@@ -59,11 +58,13 @@ interface RuntimeMetricsProps {
 export default function RuntimeMetrics({ serviceId, range, spanMs }: RuntimeMetricsProps) {
   const { token } = useAuth();
   const { isMono } = useTheme();
+  const { fetcher } = useShareApi();
+  const { readOnly } = useShareMode();
   const [chartMode, setChartMode] = useState<'eventloop' | 'memory' | 'gc' | 'cpu'>('eventloop');
 
   const endpoint = `/apm/${serviceId}/runtime?${range}`;
   const { data, error } = useSWR(
-    token && serviceId ? endpoint : null,
+    (token || readOnly) && serviceId ? endpoint : null,
     fetcher,
     { refreshInterval: 15000 },
   );
