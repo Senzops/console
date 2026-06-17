@@ -488,6 +488,38 @@ export const ServiceModals: React.FC = () => {
     }
   };
 
+  const handleBoardSubmit = async () => {
+    if (!name.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      if (isEdit && editData?.id) {
+        await api.put(`/monitor-board/${editData.id}`, {
+          name: name.trim(),
+          description: description.trim(),
+        });
+        await editData.onSuccess?.();
+        closeModal();
+        toast.success("Board updated");
+      } else {
+        const res = await api.post("/monitor-board", {
+          name: name.trim(),
+          description: description.trim(),
+        });
+        setName("");
+        setDescription("");
+        closeModal();
+        mutateFns.board?.();
+        toast.success("Status board created!");
+        router.push(`/dashboard/monitor/board/${res.data.board._id}`);
+      }
+    } catch (e: any) {
+      handleApiError(e, isEdit ? "Failed to update board" : "Failed to create board.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // =======================================================================
   // Shared UI fragments
   // =======================================================================
@@ -590,6 +622,66 @@ export const ServiceModals: React.FC = () => {
                 "Update"
               ) : (
                 "Create Canvas"
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* ================================================================= */}
+      {/* STATUS BOARD MODAL                                                */}
+      {/* ================================================================= */}
+      <Dialog
+        open={activeModal === "board"}
+        onClose={closeModal}
+        title={isEdit ? "Edit Status Board" : "Create Status Board"}
+      >
+        <div className="space-y-4">
+          <ErrorBanner />
+          <p className="text-sm text-muted-foreground">
+            A status board groups your uptime monitors into one shareable dashboard.
+          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Board Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+              placeholder="e.g. Production Status"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              maxLength={120}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Description{" "}
+              <span className="text-muted-foreground font-normal">(Optional)</span>
+            </label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+              placeholder="What does this board track?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={500}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" onClick={closeModal} disabled={loading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBoardSubmit}
+              disabled={loading || !name.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {loading ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" /> {isEdit ? "Updating..." : "Creating..."}
+                </>
+              ) : isEdit ? (
+                "Update"
+              ) : (
+                "Create Board"
               )}
             </Button>
           </div>

@@ -91,7 +91,8 @@ export type ShareScopeType =
   | "task"
   | "web"
   | "vps"
-  | "savedview";
+  | "savedview"
+  | "monitorboard";
 
 export interface DashboardShareLink {
   id: string;

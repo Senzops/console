@@ -18,6 +18,7 @@ import ServerDetail from "@/pages/dashboard/server/[id]";
 import RumDashboard from "@/pages/dashboard/rum/[id]";
 import TaskServiceDashboard from "@/pages/dashboard/task/[id]";
 import CustomDashboardView from "@/pages/dashboard/views/[id]";
+import MonitorBoardView from "@/pages/dashboard/monitor/board/[id]";
 import { Unlink, Clock, ArrowRight, Eye } from "lucide-react";
 
 interface ShareMeta {
@@ -56,6 +57,8 @@ const SharedDashboardBody = ({ meta }: { meta: ShareMeta }) => {
       return <ServerDetail />;
     case "savedview":
       return <CustomDashboardView />;
+    case "monitorboard":
+      return <MonitorBoardView />;
     default:
       return (
         <div className="max-w-md mx-auto text-center py-24 px-6">

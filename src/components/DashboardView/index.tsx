@@ -57,7 +57,8 @@ interface DashboardViewProps {
     | "task"
     | "rum"
     | "firebase"
-    | "view";
+    | "view"
+    | "board";
 }
 
 export default function DashboardView({ filterType }: DashboardViewProps) {
@@ -114,6 +115,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     error: viewsErr,
     mutate: mutateViews,
   } = useSWR(token ? "/views" : null, fetcher);
+  const {
+    data: boardsData,
+    error: boardsErr,
+    mutate: mutateBoards,
+  } = useSWR(token ? "/monitor-board" : null, fetcher);
 
   const hasError =
     serverErr ||
@@ -124,7 +130,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     taskErr ||
     rumErr ||
     firebaseErr ||
-    viewsErr;
+    viewsErr ||
+    boardsErr;
   const isLoading =
     !serverList &&
     !webList &&
@@ -135,6 +142,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     !rumList &&
     !firebaseList &&
     !viewsData &&
+    !boardsData &&
     !hasError;
 
   const isEmpty =
@@ -146,7 +154,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     (taskList?.length || 0) === 0 &&
     (rumList?.length || 0) === 0 &&
     (firebaseList?.length || 0) === 0 &&
-    (viewsData?.views?.length || 0) === 0;
+    (viewsData?.views?.length || 0) === 0 &&
+    (boardsData?.boards?.length || 0) === 0;
 
   useEffect(() => {
     setViewMode(defaultViewMode);
@@ -162,6 +171,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutateRum();
     mutateFirebase();
     mutateViews();
+    mutateBoards();
   };
 
   if (hasError) {
@@ -199,7 +209,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
             Welcome to Senzor
           </h2>
           <p className="max-w-md text-center">
-            Add a "Service" from the sidebar to start monitoring your
+            Add a &quot;Service&quot; from the sidebar to start monitoring your
             infrastructure.
           </p>
         </div>
@@ -226,6 +236,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
     ...(taskList || []).map((t: any) => ({ ...t, type: "task" })),
     ...(monitorList || []).map((m: any) => ({ ...m, type: "monitor" })),
+    ...(boardsData?.boards || []).map((b: any) => ({ ...b, type: "board" })), // Status Boards last (matches sidebar order: after Uptime)
   ];
 
   if (filterType) items = items.filter((i) => i.type === filterType);
@@ -244,6 +255,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     if (item.type === "database") return `/dashboard/db/${item._id}`;
     if (item.type === "firebase") return `/dashboard/firebase/${item._id}`;
     if (item.type === "view") return `/dashboard/views/${item._id}`;
+    if (item.type === "board") return `/dashboard/monitor/board/${item._id}`;
     return `/dashboard/monitor/${item._id}`;
   };
 
@@ -293,6 +305,15 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           className="text-teal-500 border-teal-500/30 bg-teal-500/5"
         >
           CUSTOM
+        </Badge>
+      );
+    if (item.type === "board")
+      return (
+        <Badge
+          variant="outline"
+          className="text-emerald-500 border-emerald-500/30 bg-emerald-500/5"
+        >
+          BOARD
         </Badge>
       );
     if (item.type === "apm") {
@@ -374,6 +395,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         return <Flame className={`h-5 w-5 text-amber-500`} />;
       case "view":
         return <LayoutTemplate className={`h-5 w-5 text-teal-500`} />;
+      case "board":
+        return <LayoutGrid className={`h-5 w-5 text-emerald-500`} />;
       case "monitor":
         return (
           <Activity
@@ -438,6 +461,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           <LayoutGrid className="h-3 w-3" /> {item.widgetCount || 0} Widgets
         </>
       );
+    if (item.type === "board")
+      return (
+        <>
+          <Activity className="h-3 w-3" /> {item.monitorCount || 0} Monitors
+        </>
+      );
     return (
       <>
         <Timer className="h-3 w-3" /> {item.interval}m Check
@@ -454,9 +483,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           ? "Web APM Services"
           : filterType === "view"
             ? "Saved Views"
-            : filterType === "firebase"
-              ? "Firebase Projects"
-              : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
+            : filterType === "board"
+              ? "Status Boards"
+              : filterType === "firebase"
+                ? "Firebase Projects"
+                : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
     : "Global Infra";
 
   return (
@@ -761,6 +792,32 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                         </>
                       )}
 
+                      {item.type === "board" && (
+                        <>
+                          <div
+                            className={`mb-3 p-3 rounded-full bg-emerald-500/10 text-emerald-500`}
+                          >
+                            <LayoutGrid className="h-6 w-6" />
+                          </div>
+
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">
+                            {item.name}
+                          </h3>
+
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
+                            <Activity className="h-3 w-3" /> {item.monitorCount || 0}{" "}
+                            Monitors
+                          </div>
+
+                          <Badge
+                            variant="outline"
+                            className="px-2 py-0 text-[10px] text-emerald-500 border-emerald-500/30 bg-emerald-500/5"
+                          >
+                            BOARD
+                          </Badge>
+                        </>
+                      )}
+
                       {item.type === "monitor" && (
                         <>
                           <div
@@ -846,7 +903,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                                           ? "bg-emerald-500/5"
                                           : item.type === "view"
                                             ? "bg-teal-500/5"
-                                            : "bg-blue-500/5"
+                                            : item.type === "board"
+                                              ? "bg-emerald-500/5"
+                                              : "bg-blue-500/5"
                               }`}
                             >
                               {getIcon(item.type, item.status)}

@@ -14,7 +14,8 @@ export type ServiceType =
   | "monitor"
   | "database"
   | "firebase"
-  | "view";
+  | "view"
+  | "board";
 
 export type ModalMode = "register" | "edit";
 

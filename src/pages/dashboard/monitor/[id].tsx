@@ -15,6 +15,7 @@ import { Activity, Clock, Trash2, AlertTriangle, X, RefreshCw, Globe, Maximize, 
 import { useServiceModal } from '@/components/ServiceModals/context';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
+import { UptimeStrip } from '@/components/MonitorBoard/UptimeStrip';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 
@@ -198,49 +199,6 @@ const DistributionTable = ({ data }: { data: any[] }) => {
     </div>
   )
 };
-
-const UptimeStrip = ({ history }: { history: any[] }) => {
-  const checks = history.slice(0, 60).reverse();
-  const filledChecks = [...Array(Math.max(0, 60 - checks.length)).fill(null), ...checks];
-
-  return (
-    <div className="space-y-2 bg-card/50 p-4 rounded-xl border">
-      <div className="flex justify-between items-center text-xs text-muted-foreground uppercase tracking-wider font-medium">
-        <span>Last 60 Checks</span>
-        <span className="flex items-center gap-2">
-          <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Up</span>
-          <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-destructive" /> Down</span>
-          <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500" /> Timeout</span>
-        </span>
-      </div>
-      <div className="h-8 w-full flex gap-[2px]">
-        {filledChecks.map((run, i) => {
-          if (!run) return <div key={i} className="flex-1 bg-secondary/30 rounded-sm" />;
-
-          let color = "bg-emerald-500";
-          if (run.status === 'down') color = "bg-destructive";
-          if (run.status === 'timeout') color = "bg-yellow-500";
-
-          return (
-            <div
-              key={run._id || i}
-              className={`flex-1 rounded-sm ${color} transition-all hover:scale-y-125 hover:opacity-80 relative group`}
-            >
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-popover border border-border text-[10px] px-2 py-1 rounded shadow-lg z-50 whitespace-nowrap">
-                {new Date(run.createdAt).toLocaleString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit'
-                })} • {run.latency}ms • {run.statusCode || 'Err'}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 const StatCard = ({ title, value, sub, icon: Icon, color, isMono, textColor }: any) => {
   const iconClass = isMono ? 'text-[hsl(var(--chart-mono))]' : color;

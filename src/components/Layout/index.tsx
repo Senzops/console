@@ -500,6 +500,9 @@ export const SidebarSection = ({
     } else if (title === "Uptime") {
       HeaderIconComponent = Activity;
       iconColorClass = "text-emerald-500";
+    } else if (title === "Status Boards") {
+      HeaderIconComponent = LayoutGrid;
+      iconColorClass = "text-emerald-500";
     }
 
     return (
@@ -813,6 +816,7 @@ export const DashboardLayout = ({
   const { mutate: mutateTask } = useSWR(token ? "/task/list" : null, fetcher);
   const { mutate: mutateRum } = useSWR(token ? "/rum/list" : null, fetcher);
   const { mutate: mutateViews } = useSWR(token ? "/views" : null, fetcher);
+  const { mutate: mutateBoards } = useSWR(token ? "/monitor-board" : null, fetcher);
 
   const mutateFns = React.useMemo(
     () => ({
@@ -825,8 +829,9 @@ export const DashboardLayout = ({
       task: mutateTask,
       rum: mutateRum,
       view: mutateViews,
+      board: mutateBoards,
     }),
-    [mutateServers, mutateWeb, mutateMonitors, mutateApm, mutateDb, mutateFirebase, mutateTask, mutateRum, mutateViews],
+    [mutateServers, mutateWeb, mutateMonitors, mutateApm, mutateDb, mutateFirebase, mutateTask, mutateRum, mutateViews, mutateBoards],
   );
 
   return (
@@ -1042,6 +1047,7 @@ const DashboardLayoutInner = ({
   const { data: taskList } = useSWR(token ? "/task/list" : null, fetcher);
   const { data: rumList } = useSWR(token ? "/rum/list" : null, fetcher);
   const { data: viewsList } = useSWR(token ? "/views" : null, fetcher);
+  const { data: boardsData } = useSWR(token ? "/monitor-board" : null, fetcher);
 
   // ENTERPRISE FIX: Hydrate scroll position instantly on mount and intercept scroll events
   useEffect(() => {
@@ -1526,6 +1532,28 @@ const DashboardLayoutInner = ({
                   linkPrefix: "/dashboard/monitor",
                   onAdd: !user.isDemo ? () => openModal('monitor') : undefined,
                   icon: <Activity className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* --- Status Boards (centralized, shareable uptime dashboards) --- */}
+              <SidebarSection
+                title="Status Boards"
+                items={boardsData?.boards}
+                hrefPrefix="/dashboard/monitor/board"
+                linkPrefix="/dashboard/monitor/board"
+                onAdd={!user.isDemo ? () => openModal('board') : undefined}
+                icon={<LayoutGrid className="h-3 w-3 text-emerald-500 shrink-0" />}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "status-boards",
+                  title: "Status Boards",
+                  items: boardsData?.boards,
+                  hrefPrefix: "/dashboard/monitor/board",
+                  linkPrefix: "/dashboard/monitor/board",
+                  onAdd: !user.isDemo ? () => openModal('board') : undefined,
+                  icon: <LayoutGrid className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
                 onMouseLeave={handleSectionMouseLeave}
