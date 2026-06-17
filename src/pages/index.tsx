@@ -21,7 +21,7 @@ const LIFECYCLE_STAGES = [
     label: "Deploy",
     caption: "Ship & validate",
     accent: "#8b5cf6",
-    services: ["Uptime Monitoring", "Log Management"],
+    services: ["Uptime Monitoring", "Status Boards", "Log Management"],
   },
   {
     label: "Operate",

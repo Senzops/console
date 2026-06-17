@@ -1154,6 +1154,60 @@ const DiagramUptime = () => (
   </DiagramFrame>
 );
 
+/** Status Boards — Centralized, shareable status page with per-monitor stripes */
+const DiagramStatusBoard = () => {
+  const monitors = [
+    { name: "api.production.com", up: true, uptime: "99.98%", downAt: -1 },
+    { name: "app.production.com", up: true, uptime: "99.91%", downAt: -1 },
+    { name: "checkout.api.com", up: false, uptime: "98.40%", downAt: 17 },
+  ];
+  return (
+    <DiagramFrame className="relative">
+      <ShimmerOverlay />
+      <FrameHeader
+        title="Production Status"
+        icon={<LayoutTemplate className="w-3.5 h-3.5 text-emerald-500" />}
+        badge={{ label: "PUBLIC · 30d", style: BADGE_STYLE.uptime }}
+      />
+      <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center">
+        {monitors.map((m, idx) => (
+          <div
+            key={idx}
+            className="bg-background border border-border/50 rounded-lg p-2.5 shadow-sm animate-[diag-fade-in-up_0.4s_ease-out_both]"
+            style={{ animationDelay: `${idx * 0.1}s` }}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full shrink-0 ${m.up ? "bg-emerald-500" : "bg-red-500"}`}
+                />
+                <span className="text-[10px] font-mono font-semibold text-foreground truncate">
+                  {m.name}
+                </span>
+              </div>
+              <span className="text-[9px] font-mono font-bold text-muted-foreground">
+                {m.uptime}
+              </span>
+            </div>
+            {/* Range-aware availability stripe (24 buckets) */}
+            <div className="flex items-center gap-px h-3">
+              {Array.from({ length: 24 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`flex-1 rounded-[1px] h-full origin-bottom animate-[diag-bar-grow_0.4s_ease-out_both] ${
+                    m.downAt >= 0 && i === m.downAt ? "bg-red-500" : "bg-emerald-500/70"
+                  }`}
+                  style={{ animationDelay: `${idx * 0.1 + i * 0.012}s` }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </DiagramFrame>
+  );
+};
+
 /** Alerts & Incident Routing — Evaluation rule with animated routing */
 const DiagramAlerts = () => (
   <DiagramFrame>
@@ -1394,6 +1448,8 @@ export const renderDiagram = (id: string): React.ReactNode => {
       return <DiagramAlerts />;
     case "uptime":
       return <DiagramUptime />;
+    case "status-boards":
+      return <DiagramStatusBoard />;
     case "firebase":
       return <DiagramFirebase />;
     default:
@@ -1585,6 +1641,22 @@ export const FEATURES_DATA: FeatureData[] = [
     diagramId: "uptime",
     href: "/features/uptime",
     colorClasses: "text-green-500 bg-green-500/10 border-green-500/20",
+  },
+  {
+    id: "status-boards",
+    title: "Status Boards",
+    subtitle: "One shareable status page for your whole stack.",
+    description:
+      "Compose your uptime monitors into a centralized, drag-and-drop board with resizable cards and range-aware availability stripes — then publish it as a public, view-only status page.",
+    points: [
+      "Centralized, multi-monitor overview",
+      "Drag-to-arrange, resizable cards",
+      "Range-aware uptime & latency",
+      "Public, revocable, expiring share links",
+    ],
+    diagramId: "status-boards",
+    href: "/features/status-boards",
+    colorClasses: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
   },
   {
     id: "ai-assistant",
