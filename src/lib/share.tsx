@@ -22,23 +22,36 @@ export const publicApi = axios.create({
 interface ShareContextValue {
   readOnly: boolean;
   token?: string;
+  scopeId?: string;
 }
 
 const ShareContext = createContext<ShareContextValue>({ readOnly: false });
 
 export const ShareProvider = ({
   token,
+  scopeId,
   children,
 }: {
   token: string;
+  scopeId: string;
   children: React.ReactNode;
 }) => (
-  <ShareContext.Provider value={{ readOnly: true, token }}>
+  <ShareContext.Provider value={{ readOnly: true, token, scopeId }}>
     {children}
   </ShareContext.Provider>
 );
 
 export const useShareMode = () => useContext(ShareContext);
+
+/**
+ * Resolves the dashboard's resource id. On authenticated pages this is the route
+ * param; on the public share page there is no route id, so it comes from the
+ * share context. Lets a dashboard component work in both modes unchanged.
+ */
+export const useShareScopeId = (routerId?: string): string | undefined => {
+  const { scopeId } = useContext(ShareContext);
+  return scopeId ?? routerId;
+};
 
 /**
  * Returns a `fetcher` (for SWR) and a `get` that target either the authenticated

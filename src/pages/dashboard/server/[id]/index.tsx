@@ -2,6 +2,8 @@ import React, { createContext, useContext, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
+import { useShareApi, useShareMode, useShareScopeId } from '../../../../lib/share';
+import { ShareButton } from '../../../../components/ShareModal';
 import { useTheme } from '../../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, cn, DataError } from '../../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../../components/TimeRangePicker';
@@ -267,8 +269,10 @@ const UptimeStrip = ({ uptime }: { uptime: any[] }) => {
 
 export default function ServerDetail() {
   const router = useRouter();
-  const { id } = router.query;
+  const id = useShareScopeId(router.query.id as string | undefined);
   const { token } = useAuth();
+  const { fetcher } = useShareApi();
+  const { readOnly } = useShareMode();
   const { isMono } = useTheme(); // Get Monochromatic state
 
   const retentionDays = usePlanRetention();
@@ -278,8 +282,8 @@ export default function ServerDetail() {
   const { openModal } = useServiceModal();
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/vps/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null, 
-    fetcher, 
+    (token || readOnly) && id ? `/vps/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null,
+    fetcher,
     { refreshInterval: 60000 }
   );
 
@@ -414,12 +418,17 @@ export default function ServerDetail() {
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>
-            <Button variant="outline" size="icon" onClick={openEdit}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {!readOnly && <ShareButton scopeType="vps" scopeId={id as string} dashboardName={vps?.name} />}
+            {!readOnly && (
+              <Button variant="outline" size="icon" onClick={openEdit}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {!readOnly && (
+              <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 

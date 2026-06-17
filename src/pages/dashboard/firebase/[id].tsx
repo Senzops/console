@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
+import { useShareApi, useShareMode, useShareScopeId } from '../../../lib/share';
+import { ShareButton } from '../../../components/ShareModal';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
@@ -293,8 +295,10 @@ const ProviderDistribution = ({ providers }: { providers: any }) => {
 
 export default function FirebaseDetail() {
   const router = useRouter();
-  const { id } = router.query;
+  const id = useShareScopeId(router.query.id as string | undefined);
   const { token } = useAuth();
+  const { fetcher } = useShareApi();
+  const { readOnly } = useShareMode();
 
   const { openModal } = useServiceModal();
   const retentionDays = usePlanRetention();
@@ -304,7 +308,7 @@ export default function FirebaseDetail() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/firebase/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null,
+    (token || readOnly) && id ? `/firebase/${id}/stats?${buildTimeRangeQuery(timeRange)}` : null,
     fetcher,
     { refreshInterval: 60000 }
   );
@@ -414,12 +418,17 @@ export default function FirebaseDetail() {
             <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
                 <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             </Button>
-            <Button variant="outline" size="icon" onClick={openEdit}>
+            {!readOnly && <ShareButton scopeType="firebase" scopeId={id as string} dashboardName={data?.service?.name} />}
+            {!readOnly && (
+              <Button variant="outline" size="icon" onClick={openEdit}>
                 <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}>
+              </Button>
+            )}
+            {!readOnly && (
+              <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}>
                 <Trash2 className="h-4 w-4" />
-            </Button>
+              </Button>
+            )}
           </div>
         </div>
 

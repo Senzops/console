@@ -11,6 +11,8 @@ import React, {
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../../lib/auth";
+import { useShareApi, useShareMode, useShareScopeId } from "../../../../lib/share";
+import { ShareButton } from "../../../../components/ShareModal";
 import { useTheme } from "../../../../lib/theme";
 import {
   Card,
@@ -471,8 +473,10 @@ const TasksTable = ({ tasks, router, serviceId }: any) => {
 // --- MAIN DASHBOARD PAGE ---
 export default function TaskServiceDashboard() {
   const router = useRouter();
-  const { id } = router.query;
+  const id = useShareScopeId(router.query.id as string | undefined);
   const { token } = useAuth();
+  const { fetcher } = useShareApi();
+  const { readOnly } = useShareMode();
   const { isMono } = useTheme();
 
   const retentionDays = usePlanRetention();
@@ -485,7 +489,7 @@ export default function TaskServiceDashboard() {
 
   const endpoint = `/task/${id}/dashboard?${rangeQuery}`;
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? endpoint : null,
+    (token || readOnly) && id ? endpoint : null,
     fetcher,
     { refreshInterval: 30000 },
   );
@@ -633,20 +637,27 @@ export default function TaskServiceDashboard() {
                   className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`}
                 />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={openEdit}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() => setIsDeleteOpen(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {!readOnly && (
+                <ShareButton scopeType="task" scopeId={id as string} dashboardName={data?.service?.name} />
+              )}
+              {!readOnly && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={openEdit}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {!readOnly && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => setIsDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>

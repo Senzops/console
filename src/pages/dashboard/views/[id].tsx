@@ -3,6 +3,8 @@ import { useRouter } from "next/router";
 import useSWR from "swr";
 import Editor from "@monaco-editor/react";
 import { api, useAuth } from "../../../lib/auth";
+import { useShareApi, useShareMode, useShareScopeId } from "../../../lib/share";
+import { ShareButton } from "../../../components/ShareModal";
 import { useTheme } from "../../../lib/theme";
 import { WorldMap } from "../../../components/WorldMap";
 import {
@@ -1426,6 +1428,8 @@ const WidgetWrapper = ({
   const [isMaximized, setIsMaximized] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const headerActionsRef = useRef<HTMLDivElement>(null);
+  // Share-aware: routes to the public widget-data endpoint when viewed via a share link.
+  const { fetcher } = useShareApi();
 
   const { data, error, isValidating } = useSWR(
     `/views/widgets/${widget._id}/data?${rangeQuery}`,
@@ -1558,8 +1562,10 @@ const WidgetWrapper = ({
 // --- Main Canvas Dashboard ---
 export default function CustomDashboardView() {
   const router = useRouter();
-  const { id } = router.query;
+  const id = useShareScopeId(router.query.id as string | undefined);
   const { token } = useAuth();
+  const { fetcher } = useShareApi();
+  const { readOnly } = useShareMode();
   const { theme, isMono } = useTheme();
 
   const retentionDays = usePlanRetention();
@@ -1606,7 +1612,7 @@ export default function CustomDashboardView() {
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/views/${id}` : null,
+    (token || readOnly) && id ? `/views/${id}` : null,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -1890,21 +1896,28 @@ export default function CustomDashboardView() {
                 className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`}
               />
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              onClick={openEditView}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="destructive" 
-              size="icon"
-              onClick={() => setIsDeleteViewOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {!readOnly && (
+              <ShareButton scopeType="savedview" scopeId={id as string} dashboardName={view?.name} />
+            )}
+            {!readOnly && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                onClick={openEditView}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {!readOnly && (
+              <Button
+                variant="destructive"
+                size="icon"
+                onClick={() => setIsDeleteViewOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1975,8 +1988,8 @@ export default function CustomDashboardView() {
         </div>
       </div>
 
-      {/* --- FLOATING EDIT MODE DOCK --- */}
-      {isEditing ? (
+      {/* --- FLOATING EDIT MODE DOCK (hidden entirely in read-only share view) --- */}
+      {!readOnly && (isEditing ? (
         <div className="fixed bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 md:left-[calc(50vw+8rem)] w-[calc(100%-2rem)] max-w-fit bg-card/95 backdrop-blur-md border border-border/80 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] px-3 py-2.5 md:px-6 md:py-3 rounded-full flex items-center justify-center gap-2 md:gap-6 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-2 md:pr-4 md:border-r border-border/40 shrink-0">
             <div className="h-2 w-2 rounded-full bg-teal-500 animate-pulse" />
@@ -2032,7 +2045,7 @@ export default function CustomDashboardView() {
             <Edit3 className="h-5 w-5 group-hover:scale-110 transition-transform" />
           </Button>
         </div>
-      )}
+      ))}
 
       {/* --- ENTERPRISE WIDGET BUILDER MODAL --- */}
       {isBuilderOpen && (

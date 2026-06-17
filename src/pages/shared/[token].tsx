@@ -7,6 +7,17 @@ import { Spinner } from "@/components/Core";
 import { publicApi, ShareProvider } from "@/lib/share";
 import { ServiceModalProvider } from "@/components/ServiceModals/context";
 import ApmView from "@/components/ApmView";
+// Authenticated dashboard pages reused read-only on the public share page.
+// In share mode they resolve their resource id from ShareProvider (useShareScopeId)
+// and route all reads through the public share endpoints (useShareApi).
+import MonitorDetail from "@/pages/dashboard/monitor/[id]";
+import DatabaseDetail from "@/pages/dashboard/db/[id]";
+import FirebaseDetail from "@/pages/dashboard/firebase/[id]";
+import WebDetail from "@/pages/dashboard/web/[id]";
+import ServerDetail from "@/pages/dashboard/server/[id]";
+import RumDashboard from "@/pages/dashboard/rum/[id]";
+import TaskServiceDashboard from "@/pages/dashboard/task/[id]";
+import CustomDashboardView from "@/pages/dashboard/views/[id]";
 import { Unlink, Clock, ArrowRight, Eye } from "lucide-react";
 
 interface ShareMeta {
@@ -29,6 +40,22 @@ const SharedDashboardBody = ({ meta }: { meta: ShareMeta }) => {
   switch (meta.scopeType) {
     case "apm":
       return <ApmView serviceId={meta.scopeId} />;
+    case "rum":
+      return <RumDashboard />;
+    case "uptime":
+      return <MonitorDetail />;
+    case "database":
+      return <DatabaseDetail />;
+    case "firebase":
+      return <FirebaseDetail />;
+    case "task":
+      return <TaskServiceDashboard />;
+    case "web":
+      return <WebDetail />;
+    case "vps":
+      return <ServerDetail />;
+    case "savedview":
+      return <CustomDashboardView />;
     default:
       return (
         <div className="max-w-md mx-auto text-center py-24 px-6">
@@ -120,24 +147,30 @@ export default function SharedDashboardPage() {
         <title>{`${meta.name} · Shared dashboard`}</title>
       </Head>
 
-      <div className="bg-background text-foreground">
+      {/* Mirrors the authenticated dashboard layout: a fixed-height (h-screen)
+          flex column with a single internally-scrolling region. This gives the
+          dashboard's `h-full` loading spinner a definite parent height (so it
+          fills the viewport, centered), while the footer lives INSIDE the scroll
+          region after the content — so during loading it sits just below the
+          fold (not visible) and after load it flows naturally at the end. No
+          flicker, no footer riding up. */}
+      <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
         {/* --- Dashboard body in read-only mode (no top chrome — the dashboard's
             own header carries the title/time range).
             ShareProvider routes all reads to the public share endpoints.
             ServiceModalProvider satisfies the dashboard's modal hook (no-op here;
             all mutation controls are hidden in read-only mode). */}
-        <main>
-          <ShareProvider token={token as string}>
+        <main className="flex-1 overflow-y-auto">
+          <ShareProvider token={token as string} scopeId={meta.scopeId}>
             <ServiceModalProvider mutateFns={{}}>
               <SharedDashboardBody meta={meta} />
             </ServiceModalProvider>
           </ShareProvider>
-        </main>
 
-        {/* --- Informative footer (detached, at the end of the dashboard).
-            Clean and balanced: brand + share status on one row, then a divider
-            and copyright line — mirrors the main footer's tokens. --- */}
-        <footer className="border-t border-border bg-card/40 mt-12">
+          {/* --- Informative footer (inside the scroll region, at the end of the
+              dashboard). Clean and balanced: brand + share status on one row,
+              then a divider and copyright line — mirrors the main footer. --- */}
+          <footer className="border-t border-border bg-card/40 mt-12">
           <div className="max-w-7xl mx-auto px-6 md:px-8 py-10">
             {/* Brand + share status */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-8">
@@ -182,7 +215,8 @@ export default function SharedDashboardPage() {
               </Link>
             </div>
           </div>
-        </footer>
+          </footer>
+        </main>
       </div>
     </>
   );

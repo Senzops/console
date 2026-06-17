@@ -8,6 +8,8 @@ import React, {
 import { useRouter } from "next/router";
 import useSWR from "swr";
 import { api, useAuth } from "../../../../lib/auth";
+import { useShareApi, useShareMode, useShareScopeId } from "../../../../lib/share";
+import { ShareButton } from "../../../../components/ShareModal";
 import { useTheme } from "../../../../lib/theme";
 import {
   Card,
@@ -540,9 +542,11 @@ const computePathsFallback = (traces: any[]) => {
 // --- MAIN VIEW ---
 export default function RumDashboard() {
   const router = useRouter();
-  const { id } = router.query;
+  const id = useShareScopeId(router.query.id as string | undefined);
   const pathFilter = router.query.path as string | undefined; // Reads path from query for dynamic filtering
   const { token } = useAuth();
+  const { fetcher } = useShareApi();
+  const { readOnly } = useShareMode();
   const { isMono } = useTheme();
 
   const { openModal } = useServiceModal();
@@ -557,7 +561,7 @@ export default function RumDashboard() {
     `/rum/${id}/dashboard?${rangeQuery}` +
     (pathFilter ? `&path=${encodeURIComponent(pathFilter)}` : "");
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? endpoint : null,
+    (token || readOnly) && id ? endpoint : null,
     fetcher,
     { refreshInterval: 30000 },
   );
@@ -716,20 +720,27 @@ export default function RumDashboard() {
                   className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`}
                 />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={openEdit}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() => setIsDeleteOpen(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {!readOnly && (
+                <ShareButton scopeType="rum" scopeId={id as string} dashboardName={data?.service?.name} />
+              )}
+              {!readOnly && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={openEdit}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {!readOnly && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => setIsDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
