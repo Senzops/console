@@ -220,17 +220,20 @@ const DistributionTable = ({ data, router, id }: { data: any[], router: any, id:
   )
 };
 
-// --- Uptime Strip (Unchanged logic) ---
-const UptimeStrip = ({ history }: { history: any[] }) => {
+// --- Uptime Strip ---
+// Fed by the dedicated `uptime` series (fixed last-60-minutes, 1-minute
+// resolution) from the API — independent of the chart's selected range.
+const UptimeStrip = ({ uptime }: { uptime: any[] }) => {
   const blocks = useMemo(() => {
-    if (!history || history.length === 0) return [];
-    // Ensure we only ever map the last 60 minutes for visual readability
-    const recentHistory = history.slice(-60);
-    return recentHistory.map((run: any) => ({
+    if (!uptime || uptime.length === 0) return [];
+    // The series is already the last hour at 1-minute resolution; cap at 60
+    // segments for visual readability.
+    const recent = uptime.slice(-60);
+    return recent.map((run: any) => ({
       status: run.isOnline === false ? 'down' : 'up',
       time: run.createdAt
     }));
-  }, [history]);
+  }, [uptime]);
 
   const uptimePct = useMemo(() => {
      if(!blocks.length) return 0;
@@ -280,7 +283,7 @@ export default function ServerDetail() {
     { refreshInterval: 60000 }
   );
 
-  const { vps, history } = data || {};
+  const { vps, history, uptime } = data || {};
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -420,7 +423,7 @@ export default function ServerDetail() {
           </div>
         </div>
 
-        <UptimeStrip history={history} />
+        <UptimeStrip uptime={uptime} />
 
         {/* Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
