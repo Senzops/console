@@ -611,7 +611,236 @@ export const IncidentDetailSkeleton = () => (
   </SkeletonScreen>
 )
 
+/**
+ * A card with a titled header bar (title + optional right-side badge) over a
+ * table (column header + rows). Mirrors the many "section card" tables across
+ * the app (members, billing history, etc.) which wrap a table in a CardHeader.
+ */
+export const SkeletonTitledTableCard = ({
+  columns = 5,
+  rows = 5,
+  rightBadge = true,
+}: {
+  columns?: number
+  rows?: number
+  rightBadge?: boolean
+}) => (
+  <Card className="overflow-hidden">
+    <div className="py-4 px-6 border-b border-border/40 flex items-center justify-between h-14 bg-muted/20">
+      <Skeleton className="h-4 w-40" />
+      {rightBadge && <SkeletonPill className="w-16" />}
+    </div>
+    <div className="bg-muted/30 px-6 py-3 flex gap-6">
+      {Array.from({ length: columns }).map((_, i) => (
+        <Skeleton key={i} className="h-3 flex-1" />
+      ))}
+    </div>
+    <div className="divide-y divide-border">
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="px-6 py-4 flex gap-6 items-center">
+          {Array.from({ length: columns }).map((_, c) => (
+            <Skeleton key={c} className="h-4 flex-1" />
+          ))}
+        </div>
+      ))}
+    </div>
+  </Card>
+)
+
+// The hexagon clip-path used by the global dashboard's honeycomb grid
+// (mirrors HEX_CLIP in components/DashboardView).
+const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)"
+
+/** A single hexagon resource tile (icon, name, meta, status badge). */
+const SkeletonHexTile = () => (
+  <div
+    className="w-[190px] h-[220px] bg-card flex flex-col items-center justify-center p-6 shadow-lg"
+    style={{ clipPath: HEX_CLIP }}
+  >
+    <Skeleton className="h-12 w-12 rounded-full mb-3" />
+    <Skeleton className="h-3.5 w-24 mb-2" />
+    <Skeleton className="h-2.5 w-16 mb-3" />
+    <SkeletonPill className="w-14" />
+  </div>
+)
+
 // --- Page-level skeletons -----------------------------------------------------
+
+/**
+ * Global dashboard (components/DashboardView, the /dashboard home). Uses its own
+ * `flex h-full` shell (not SkeletonScreen): a header (title + count + search +
+ * grid/list toggle) and either the honeycomb hexagon grid or a resource table,
+ * matched to the active `viewMode`.
+ */
+export const GlobalDashboardSkeleton = ({
+  viewMode = "grid",
+}: {
+  viewMode?: "grid" | "list"
+}) => (
+  <div role="status" aria-busy="true" aria-live="polite" className="flex flex-col h-full">
+    <span className="sr-only">Loading dashboard</span>
+    {/* Header */}
+    <div className="p-8 pb-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-32" />
+      </div>
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-9 w-64 rounded-md hidden md:block" />
+        <Skeleton className="h-9 w-20 rounded-lg" />
+      </div>
+    </div>
+    {/* Content */}
+    <div className="flex-1 overflow-y-auto p-8">
+      {viewMode === "list" ? (
+        <div className="max-w-[1400px] mx-auto">
+          <SkeletonTitledTableCard columns={4} rows={12} rightBadge={false} />
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-center gap-y-4 px-8">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="-mx-3 even:mt-16">
+              <SkeletonHexTile />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)
+
+/**
+ * Organization detail (pages/dashboard/organization). Mirrors the dominant
+ * authenticated view: page heading, identity card (cover + avatar + meta),
+ * Plan & Usage split card, Data Breakdown card, and Billing History table.
+ */
+export const OrganizationSkeleton = ({
+  variant = "detail",
+}: {
+  /** "detail" = an org is active (identity + billing); "list" = personal context,
+   *  the organizations-list view (header + table). */
+  variant?: "detail" | "list"
+}) => {
+  if (variant === "list") {
+    return (
+      <SkeletonScreen label="Loading organizations" className="max-w-5xl pb-24">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-6 w-44" />
+              <SkeletonPill className="w-12" />
+            </div>
+            <Skeleton className="h-3 w-72 max-w-full" />
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <SkeletonIconButton />
+            <Skeleton className="h-9 w-44 rounded-md" />
+          </div>
+        </div>
+        <SkeletonTitledTableCard columns={4} rows={5} />
+      </SkeletonScreen>
+    )
+  }
+
+  return (
+    <SkeletonScreen label="Loading organization" className="max-w-5xl pb-24">
+      {/* Heading */}
+    <div className="space-y-2">
+      <Skeleton className="h-8 w-56" />
+      <Skeleton className="h-4 w-96 max-w-full" />
+    </div>
+
+    {/* 1. Identity card */}
+    <Card className="overflow-hidden">
+      <Skeleton className="h-32 w-full !rounded-none" />
+      <CardContent className="p-6 md:p-8 pt-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-12">
+          <Skeleton className="h-24 w-24 rounded-2xl shrink-0" />
+          <div className="flex-1 space-y-2 pb-1">
+            <Skeleton className="h-6 w-48" />
+            <div className="flex items-center gap-4 flex-wrap">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+          </div>
+          <Skeleton className="h-9 w-28 rounded-md" />
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* 2. Plan & Usage card */}
+    <Card className="overflow-hidden">
+      <div className="py-4 px-6 border-b border-border/40 flex items-center justify-between h-14 bg-muted/20">
+        <Skeleton className="h-4 w-32" />
+        <SkeletonPill className="w-20" />
+      </div>
+      <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-border/40">
+        <div className="p-6 lg:w-1/2 space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex justify-between items-center border-b border-border/40 pb-3 last:border-0">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          ))}
+        </div>
+        <div className="p-6 lg:w-1/2 space-y-5">
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-2.5 w-full rounded-full" />
+          <div className="grid grid-cols-2 gap-4 pt-4">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-2.5 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    {/* 3. Data Breakdown card */}
+    <Card className="overflow-hidden">
+      <div className="p-6 border-b border-border/40 bg-muted/20">
+        <Skeleton className="h-5 w-40" />
+      </div>
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-2 w-full rounded-full" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-lg border border-border/40 bg-card space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+
+    {/* 4. Billing History */}
+    <SkeletonTitledTableCard columns={4} rows={4} rightBadge={false} />
+    </SkeletonScreen>
+  )
+}
+
+/**
+ * Organization members (pages/dashboard/organization/members). Header + the
+ * team-members table card; the invitations table follows for managers.
+ */
+export const MembersSkeleton = () => (
+  <SkeletonScreen label="Loading members" className="max-w-5xl pb-24">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-3 w-80 max-w-full" />
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <SkeletonIconButton />
+        <Skeleton className="h-9 w-28 rounded-md" />
+      </div>
+    </div>
+    <SkeletonTitledTableCard columns={5} rows={5} />
+  </SkeletonScreen>
+)
 
 /**
  * Reference skeleton for the Server detail dashboard

@@ -29,7 +29,6 @@ import { api, useAuth } from "../../lib/auth";
 import Link from "next/link";
 import {
   Badge,
-  Spinner,
   Button,
   Card,
   CardContent,
@@ -38,6 +37,7 @@ import {
   cn,
   DataError,
 } from "../Core";
+import { GlobalDashboardSkeleton } from "../Skeletons";
 import { formatDistanceToNow } from "date-fns";
 import { useTheme } from "@/lib/theme";
 
@@ -185,13 +185,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
   }
 
   if (isLoading) {
-    return (
-      <>
-        <div className="h-full flex items-center justify-center">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-        </div>
-      </>
-    );
+    return <GlobalDashboardSkeleton viewMode={viewMode} />;
   }
 
   if (isEmpty) {

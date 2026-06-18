@@ -16,8 +16,9 @@ import {
   cn,
   Avatar,
 } from "../../../components/Core";
+import { OrganizationSkeleton } from "../../../components/Skeletons";
 import { useAuth, api } from "../../../lib/auth";
-import { useOrg, Organization } from "../../../lib/org";
+import { useOrg, Organization, hasStoredActiveOrg } from "../../../lib/org";
 import { toast } from "sonner";
 import {
   Building2,
@@ -168,11 +169,9 @@ export default function OrganizationPage() {
   // Without this, there's a flicker: "No Organizations" empty state → then the actual
   // org detail view appears once activeOrg is restored from sessionStorage.
   if (!isReady || orgListLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Spinner className="h-8 w-8 text-emerald-500" />
-      </div>
-    );
+    // Predict the landing layout: org-detail when an org is active/stored,
+    // otherwise the personal organizations-list view.
+    return <OrganizationSkeleton variant={activeOrg || hasStoredActiveOrg() ? "detail" : "list"} />;
   }
 
   if (!activeOrg) {

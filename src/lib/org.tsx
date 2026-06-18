@@ -85,6 +85,22 @@ function getStoredOrgId(): string | null {
   return null;
 }
 
+/**
+ * Synchronously reports whether an active org is persisted (sessionStorage).
+ * Lets loading states predict which way the org page will resolve — the
+ * org-detail view (an org is stored) vs the personal organizations-list view
+ * (no stored org) — so the skeleton can match the landing layout.
+ */
+export function hasStoredActiveOrg(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const s = sessionStorage.getItem(ORG_STORAGE_KEY);
+    return !!s && !!JSON.parse(s)?._id;
+  } catch {
+    return false;
+  }
+}
+
 // Initialize the header synchronously at module load time
 const _initialOrgId = getStoredOrgId();
 

@@ -20,6 +20,7 @@ import {
   SelectContent,
   SelectItem,
 } from "../../../components/Core";
+import { MembersSkeleton } from "../../../components/Skeletons";
 import { useAuth, api } from "../../../lib/auth";
 import { useOrg } from "../../../lib/org";
 import { toast } from "sonner";
@@ -130,11 +131,7 @@ export default function MembersPage() {
   // Prevents flicker of "No Organization Selected" when the org is
   // actually being restored from sessionStorage.
   if (!isReady || orgListLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Spinner className="h-8 w-8 text-emerald-500" />
-      </div>
-    );
+    return <MembersSkeleton />;
   }
 
   if (!activeOrg) {
