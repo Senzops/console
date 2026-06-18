@@ -11,7 +11,6 @@ import {
   Badge,
   Input,
   Button,
-  Spinner,
   DataError,
   Select,
   SelectTrigger,
@@ -19,6 +18,7 @@ import {
   SelectContent,
   SelectItem,
 } from "../../../components/Core";
+import { TablePageSkeleton } from "../../../components/Skeletons";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
@@ -198,16 +198,7 @@ export default function GlobalErrorsDashboard() {
   }, [data?.trend, spanMs]);
 
   if (!data && !error && isLoading)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">
-            Connecting to Error Trackers...
-          </p>
-        </div>
-      </>
-    );
+    return <TablePageSkeleton stats={4} chart actions={1} columns={6} rows={8} label="Loading error tracker" />;
 
   if (error)
     return (

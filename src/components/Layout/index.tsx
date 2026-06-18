@@ -4,6 +4,7 @@ import { useAuth, api } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
 import { useRouter } from "next/router";
 import { Button, Dialog, Avatar, Spinner, Badge, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../Core";
+import { SkeletonSidebarItems } from "../Skeletons";
 import {
   Plus,
   Copy,
@@ -590,11 +591,7 @@ export const SidebarSection = ({
               isAnyChildActive ? "border-primary/50" : "border-border/30",
             )}
           >
-            {!items && (
-              <div className="flex justify-center py-3">
-                <Spinner className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            )}
+            {!items && <SkeletonSidebarItems count={2} />}
 
             {visibleItems?.map((item: any) => {
               const isActive = router.asPath.includes(

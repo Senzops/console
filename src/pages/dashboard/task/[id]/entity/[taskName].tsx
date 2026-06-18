@@ -19,9 +19,9 @@ import {
   CardTitle,
   Badge,
   Button,
-  Spinner,
   DataError,
 } from "../../../../../components/Core";
+import { DetailPageSkeleton } from "../../../../../components/Skeletons";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
@@ -484,14 +484,7 @@ export default function TaskEntityDetail() {
   );
 
   if (!data && !error)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Loading Task Signature...</p>
-        </div>
-      </>
-    );
+    return <DetailPageSkeleton badgeInline stats={4} chart table label="Loading task signature" />;
   if (error)
     return (
       <>

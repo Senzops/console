@@ -24,6 +24,7 @@ import {
   SelectItem,
   cn,
 } from "../../../components/Core";
+import { DetailPageSkeleton } from "../../../components/Skeletons";
 import {
   ArrowLeft,
   Plus,
@@ -844,14 +845,7 @@ export default function AlertPolicyDetail() {
   };
 
   if (!data && !error)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Loading Alert Policy...</p>
-        </div>
-      </>
-    );
+    return <DetailPageSkeleton badgeInline headerActions={2} table label="Loading alert policy" />;
   if (error)
     return (
       <>

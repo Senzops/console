@@ -10,9 +10,9 @@ import {
   CardTitle,
   Badge,
   Button,
-  Spinner,
   DataError,
 } from "../../../components/Core";
+import { DetailPageSkeleton } from "../../../components/Skeletons";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
@@ -186,16 +186,7 @@ export default function ErrorDetailPage() {
   }, [data?.trend, spanMs]);
 
   if (!data && !error)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">
-            Connecting to Error Tracker...
-          </p>
-        </div>
-      </>
-    );
+    return <DetailPageSkeleton chart table label="Loading error details" />;
 
   if (error)
     return (

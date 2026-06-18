@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
-import { Card, CardContent, CardHeader, CardTitle, Button, Spinner, Badge } from '../../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '../../../../components/Core';
+import { MediaDetailSkeleton } from '../../../../components/Skeletons';
 import { AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, Route, Activity, Maximize2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -29,7 +30,7 @@ export default function TraefikDetail() {
       }));
   }, [history]);
 
-  if (!data) return <><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-emerald-500" /></div></>;
+  if (!data) return <MediaDetailSkeleton stats={3} charts={2} label="Loading Traefik metrics" />;
 
   const latest = history && history.length > 0 ? history[0].metrics?.traefik || {} : {};
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;

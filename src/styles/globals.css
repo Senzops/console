@@ -309,3 +309,43 @@
     stroke-dashoffset: 0;
   }
 }
+
+/*
+   SKELETON — content placeholder (components/Core <Skeleton />)
+   A muted block with a soft highlight sweeping across it left-to-right,
+   signalling that the real content's layout is loading in place (so there is
+   no layout shift when data arrives). Base is `--muted`; the sweep is a
+   translucent `--foreground` highlight, so it adapts to light/dark themes. */
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: hsl(var(--muted));
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(var(--foreground) / 0.06) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+/* Respect reduced-motion: a static muted block reads as a placeholder without
+   the sweeping motion, which can be distracting/nauseating for some users. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    display: none;
+  }
+}

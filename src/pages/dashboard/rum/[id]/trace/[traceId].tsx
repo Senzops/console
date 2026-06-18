@@ -4,11 +4,11 @@ import useSWR from "swr";
 import { api, useAuth } from "../../../../../lib/auth";
 import {
   Button,
-  Spinner,
   Card,
   Badge,
   CardContent,
 } from "../../../../../components/Core";
+import { DetailPageSkeleton } from "../../../../../components/Skeletons";
 import {
   ArrowLeft,
   Clock,
@@ -105,16 +105,7 @@ export default function RumTraceDetail() {
   );
 
   if (!data && !error)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">
-            Reconstructing Web Waterfall...
-          </p>
-        </div>
-      </>
-    );
+    return <DetailPageSkeleton badgeInline chart table label="Loading trace waterfall" />;
 
   if (error || !data?.trace)
     return (

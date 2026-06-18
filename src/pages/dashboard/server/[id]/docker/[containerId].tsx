@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api } from '../../../../../lib/auth';
 import { useTheme } from '../../../../../lib/theme';
-import { Card, CardHeader, CardTitle, Badge, Button, CardContent, Spinner } from '../../../../../components/Core';
+import { Card, CardHeader, CardTitle, Badge, Button, CardContent } from '../../../../../components/Core';
+import { MediaDetailSkeleton } from '../../../../../components/Skeletons';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, Box, Maximize, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -63,7 +64,7 @@ export default function DockerDetail() {
     }).filter(Boolean);
   }, [history, containerId]);
 
-  if (!data) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Loading Container Data...</p></div></>;
+  if (!data) return <MediaDetailSkeleton charts={4} label="Loading container metrics" />;
 
   const latestRun = history[history.length - 1];
   const containerCurrent = latestRun?.metrics.docker.find((c: any) => c.id === containerId);

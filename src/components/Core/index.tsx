@@ -41,6 +41,18 @@ export const Spinner = ({ className, label = "Loading", ...props }: SpinnerProps
   </svg>
 )
 
+// --- Skeleton ---
+// A theme-aware content placeholder with a soft shimmer (see `.skeleton` in
+// globals.css). Use it to mirror the shape of content that is still loading so
+// the layout doesn't shift when data arrives. Size/shape via className, e.g.
+// <Skeleton className="h-4 w-32" /> or <Skeleton className="h-9 w-9 rounded-full" />.
+// Purely decorative: it is aria-hidden, so the loading state must be announced
+// by an ancestor (e.g. a container with role="status" aria-busy).
+export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
+export const Skeleton = ({ className, ...props }: SkeletonProps) => (
+  <div aria-hidden="true" className={cn("skeleton rounded-md", className)} {...props} />
+)
+
 // --- Card ---
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div ref={ref} className={cn("rounded-xl border bg-card text-card-foreground shadow-sm", className)} {...props} />

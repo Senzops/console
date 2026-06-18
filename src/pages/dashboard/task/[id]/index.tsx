@@ -25,6 +25,7 @@ import {
   Dialog,
   DataError,
 } from "../../../../components/Core";
+import { TaskDashboardSkeleton } from "../../../../components/Skeletons";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
@@ -526,15 +527,7 @@ export default function TaskServiceDashboard() {
     [spanMs],
   );
 
-  if (!data && !error)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Connecting to Task Service...</p>
-        </div>
-      </>
-    );
+  if (!data && !error) return <TaskDashboardSkeleton />;
   if (error)
     return (
       <>

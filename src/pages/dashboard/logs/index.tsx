@@ -14,6 +14,7 @@ import {
   Spinner,
   DataError,
 } from "../../../components/Core";
+import { TablePageSkeleton } from "../../../components/Skeletons";
 import {
   TimeRangePicker,
   buildTimeRangeQuery,
@@ -267,12 +268,7 @@ export default function GlobalLogsDashboard() {
   };
 
   if (!data && !error && isLoading) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-4">
-        <Spinner className="h-8 w-8 text-emerald-500" />
-        <p className="text-muted-foreground">Querying Log Events...</p>
-      </div>
-    );
+    return <TablePageSkeleton stats={4} chart actions={1} columns={5} rows={10} label="Loading logs" maxWidthClass="max-w-[1600px]" />;
   }
 
   if (error) {

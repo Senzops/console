@@ -3,11 +3,11 @@ import useSWR from "swr";
 import { api, useAuth } from "../../../../../lib/auth";
 import {
   Button,
-  Spinner,
   Card,
   Badge,
   CardContent,
 } from "../../../../../components/Core";
+import { DetailPageSkeleton } from "../../../../../components/Skeletons";
 import {
   ArrowLeft,
   Clock,
@@ -88,14 +88,7 @@ export default function TraceDetail() {
   );
 
   if (!trace && !error)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Connecting to APM trace...</p>
-        </div>
-      </>
-    );
+    return <DetailPageSkeleton badgeInline chart table label="Loading APM trace" />;
   if (error || !trace)
     return (
       <>

@@ -10,7 +10,6 @@ import {
   CardTitle,
   Badge,
   Button,
-  Spinner,
   DataError,
   Select,
   SelectTrigger,
@@ -18,6 +17,7 @@ import {
   SelectContent,
   SelectItem,
 } from "../../../components/Core";
+import { TablePageSkeleton } from "../../../components/Skeletons";
 import {
   AlertOctagon,
   Search,
@@ -253,12 +253,7 @@ export default function IncidentsDashboard() {
   };
 
   if (isLoading)
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-4">
-        <Spinner className="h-8 w-8 text-orange-500" />
-        <p className="text-muted-foreground">Loading Incidents...</p>
-      </div>
-    );
+    return <TablePageSkeleton chips={4} actions={1} picker={false} icon={false} badge columns={6} rows={8} label="Loading incidents" maxWidthClass="max-w-[1600px]" />;
   if (error)
     return (
       <div className="h-full flex items-center justify-center p-8">

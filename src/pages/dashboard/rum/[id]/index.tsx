@@ -22,6 +22,7 @@ import {
   Dialog,
   DataError,
 } from "../../../../components/Core";
+import { RumDashboardSkeleton } from "../../../../components/Skeletons";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
@@ -602,15 +603,7 @@ export default function RumDashboard() {
     [spanMs],
   );
 
-  if (!data && !error)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Connecting to Web APM...</p>
-        </div>
-      </>
-    );
+  if (!data && !error) return <RumDashboardSkeleton />;
   if (error)
     return (
       <>

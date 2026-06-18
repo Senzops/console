@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { api, useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../Core';
+import { ApmDashboardSkeleton } from '../Skeletons';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../TimeRangePicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
 import { Activity, Clock, Trash2, AlertTriangle, Maximize2, X, RefreshCw, Box, Code, AlertOctagon, Zap, ArrowRight, ArrowLeft, Search, Layers, Globe, Smartphone, Monitor, Laptop, Map as MapIcon, Maximize, Filter, Pencil } from 'lucide-react';
@@ -439,7 +440,7 @@ export default function ApmView({ serviceId, route }: ApmViewProps) {
   );
 
 
-  if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to APM service...</p></div></>;
+  if (!data && !error) return <ApmDashboardSkeleton />;
   if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => { mutate(); mutateInvocations(); }} /></div></>;
   if (!data?.meta) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load APM service.</div></div></>;
 

@@ -6,6 +6,7 @@ import { useShareApi, useShareMode, useShareScopeId } from '../../../lib/share';
 import { ShareButton } from '../../../components/ShareModal';
 import { useTheme } from '../../../lib/theme';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
+import { WebDashboardSkeleton } from '../../../components/Skeletons';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
@@ -291,7 +292,7 @@ export default function WebDetail() {
     });
   }, [data?.traffic?.hours]);
 
-  if (!data && !error) return <><div className="h-full flex flex-col items-center justify-center gap-4"><Spinner className="h-8 w-8 text-emerald-500" /><p className="text-muted-foreground">Connecting to Website...</p></div></>;
+  if (!data && !error) return <WebDashboardSkeleton />;
   if (error) return <><div className="h-full flex items-center justify-center p-8"><DataError onRetry={() => mutate()} /></div></>;
   if (!data?.meta) return <><div className="h-full flex flex-col items-center justify-center gap-4"><div className="p-8 text-destructive">Failed to load analytics.</div></div></>;
 

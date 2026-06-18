@@ -22,6 +22,7 @@ import {
   SelectContent,
   SelectItem,
 } from "../../../components/Core";
+import { TablePageSkeleton } from "../../../components/Skeletons";
 import {
   BellRing,
   Plus,
@@ -869,14 +870,7 @@ export default function AlertsDashboard() {
   };
 
   if (isLoading)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Loading Alerts...</p>
-        </div>
-      </>
-    );
+    return <TablePageSkeleton tables={3} actions={4} picker={false} icon={false} badge columns={6} rows={4} label="Loading alerts" />;
   if (policiesError || channelsError || silencesError)
     return (
       <>

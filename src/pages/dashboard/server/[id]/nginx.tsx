@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../../lib/auth';
 import { useTheme } from '../../../../lib/theme';
-import { Badge, Button, Spinner } from '../../../../components/Core';
+import { Badge, Button } from '../../../../components/Core';
+import { MediaDetailSkeleton } from '../../../../components/Skeletons';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
 import { ArrowLeft, CloudLightning, Activity, RefreshCw } from 'lucide-react';
 import { ChartCard, ChartTooltip, fetcher, StatCard } from '.';
@@ -30,7 +31,7 @@ export default function NginxDetail() {
       }));
   }, [history]);
 
-  if (!data) return <><div className="h-full flex items-center justify-center"><Spinner className="h-8 w-8 text-emerald-500" /></div></>;
+  if (!data) return <MediaDetailSkeleton stats={3} charts={2} label="Loading Nginx metrics" />;
 
   const latest = history && history.length > 0 ? history[0].metrics?.nginx || {} : {};
   const getColor = (defaultColor: string) => isMono ? 'hsl(var(--chart-mono))' : defaultColor;

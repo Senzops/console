@@ -17,6 +17,7 @@ import {
   Input,
   DataError,
 } from "../../../components/Core";
+import { TablePageSkeleton } from "../../../components/Skeletons";
 import {
   AreaChart,
   Area,
@@ -416,14 +417,7 @@ export default function McpSettingsDashboard() {
     isMono ? "hsl(var(--chart-mono))" : defaultColor;
 
   if (!keysData && !usageData && !usageError) {
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Loading AI Telemetry...</p>
-        </div>
-      </>
-    );
+    return <TablePageSkeleton stats={4} chart actions={1} picker={false} icon={false} badge columns={5} rows={6} label="Loading MCP dashboard" />;
   }
 
   if (usageError) {

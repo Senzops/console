@@ -6,6 +6,7 @@ import { api, useAuth } from "@/lib/auth";
 import { useShareApi, useShareMode, useShareScopeId } from "@/lib/share";
 import { ShareButton } from "@/components/ShareModal";
 import { Card, Button, Spinner, Badge, Dialog, DataError } from "@/components/Core";
+import { StatusBoardSkeleton } from "@/components/Skeletons";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "@/components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { getDisplayLabel } from "@/lib/formatAxisDate";
@@ -187,12 +188,7 @@ export default function MonitorBoardView() {
 
   // --- Gates ---
   if (!boardData && !boardErr) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-4">
-        <Spinner className="h-8 w-8 text-emerald-500" />
-        <p className="text-muted-foreground">Loading board…</p>
-      </div>
-    );
+    return <StatusBoardSkeleton />;
   }
   if (boardErr) {
     return (

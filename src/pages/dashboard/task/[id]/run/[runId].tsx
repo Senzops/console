@@ -9,9 +9,9 @@ import {
   CardContent,
   Badge,
   Button,
-  Spinner,
   DataError,
 } from "../../../../../components/Core";
+import { DetailPageSkeleton } from "../../../../../components/Skeletons";
 import { ErrorEventList } from "../../../../../components/TraceErrors";
 import { TraceWaterfall } from "../../../../../components/TraceWaterfall";
 import { SmartAnimatedValue } from "@/components/Tween";
@@ -145,14 +145,7 @@ export default function TaskRunDetail() {
   );
 
   if (isLoading || !data)
-    return (
-      <>
-        <div className="h-full flex flex-col items-center justify-center gap-4">
-          <Spinner className="h-8 w-8 text-emerald-500" />
-          <p className="text-muted-foreground">Loading Task Execution...</p>
-        </div>
-      </>
-    );
+    return <DetailPageSkeleton badgeInline table label="Loading task execution" />;
   if (error)
     return (
       <>

@@ -21,6 +21,7 @@ import {
   SelectItem,
   cn,
 } from "../../../components/Core";
+import { IncidentDetailSkeleton } from "../../../components/Skeletons";
 import {
   ArrowLeft,
   AlertOctagon,
@@ -320,12 +321,7 @@ export default function IncidentDetailPage() {
   };
 
   if (!data && !error)
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-4">
-        <Spinner className="h-8 w-8 text-orange-500" />
-        <p className="text-muted-foreground">Loading Incident...</p>
-      </div>
-    );
+    return <IncidentDetailSkeleton />;
   if (error)
     return (
       <div className="h-full flex items-center justify-center p-8">
