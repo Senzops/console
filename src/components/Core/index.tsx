@@ -9,20 +9,35 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // --- Spinner ---
-export const Spinner = ({ className }: { className?: string }) => (
+// An "alive" indeterminate spinner: the ring rotates continuously while its
+// arc grows and shrinks (Material/Linear style). Color follows `currentColor`
+// (e.g. text-primary) and size follows width/height (e.g. h-4 w-4) — fully
+// drop-in compatible with the previous icon-style spinner.
+export interface SpinnerProps extends React.SVGProps<SVGSVGElement> {
+  /** Accessible name announced by screen readers. Defaults to "Loading". */
+  label?: string
+}
+export const Spinner = ({ className, label = "Loading", ...props }: SpinnerProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"
     height="24"
     viewBox="0 0 24 24"
     fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={cn("animate-spin", className)}
+    role="status"
+    aria-label={label}
+    className={cn(className)}
+    {...props}
   >
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    <circle
+      className="spinner-arc"
+      cx="12"
+      cy="12"
+      r="9"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
   </svg>
 )
 

@@ -258,3 +258,54 @@
     box-shadow: 0 0 24px 6px rgba(192, 132, 252, 0.3);
   }
 }
+
+/*
+   ALIVE SPINNER — global loader (components/Core <Spinner />)
+   Continuous rotation + an arc that grows and shrinks ("breathing"), the
+   refined Material/Linear-style indeterminate spinner. Color follows
+   currentColor; */
+@keyframes spinner-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Arc length/offset tuned for r=9 (circumference ~56.5): a near-dot at 0%
+   grows to ~74% of the ring, while the offset sweeps the gap a full turn so
+   the arc seamlessly chases its tail. */
+@keyframes spinner-dash {
+  0% {
+    stroke-dasharray: 1, 200;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 42, 200;
+    stroke-dashoffset: -7;
+  }
+  100% {
+    stroke-dasharray: 42, 200;
+    stroke-dashoffset: -55;
+  }
+}
+
+/* Rotate + grow/shrink in SVG vector space. `transform-box: fill-box` pins the
+   pivot to the circle's exact geometric center (12,12), independent of the
+   rendered pixel box, so there's no sub-pixel wobble when the svg is resized
+   by Tailwind h-*\/w-* classes. */
+.spinner-arc {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    spinner-rotate 1.4s linear infinite,
+    spinner-dash 1.4s ease-in-out infinite;
+}
+
+/* Respect reduced-motion: keep a gentle rotation (a frozen spinner reads as
+   broken) but drop the grow/shrink, settling on a steady ~74% arc. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner-arc {
+    animation: spinner-rotate 2.4s linear infinite;
+    stroke-dasharray: 42, 200;
+    stroke-dashoffset: 0;
+  }
+}
