@@ -34,6 +34,13 @@ const MIN_H = 2;
 const MAX_W = 12;
 const MAX_H = 6;
 
+// Status Boards (incl. public status pages) divide the selected window into a
+// fixed number of availability-stripe buckets. Below ~24h the stripe is mostly
+// empty for typical check intervals, so we floor the selectable range at 24h —
+// matching the convention of every major status-page product. Enforced again
+// server-side in getBoardSummary as defense-in-depth for the public share path.
+const BOARD_MIN_RANGE_HOURS = 24;
+
 export default function MonitorBoardView() {
   const router = useRouter();
   const id = useShareScopeId(router.query.id as string | undefined);
@@ -43,7 +50,7 @@ export default function MonitorBoardView() {
   const { openModal } = useServiceModal();
 
   const retentionDays = usePlanRetention();
-  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
+  const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays, BOARD_MIN_RANGE_HOURS);
   const rangeQuery = buildTimeRangeQuery(timeRange);
   const displayRange = timeRange.type === "relative" ? timeRange.range : getDisplayLabel(timeRange);
 
@@ -235,7 +242,7 @@ export default function MonitorBoardView() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} />
+            <TimeRangePicker value={timeRange} onChange={setTimeRange} maxRetentionDays={retentionDays} minRangeHours={BOARD_MIN_RANGE_HOURS} />
             <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => mutateSummary()} disabled={isValidating}>
               <RefreshCw className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`} />
             </Button>

@@ -13,6 +13,13 @@ interface TimeRangePickerProps {
   value: TimeRangeValue;
   onChange: (value: TimeRangeValue) => void;
   maxRetentionDays?: number;
+  /**
+   * Optional lower bound (in hours) on the selectable window. Presets shorter
+   * than this are disabled and custom/recent ranges below it are rejected.
+   * Used by Status Boards, where a sub-day window leaves the bucketed
+   * availability stripe mostly empty (unprofessional on a public status page).
+   */
+  minRangeHours?: number;
   className?: string;
 }
 
@@ -49,6 +56,15 @@ function formatDisplayLabel(value: TimeRangeValue): string {
   const end = new Date(value.end);
   const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   return `${fmt(start)} — ${fmt(end)}`;
+}
+
+/** Human-friendly label for an hours value (e.g. 24 → "1 day", 12 → "12 hours"). */
+function formatHoursLabel(hours: number): string {
+  if (hours % 24 === 0) {
+    const days = hours / 24;
+    return days === 1 ? '1 day' : `${days} days`;
+  }
+  return hours === 1 ? '1 hour' : `${hours} hours`;
 }
 
 function formatRecentLabel(start: string, end: string): string {
@@ -108,7 +124,7 @@ function CalendarPickerButton({ inputRef, dark }: { inputRef: React.RefObject<HT
 }
 
 // --- Component ---
-export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, className }: TimeRangePickerProps) {
+export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, minRangeHours, className }: TimeRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -124,6 +140,8 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
   const dark = isDarkTheme(theme);
 
   const retentionHours = maxRetentionDays * 24;
+  const minLabel = minRangeHours != null ? formatHoursLabel(minRangeHours) : '';
+  const minRangeMs = minRangeHours != null ? minRangeHours * 60 * 60 * 1000 : 0;
 
   // Compute min/max for datetime-local inputs
   const { minDatetime, maxDatetime } = useMemo(() => {
@@ -205,6 +223,10 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
       setCustomError('End cannot be in the future');
       return;
     }
+    if (minRangeHours != null && endDate.getTime() - startDate.getTime() < minRangeMs) {
+      setCustomError(`Range must be at least ${minLabel}`);
+      return;
+    }
 
     const startUtc = startDate.toISOString();
     const endUtc = endDate.toISOString();
@@ -214,7 +236,7 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
     onChange({ type: 'custom', start: startUtc, end: endUtc });
     setCustomError('');
     setOpen(false);
-  }, [customStart, customEnd, onChange, addRecent]);
+  }, [customStart, customEnd, onChange, addRecent, minRangeHours, minRangeMs, minLabel]);
 
   const handleSetEndNow = useCallback(() => {
     setCustomEnd(toLocalDatetimeString(new Date()));
@@ -281,7 +303,9 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Relative</span>
             </div>
             {PRESETS.map(preset => {
-              const disabled = preset.hours > retentionHours;
+              const aboveMax = preset.hours > retentionHours;
+              const belowMin = minRangeHours != null && preset.hours < minRangeHours;
+              const disabled = aboveMax || belowMin;
               const isActive = value.type === 'relative' && value.range === preset.value;
               return (
                 <React.Fragment key={preset.value}>
@@ -296,7 +320,13 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
                         : 'hover:bg-accent text-foreground',
                       disabled && 'opacity-40 cursor-not-allowed hover:bg-transparent',
                     )}
-                    title={disabled ? `Data not available beyond ${maxRetentionDays} days` : undefined}
+                    title={
+                      aboveMax
+                        ? `Data not available beyond ${maxRetentionDays} days`
+                        : belowMin
+                          ? `Minimum range is ${minLabel}`
+                          : undefined
+                    }
                   >
                     {preset.label}
                   </button>
@@ -385,17 +415,23 @@ export function TimeRangePicker({ value, onChange, maxRetentionDays = 7, classNa
                 <div className="flex flex-col gap-0.5">
                   {recentRanges.slice(0, 3).map((r) => {
                     const isActive = value.type === 'custom' && value.start === r.start && value.end === r.end;
+                    const tooShort =
+                      minRangeHours != null &&
+                      new Date(r.end).getTime() - new Date(r.start).getTime() < minRangeMs;
                     return (
                       <button
                         key={`${r.start}_${r.end}`}
                         type="button"
+                        disabled={tooShort}
                         onClick={() => handleRecentSelect(r)}
                         className={cn(
                           'flex items-center px-2 py-1.5 rounded-md text-xs transition-colors text-left',
                           isActive
                             ? 'bg-primary/10 text-primary font-medium'
                             : 'hover:bg-accent text-muted-foreground hover:text-foreground',
+                          tooShort && 'opacity-40 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground',
                         )}
+                        title={tooShort ? `Below the ${minLabel} minimum` : undefined}
                       >
                         <span className="truncate">{r.label}</span>
                       </button>

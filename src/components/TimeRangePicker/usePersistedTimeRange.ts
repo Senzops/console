@@ -77,18 +77,59 @@ function clampToRetention(stored: TimeRangeValue, maxRetentionDays: number): Tim
 }
 
 /**
+ * Raises a stored value UP to a per-dashboard minimum window (in hours).
+ *
+ * Some surfaces — notably Status Boards — are meaningless below a certain
+ * window (a sub-day range leaves the bucketed availability stripe mostly
+ * empty). When such a dashboard mounts with a shorter range carried over from
+ * another dashboard (the stored range is global), we bump it up to the smallest
+ * preset that satisfies the minimum without exceeding retention.
+ *
+ * This only adjusts the value RETURNED to the dashboard; it is deliberately not
+ * persisted here, so raising the floor on one dashboard never overwrites the
+ * shared preference for dashboards that legitimately allow shorter ranges.
+ */
+function clampToMin(
+  value: TimeRangeValue,
+  minRangeHours: number,
+  maxRetentionDays: number
+): TimeRangeValue {
+  const retentionHours = maxRetentionDays * 24;
+  // The floor can never exceed what retention allows.
+  const effMinHours = Math.min(minRangeHours, retentionHours);
+  // Smallest preset that satisfies the floor and fits within retention.
+  const floorPreset =
+    [...PRESETS_DESC].reverse().find((p) => p.hours >= effMinHours && p.hours <= retentionHours) ||
+    PRESETS_DESC.find((p) => p.hours <= retentionHours);
+
+  if (value.type === 'relative') {
+    const preset = PRESETS_DESC.find((p) => p.value === value.range);
+    if (preset && preset.hours >= effMinHours) return value;
+    return floorPreset ? { type: 'relative', range: floorPreset.value } : value;
+  }
+
+  // Custom range — bump up only if its span is below the floor.
+  const span = new Date(value.end).getTime() - new Date(value.start).getTime();
+  if (Number.isFinite(span) && span >= effMinHours * 60 * 60 * 1000) return value;
+  return floorPreset ? { type: 'relative', range: floorPreset.value } : value;
+}
+
+/**
  * A drop-in replacement for `useState<TimeRangeValue>` that persists the
  * selected range to localStorage and restores it on mount.
  *
  * The stored value is automatically clamped to the dashboard's retention
  * limit, so navigating from a 30-day dashboard to a 1-day dashboard
  * gracefully falls back to the largest allowed preset.
+ *
+ * `minRangeHours` (optional) raises the value up to a per-dashboard lower bound
+ * — see {@link clampToMin}.
  */
-export function usePersistedTimeRange(maxRetentionDays: number) {
+export function usePersistedTimeRange(maxRetentionDays: number, minRangeHours?: number) {
   const [value, setValueRaw] = useState<TimeRangeValue>(() => {
     const stored = readStored();
-    if (!stored) return DEFAULT_RANGE;
-    return clampToRetention(stored, maxRetentionDays);
+    const base = stored ? clampToRetention(stored, maxRetentionDays) : DEFAULT_RANGE;
+    return minRangeHours != null ? clampToMin(base, minRangeHours, maxRetentionDays) : base;
   });
 
   const setValue = useCallback((next: TimeRangeValue) => {
