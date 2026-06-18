@@ -443,6 +443,70 @@ export const DOCS_DATA: DocsConfig = {
       ]
     },
     {
+      id: "status-boards",
+      title: "Status Boards",
+      iconName: "LayoutTemplate",
+      shortDescription: "Centralized, shareable uptime dashboards and public status pages.",
+      overview: "Compose your existing uptime monitors into a centralized, drag-and-drop board with resizable cards and range-aware availability stripes — then publish it as a public, view-only status page. Status Boards reuse the monitors you already run, so there are no new agents or checks to deploy. When a board is shared publicly, each monitor's internal target URL is stripped from the response, so a customer-facing status page never reveals your private endpoints.",
+      prerequisites: [
+        "At least one configured Uptime monitor to add to the board.",
+        "Appropriate workspace permissions to create boards and generate public share links."
+      ],
+      registrationSteps: [
+        { title: "Create a Board", description: "Navigate to Status Boards in the dashboard and click 'New Board'. Give it a name (e.g., 'Production Status') and an optional description." },
+        { title: "Add & Arrange Monitors", description: "Drag your existing uptime monitors onto the canvas, then drag-to-reposition and resize each card to build your layout. A board holds up to 60 monitors, and each workspace can keep up to 50 boards." },
+        { title: "Save the Layout", description: "Your arrangement is persisted to the board. Stats and availability stripes follow the dashboard's selected time range." },
+        { title: "Publish (Optional)", description: "Generate a public, view-only share link with an expiry to expose the board as a status page. Links can be revoked at any time, and deleting a board automatically tears down its share links." }
+      ],
+      troubleshooting: [
+        {
+          issue: "The public status page does not show monitor URLs.",
+          solution: "This is intentional. Target URLs are stripped from public share payloads so a customer-facing status page never leaks your internal endpoints. The owner-facing board still shows full URLs."
+        },
+        {
+          issue: "The availability stripe looks different across time ranges.",
+          solution: "The stripe follows the selected range, which is divided into 60 equal segments. Each segment rolls up to its worst observed status, so a wider range aggregates more checks per segment — the stripe stays consistent with the range-scoped uptime and latency stats shown above it."
+        },
+        {
+          issue: "Cannot create a new board ('Board limit reached').",
+          solution: "Each workspace is limited to 50 status boards. Delete an unused board to free up a slot before creating another."
+        }
+      ]
+    },
+    {
+      id: "ai-assistant",
+      title: "AI Assistant",
+      iconName: "Brain",
+      shortDescription: "Investigate incidents in plain English with an agentic, bring-your-own-model assistant.",
+      overview: "Ask questions about your telemetry in natural language and let the built-in agent investigate for you. It reasons step by step and calls read-only tools across your APM traces, RUM sessions, logs, errors, uptime checks, infrastructure, databases, alerts, and saved views — then returns a grounded answer with every reasoning step and tool call kept visible and auditable. Choose your execution engine: run a model fully in your browser via WebGPU for total privacy, bring your own cloud API key, or point at any self-hosted OpenAI-compatible endpoint. Conversation history is optional — you can keep chats entirely off the server.",
+      prerequisites: [
+        "An active Senzor workspace with telemetry to investigate.",
+        "For local inference: a WebGPU-capable browser (Chrome 113+ or Edge 113+) with a compatible GPU.",
+        "For cloud providers: your own API key for the chosen provider. Keys are stored locally in your browser and calls go directly to the provider — they are never sent to or stored on Senzor servers.",
+        "For a custom endpoint: a reachable OpenAI-compatible API URL (e.g., Ollama, vLLM, or LM Studio)."
+      ],
+      registrationSteps: [
+        { title: "Open the Assistant", description: "Navigate to AI Assistant in the dashboard sidebar." },
+        { title: "Choose an Execution Engine", description: "Select Local (WebLLM) to run in-browser via WebGPU, a cloud provider (OpenAI, Anthropic, Google AI, Groq, Mistral, or OpenRouter) with your own key, or a Custom Endpoint for any OpenAI-compatible API." },
+        { title: "Configure Access", description: "For local inference, pick a model sized to your GPU's available VRAM and load it. For a cloud provider, paste your API key. For a custom endpoint, enter the endpoint URL and model name." },
+        { title: "Start Investigating", description: "Ask a question in plain English (e.g., 'Why did checkout latency spike at 14:30?') and watch the agent reason and query your telemetry to a grounded answer." }
+      ],
+      troubleshooting: [
+        {
+          issue: "WebGPU is not available in this browser.",
+          solution: "Local (WebLLM) inference requires WebGPU. Use Chrome 113+ or Edge 113+ with a compatible GPU, or switch to a cloud provider or custom endpoint, neither of which needs WebGPU."
+        },
+        {
+          issue: "The local model fails to load or runs very slowly.",
+          solution: "The selected model likely needs more VRAM than your GPU reports. Choose a smaller model — for example Llama 3.2 3B or Qwen 2.5 1.5B — that fits within your hardware's available allocation."
+        },
+        {
+          issue: "Are my API keys or conversations sent to Senzor?",
+          solution: "API keys are stored locally in your browser and cloud calls are made directly to the provider — keys never reach Senzor servers. Conversation history is optional; disable it to keep chats entirely off the server."
+        }
+      ]
+    },
+    {
       id: "mcp",
       title: "MCP Server (AI Integration)",
       iconName: "Bot",
