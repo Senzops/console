@@ -171,6 +171,7 @@ export const ServiceModals: React.FC = () => {
   const [queueMode, setQueueMode] = useState<"agentless" | "collector">("agentless");
   const [qc, setQc] = useState<Record<string, any>>({ prefix: "bull", vhost: "/", ssl: false });
   const [queueFilter, setQueueFilter] = useState("");
+  const [queueMgmtUrl, setQueueMgmtUrl] = useState("");
   const [collectorResult, setCollectorResult] = useState<{ apiKey: string } | null>(null);
   const setQcField = (k: string, v: any) => setQc((p) => ({ ...p, [k]: v }));
 
@@ -185,11 +186,13 @@ export const ServiceModals: React.FC = () => {
       if (Array.isArray(meta.brokers)) meta.brokers = meta.brokers.join("\n");
       setQc(meta);
       setQueueFilter(editData.queueFilter || "");
+      setQueueMgmtUrl(editData.managementUrl || "");
     } else {
       setQueueSystem("bullmq");
       setQueueMode("agentless");
       setQc({ prefix: "bull", vhost: "/", ssl: false });
       setQueueFilter("");
+      setQueueMgmtUrl("");
       setInterval("1");
     }
   }, [activeModal, mode, editData, setInterval]);
@@ -533,7 +536,7 @@ export const ServiceModals: React.FC = () => {
       // Collector (push) mode — no server-side connection; issue/keep an API key.
       if (queueMode === "collector") {
         if (isEdit && editData?.id) {
-          const body: any = { queueFilter: filterArr };
+          const body: any = { queueFilter: filterArr, managementUrl: queueMgmtUrl.trim() };
           if (name.trim()) body.name = name.trim();
           if (interval) body.interval = Number(interval);
           await api.put(`/queue/${editData.id}`, body);
@@ -545,6 +548,7 @@ export const ServiceModals: React.FC = () => {
             name: name.trim(),
             system: queueSystem,
             mode: "collector",
+            managementUrl: queueMgmtUrl.trim() || undefined,
             queueFilter: filterArr,
             interval: Number(interval),
           });
@@ -566,7 +570,7 @@ export const ServiceModals: React.FC = () => {
       }
 
       if (isEdit && editData?.id) {
-        const body: any = { queueFilter: filterArr };
+        const body: any = { queueFilter: filterArr, managementUrl: queueMgmtUrl.trim() };
         if (name.trim()) body.name = name.trim();
         if (interval) body.interval = Number(interval);
         if (Object.keys(connection).length > 0) body.connection = connection;
@@ -579,6 +583,7 @@ export const ServiceModals: React.FC = () => {
           name: name.trim(),
           system: queueSystem,
           connection,
+          managementUrl: queueMgmtUrl.trim() || undefined,
           queueFilter: filterArr,
           interval: Number(interval),
         });
@@ -1883,6 +1888,23 @@ export const ServiceModals: React.FC = () => {
             />
             <p className="text-[10px] text-muted-foreground">
               One name per line (or comma-separated). {!isEdit && "Credentials are AES-256 encrypted in our secure vault."}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Management / Runbook URL
+              <span className="text-muted-foreground font-normal text-xs ml-2">(optional)</span>
+            </label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+              placeholder="https://console.aws.amazon.com/sqs/  ·  Bull Board  ·  RabbitMQ UI"
+              value={queueMgmtUrl}
+              onChange={(e) => setQueueMgmtUrl(e.target.value)}
+              disabled={loading}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Where operators go to act on dead letters. Senzor links out here — it never writes to your broker.
             </p>
           </div>
 

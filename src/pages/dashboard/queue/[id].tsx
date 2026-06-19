@@ -12,7 +12,7 @@ import { ChartTooltip } from '@/components/ChartTooltip';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Layers, Trash2, Pencil, RefreshCw, Inbox, AlertTriangle, Users, Clock, TrendingDown, Pause, Activity, Maximize, X,
-  Workflow, Sparkles
+  Workflow, Sparkles, ExternalLink
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
@@ -166,6 +166,7 @@ export default function QueueDetail() {
       connectionMeta: data.source.connectionMeta || {},
       interval: String(data.source.interval),
       queueFilter: (data.source.queueFilter || []).join('\n'),
+      managementUrl: data.source.managementUrl || '',
       onSuccess: () => mutate(),
     });
   };
@@ -216,6 +217,11 @@ export default function QueueDetail() {
           <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
             <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
           </Button>
+          {!readOnly && source.managementUrl && (
+            <a href={source.managementUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm"><ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Console</Button>
+            </a>
+          )}
           {!readOnly && <ShareButton scopeType="queue" scopeId={id as string} dashboardName={source?.name} />}
           {!readOnly && <Button variant="outline" size="icon" onClick={openEdit}><Pencil className="h-4 w-4" /></Button>}
           {!readOnly && <Button variant="outline" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
@@ -238,6 +244,24 @@ export default function QueueDetail() {
                   {discovered.length > 8 ? ` +${discovered.length - 8} more` : ''}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dead-letter hand-off — observe here, act in your own console (no broker writes) */}
+        {totals.dlqDepth > 0 && (
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">{fmtNum(totals.dlqDepth)} dead-lettered messages across your queues</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Senzor surfaces dead letters — redrive them from your broker&apos;s own console or runbook.</div>
+                </div>
+              </div>
+              {!readOnly && (source.managementUrl
+                ? <a href={source.managementUrl} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="sm" className="shrink-0"><ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open console</Button></a>
+                : <Button variant="ghost" size="sm" className="shrink-0" onClick={openEdit}>Add a console link</Button>)}
             </CardContent>
           </Card>
         )}

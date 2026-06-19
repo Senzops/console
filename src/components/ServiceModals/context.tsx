@@ -38,6 +38,8 @@ export interface EditData {
   connectionMeta?: Record<string, any>;
   /** Queue monitoring: newline/comma-separated allowlist of queue names. */
   queueFilter?: string;
+  /** Queue monitoring: management/runbook deep-link for DLQ hand-off. */
+  managementUrl?: string;
   description?: string;
   method?: string;
   headers?: Record<string, string>;
