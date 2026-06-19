@@ -4,7 +4,7 @@ import { useAuth, api } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
 import { useRouter } from "next/router";
 import { Button, Dialog, Avatar, Spinner, Badge, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../Core";
-import { SkeletonSidebarItems } from "../Skeletons";
+import { SkeletonSidebarItems, RevealProvider } from "../Skeletons";
 import {
   Plus,
   Copy,
@@ -1941,8 +1941,11 @@ const DashboardLayoutInner = ({
         )}
 
         {/* --- CONTENT INJECTION --- */}
+        {/* RevealProvider renders skeleton→content cross-fade overlays over this
+            region (see components/Skeletons/reveal.tsx + globals.css
+            .content-transition-out) so the hand-off dissolves instead of popping. */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden relative">
-          {children}
+          <RevealProvider>{children}</RevealProvider>
         </main>
       </div>
 

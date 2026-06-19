@@ -349,3 +349,36 @@
     display: none;
   }
 }
+
+/*
+   CONTENT CROSS-FADE — smooths the hand-off from skeleton placeholders to real
+   content. Instead of fading the incoming content in from 0 (which briefly
+   shows the empty background → reads as a flicker), the OUTGOING skeleton is
+   kept on screen one beat longer as an absolutely-positioned overlay and faded
+   OUT over the real content, which is already at full opacity underneath. The
+   result is a seamless dissolve with no blank frame and no pop. Driven by the
+   <ContentTransition> wrapper in components/Layout (it mounts this overlay with
+   the previous subtree). The overlay is inert (pointer-events/aria hidden). */
+@keyframes content-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.content-transition-out {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  animation: content-fade-out 320ms ease-out forwards;
+}
+
+/* Reduced-motion: no overlay/dissolve — content simply replaces the skeleton. */
+@media (prefers-reduced-motion: reduce) {
+  .content-transition-out {
+    display: none;
+  }
+}

@@ -1,5 +1,8 @@
 import * as React from "react"
 import { Card, CardContent, CardHeader, Skeleton, cn } from "../Core"
+import { useFadeOutOnUnmount } from "./reveal"
+
+export { RevealProvider } from "./reveal"
 
 /*
   Skeleton library
@@ -26,21 +29,29 @@ export const SkeletonScreen = ({
   className?: string
   label?: string
   children: React.ReactNode
-}) => (
-  <div
-    role="status"
-    aria-busy="true"
-    aria-live="polite"
-    className={cn("p-6 md:p-8 max-w-7xl mx-auto", className)}
-  >
-    {/* The visually-hidden label must NOT sit inside the spaced flow below:
-        as a layout sibling it would push the first real block down by one
-        `space-y` step (a phantom top margin the loaded page doesn't have).
-        Keeping it as a sibling of the spaced container avoids that gap. */}
-    <span className="sr-only">{label}</span>
-    <div className="space-y-6">{children}</div>
-  </div>
-)
+}) => {
+  // Cross-fade out when this skeleton is replaced by real content (see reveal.tsx).
+  useFadeOutOnUnmount(() => (
+    <div className={cn("p-6 md:p-8 max-w-7xl mx-auto", className)}>
+      <div className="space-y-6">{children}</div>
+    </div>
+  ))
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+      className={cn("p-6 md:p-8 max-w-7xl mx-auto", className)}
+    >
+      {/* The visually-hidden label must NOT sit inside the spaced flow below:
+          as a layout sibling it would push the first real block down by one
+          `space-y` step (a phantom top margin the loaded page doesn't have).
+          Keeping it as a sibling of the spaced container avoids that gap. */}
+      <span className="sr-only">{label}</span>
+      <div className="space-y-6">{children}</div>
+    </div>
+  )
+}
 
 // --- Primitive blocks ---------------------------------------------------------
 
@@ -676,38 +687,49 @@ export const GlobalDashboardSkeleton = ({
   viewMode = "grid",
 }: {
   viewMode?: "grid" | "list"
-}) => (
-  <div role="status" aria-busy="true" aria-live="polite" className="flex flex-col h-full">
-    <span className="sr-only">Loading dashboard</span>
-    {/* Header */}
-    <div className="p-8 pb-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-32" />
-      </div>
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-9 w-64 rounded-md hidden md:block" />
-        <Skeleton className="h-9 w-20 rounded-lg" />
-      </div>
-    </div>
-    {/* Content */}
-    <div className="flex-1 overflow-y-auto p-8">
-      {viewMode === "list" ? (
-        <div className="max-w-[1400px] mx-auto">
-          <SkeletonTitledTableCard columns={4} rows={12} rightBadge={false} />
+}) => {
+  const body = (
+    <>
+      {/* Header */}
+      <div className="p-8 pb-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-32" />
         </div>
-      ) : (
-        <div className="flex flex-wrap justify-center gap-y-4 px-8">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="-mx-3 even:mt-16">
-              <SkeletonHexTile />
-            </div>
-          ))}
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-64 rounded-md hidden md:block" />
+          <Skeleton className="h-9 w-20 rounded-lg" />
         </div>
-      )}
+      </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-8">
+        {viewMode === "list" ? (
+          <div className="max-w-[1400px] mx-auto">
+            <SkeletonTitledTableCard columns={4} rows={12} rightBadge={false} />
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-center gap-y-4 px-8">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="-mx-3 even:mt-16">
+                <SkeletonHexTile />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  )
+
+  // Cross-fade out when replaced by real content (see reveal.tsx).
+  useFadeOutOnUnmount(() => <div className="flex flex-col h-full">{body}</div>)
+
+  return (
+    <div role="status" aria-busy="true" aria-live="polite" className="flex flex-col h-full">
+      <span className="sr-only">Loading dashboard</span>
+      {body}
     </div>
-  </div>
-)
+  )
+}
 
 /**
  * Organization detail (pages/dashboard/organization). Mirrors the dominant
