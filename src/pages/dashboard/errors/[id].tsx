@@ -12,7 +12,7 @@ import {
   Button,
   DataError,
 } from "../../../components/Core";
-import { DetailPageSkeleton } from "../../../components/Skeletons";
+import { ErrorDetailSkeleton } from "../../../components/Skeletons";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs, getDisplayLabel } from "@/lib/formatAxisDate";
@@ -185,8 +185,7 @@ export default function ErrorDetailPage() {
     }));
   }, [data?.trend, spanMs]);
 
-  if (!data && !error)
-    return <DetailPageSkeleton chart table label="Loading error details" />;
+  if (!data && !error) return <ErrorDetailSkeleton />;
 
   if (error)
     return (

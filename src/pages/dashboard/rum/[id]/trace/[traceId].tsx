@@ -8,7 +8,7 @@ import {
   Badge,
   CardContent,
 } from "../../../../../components/Core";
-import { DetailPageSkeleton } from "../../../../../components/Skeletons";
+import { TraceDetailSkeleton } from "../../../../../components/Skeletons";
 import {
   ArrowLeft,
   Clock,
@@ -104,8 +104,7 @@ export default function RumTraceDetail() {
     fetcher,
   );
 
-  if (!data && !error)
-    return <DetailPageSkeleton badgeInline chart table label="Loading trace waterfall" />;
+  if (!data && !error) return <TraceDetailSkeleton />;
 
   if (error || !data?.trace)
     return (

@@ -22,7 +22,7 @@ import {
   SelectContent,
   SelectItem,
 } from "../../../components/Core";
-import { TablePageSkeleton } from "../../../components/Skeletons";
+import { AlertsPageSkeleton } from "../../../components/Skeletons";
 import {
   BellRing,
   Plus,
@@ -869,8 +869,7 @@ export default function AlertsDashboard() {
     }
   };
 
-  if (isLoading)
-    return <TablePageSkeleton tables={3} actions={4} picker={false} icon={false} badge columns={6} rows={4} label="Loading alerts" />;
+  if (isLoading) return <AlertsPageSkeleton />;
   if (policiesError || channelsError || silencesError)
     return (
       <>

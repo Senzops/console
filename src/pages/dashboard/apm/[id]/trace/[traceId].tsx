@@ -7,7 +7,7 @@ import {
   Badge,
   CardContent,
 } from "../../../../../components/Core";
-import { DetailPageSkeleton } from "../../../../../components/Skeletons";
+import { TraceDetailSkeleton } from "../../../../../components/Skeletons";
 import {
   ArrowLeft,
   Clock,
@@ -87,8 +87,7 @@ export default function TraceDetail() {
     fetcher,
   );
 
-  if (!trace && !error)
-    return <DetailPageSkeleton badgeInline chart table label="Loading APM trace" />;
+  if (!trace && !error) return <TraceDetailSkeleton />;
   if (error || !trace)
     return (
       <>

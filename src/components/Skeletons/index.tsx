@@ -72,22 +72,28 @@ export const SkeletonIconButton = ({ className }: { className?: string }) => (
 
 // --- Composite blocks ---------------------------------------------------------
 
-/** Mirrors the dashboard page header bar (title + meta + action buttons). */
+/**
+ * Mirrors the dashboard page header bar (title + status badge, metadata row,
+ * time-range picker + action buttons). Heights match the real header: the title
+ * row is `h-8` (text-2xl line box) and the metadata row is `h-4` (text-xs line
+ * box), with `mb-2` between — so the skeleton header is the same height as the
+ * loaded one and there is no shift.
+ */
 export const SkeletonHeaderBar = ({ actions = 4 }: { actions?: number }) => (
   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-7 w-48" />
+    <div className="min-w-0">
+      <div className="flex items-center gap-3 mb-2 h-8">
+        <Skeleton className="h-6 w-48" />
         <SkeletonPill />
       </div>
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex items-center gap-4 h-4">
         <Skeleton className="h-3 w-28" />
         <Skeleton className="h-3 w-32" />
-        <Skeleton className="h-3 w-36" />
-        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-36 hidden sm:block" />
+        <Skeleton className="h-3 w-24 hidden md:block" />
       </div>
     </div>
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 shrink-0">
       <Skeleton className="h-9 w-32 rounded-md" />
       {Array.from({ length: actions }).map((_, i) => (
         <SkeletonIconButton key={i} />
@@ -116,14 +122,16 @@ export const SkeletonListHeader = ({
   badge?: boolean
 }) => (
   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 min-w-0">
       {icon && <Skeleton className="h-9 w-9 rounded-lg shrink-0" />}
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-3 mb-1.5 h-8">
           <Skeleton className="h-6 w-52" />
           {badge && <SkeletonPill />}
         </div>
-        <Skeleton className="h-3 w-72 max-w-full" />
+        <div className="h-4 flex items-center">
+          <Skeleton className="h-3 w-72 max-w-full" />
+        </div>
       </div>
     </div>
     <div className="flex items-center gap-2 shrink-0">
@@ -170,16 +178,16 @@ export const SkeletonDetailHeader = ({
   picker?: boolean
 }) => (
   <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 bg-card/50 p-4 rounded-xl border">
-    <div className="space-y-2.5">
-      {badge && !badgeInline && <SkeletonPill className="w-24" />}
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-7 w-64 max-w-full" />
+    <div className="min-w-0">
+      {badge && !badgeInline && <SkeletonPill className="w-24 mb-2" />}
+      <div className="flex items-center gap-3 mb-2 h-8">
+        <Skeleton className="h-6 w-64 max-w-full" />
         {badge && badgeInline && <SkeletonPill className="w-20" />}
       </div>
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex items-center gap-4 h-4">
         <Skeleton className="h-3 w-28" />
         <Skeleton className="h-3 w-32" />
-        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-20 hidden sm:block" />
       </div>
     </div>
     {(actions > 0 || picker) && (
@@ -208,17 +216,38 @@ export const SkeletonUptimeStrip = () => (
   </div>
 )
 
-/** Mirrors a <StatCard /> (title + icon, large value, sub label, progress bar). */
-export const SkeletonStatCard = () => (
+/**
+ * Mirrors the vertical <StatCard /> (title + icon row, large value, sub label).
+ * The progress bar only appears on cards that render one (e.g. the server
+ * dashboard); pass `progress` so the skeleton height matches and there's no shift.
+ */
+export const SkeletonStatCard = ({ progress = false }: { progress?: boolean }) => (
   <Card>
     <CardContent className="p-6">
-      <div className="flex items-center justify-between pb-2">
+      <div className="flex items-center justify-between pb-2 h-5">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-4 w-4 rounded-md" />
       </div>
-      <Skeleton className="h-8 w-20" />
+      <Skeleton className="h-7 w-20" />
       <Skeleton className="h-3 w-28 mt-2" />
-      <Skeleton className="h-1.5 w-full mt-3 rounded-full" />
+      {progress && <Skeleton className="h-1.5 w-full mt-3 rounded-full" />}
+    </CardContent>
+  </Card>
+)
+
+/**
+ * Mirrors the horizontal trace <StatCard /> (icon tile on the left, then label /
+ * value / sub stacked). Used by the trace detail pages.
+ */
+export const SkeletonStatCardHorizontal = () => (
+  <Card>
+    <CardContent className="p-5 flex items-start gap-4">
+      <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
+      <div className="space-y-1.5 pt-0.5 min-w-0">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-3 w-24" />
+      </div>
     </CardContent>
   </Card>
 )
@@ -226,15 +255,23 @@ export const SkeletonStatCard = () => (
 /** A responsive grid of stat-card skeletons. */
 export const SkeletonStatGrid = ({
   count = 4,
+  progress = false,
+  variant = "vertical",
   className = "grid grid-cols-2 md:grid-cols-4 gap-4",
 }: {
   count?: number
+  progress?: boolean
+  variant?: "vertical" | "horizontal"
   className?: string
 }) => (
   <div className={className}>
-    {Array.from({ length: count }).map((_, i) => (
-      <SkeletonStatCard key={i} />
-    ))}
+    {Array.from({ length: count }).map((_, i) =>
+      variant === "horizontal" ? (
+        <SkeletonStatCardHorizontal key={i} />
+      ) : (
+        <SkeletonStatCard key={i} progress={progress} />
+      ),
+    )}
   </div>
 )
 
@@ -631,10 +668,14 @@ export const SkeletonTitledTableCard = ({
   columns = 5,
   rows = 5,
   rightBadge = true,
+  twoLineFirstCol = false,
 }: {
   columns?: number
   rows?: number
   rightBadge?: boolean
+  /** Render the first cell of each row as two stacked lines (e.g. a name over a
+   *  description, like the Alert Policies table). */
+  twoLineFirstCol?: boolean
 }) => (
   <Card className="overflow-hidden">
     <div className="py-4 px-6 border-b border-border/40 flex items-center justify-between h-14 bg-muted/20">
@@ -649,9 +690,16 @@ export const SkeletonTitledTableCard = ({
     <div className="divide-y divide-border">
       {Array.from({ length: rows }).map((_, r) => (
         <div key={r} className="px-6 py-4 flex gap-6 items-center">
-          {Array.from({ length: columns }).map((_, c) => (
-            <Skeleton key={c} className="h-4 flex-1" />
-          ))}
+          {Array.from({ length: columns }).map((_, c) =>
+            twoLineFirstCol && c === 0 ? (
+              <div key={c} className="flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ) : (
+              <Skeleton key={c} className="h-4 flex-1" />
+            ),
+          )}
         </div>
       ))}
     </div>
@@ -674,6 +722,126 @@ const SkeletonHexTile = () => (
     <SkeletonPill className="w-14" />
   </div>
 )
+
+/**
+ * Header for trace / execution detail pages (RUM/APM trace, task run): a badge +
+ * title + metadata row on the left, and two right-aligned metric blocks
+ * (label + big value) separated by a divider.
+ */
+export const SkeletonMetricHeader = ({ metaItems = 3 }: { metaItems?: number }) => (
+  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-card/50 p-4 rounded-xl border">
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-3 mb-2 h-7">
+        <SkeletonPill className="w-16" />
+        <Skeleton className="h-5 w-64 max-w-full" />
+      </div>
+      <div className="flex items-center gap-4 h-4">
+        {Array.from({ length: metaItems }).map((_, i) => (
+          <Skeleton
+            key={i}
+            className={cn("h-3", i === 0 ? "w-40" : "w-28", i > 1 && "hidden sm:block")}
+          />
+        ))}
+      </div>
+    </div>
+    <div className="flex items-center gap-6 border-t md:border-t-0 border-border/50 pt-4 md:pt-0 md:pl-6 shrink-0">
+      <div className="space-y-1.5">
+        <Skeleton className="h-2.5 w-16" />
+        <Skeleton className="h-7 w-20" />
+      </div>
+      <div className="h-10 w-px bg-border/60 hidden md:block" />
+      <div className="space-y-1.5">
+        <Skeleton className="h-2.5 w-16" />
+        <Skeleton className="h-7 w-16" />
+      </div>
+    </div>
+  </div>
+)
+
+/**
+ * Mirrors <TraceWaterfall>: a bordered card with a toolbar header and a list of
+ * span rows, each a name + duration line over a horizontal bar offset/sized to
+ * suggest the waterfall.
+ */
+export const SkeletonWaterfall = ({ rows = 8 }: { rows?: number }) => (
+  <div className="flex flex-col min-h-[400px] bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="h-12 border-b border-border bg-muted/20 flex items-center justify-between px-4 shrink-0">
+      <Skeleton className="h-4 w-32" />
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-6 w-24 rounded-md" />
+        <Skeleton className="h-6 w-6 rounded-md" />
+      </div>
+    </div>
+    <div className="flex-1 p-4 space-y-3">
+      {Array.from({ length: rows }).map((_, i) => {
+        const left = (i * 9) % 45
+        const width = 25 + ((i * 17) % 55)
+        return (
+          <div key={i} className="space-y-1.5">
+            <div
+              className="flex items-center justify-between gap-2"
+              style={{ paddingLeft: `${Math.min(i, 4) * 16}px` }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Skeleton className="h-4 w-4 rounded shrink-0" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+              <Skeleton className="h-3 w-14 shrink-0" />
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted relative overflow-hidden">
+              <div
+                className="absolute h-full rounded-full bg-muted-foreground/20"
+                style={{ left: `${left}%`, width: `${width}%` }}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  </div>
+)
+
+/**
+ * Mirrors the monitor Domain/SSL card: a card split into two columns (Domain
+ * Registration, SSL Certificate), each with an icon + title + badge header, a
+ * 2-column key/value grid, and a "days left" figure. Considerably taller than a
+ * plain wide card, so it must match to avoid shift.
+ */
+export const SkeletonDomainSslCard = () => {
+  const section = (
+    <div className="p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-3 h-5">
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-3.5 w-32" />
+            <SkeletonPill className="w-12 h-4" />
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-3 w-full" />
+            ))}
+            <Skeleton className="col-span-2 h-3 w-2/3" />
+          </div>
+        </div>
+        <div className="text-right shrink-0 space-y-1.5">
+          <Skeleton className="h-7 w-10 ml-auto" />
+          <Skeleton className="h-2.5 w-12 ml-auto" />
+        </div>
+      </div>
+    </div>
+  )
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+          {section}
+          {section}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 // --- Page-level skeletons -----------------------------------------------------
 
@@ -873,7 +1041,7 @@ export const ServerDashboardSkeleton = () => (
   <SkeletonScreen label="Loading server dashboard">
     <SkeletonHeaderBar />
     <SkeletonUptimeStrip />
-    <SkeletonStatGrid count={4} />
+    <SkeletonStatGrid count={4} progress />
     <SkeletonChartGrid count={6} />
   </SkeletonScreen>
 )
@@ -888,7 +1056,7 @@ export const MonitorDashboardSkeleton = () => (
     <SkeletonHeaderBar />
     <SkeletonUptimeStrip />
     <SkeletonStatGrid count={4} />
-    <SkeletonWideCard className="h-24" />
+    <SkeletonDomainSslCard />
     <SkeletonChartCard />
     <SkeletonTable columns={4} rows={5} />
   </SkeletonScreen>
@@ -978,5 +1146,162 @@ export const ApmDashboardSkeleton = () => (
     <SkeletonChartGrid count={2} />
     <SkeletonTable columns={5} rows={5} />
     <SkeletonChartGrid count={2} />
+  </SkeletonScreen>
+)
+
+/**
+ * Trace detail (pages/dashboard/rum|apm/[id]/trace/[traceId]). Back link, the
+ * metric header (badge + path + meta | Duration / Status metrics), a 4-up row
+ * of horizontal stat cards, and the network waterfall.
+ */
+export const TraceDetailSkeleton = () => (
+  <SkeletonScreen label="Loading trace">
+    <SkeletonBackLink />
+    <SkeletonMetricHeader metaItems={4} />
+    <SkeletonStatGrid
+      count={4}
+      variant="horizontal"
+      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+    />
+    <SkeletonWaterfall />
+  </SkeletonScreen>
+)
+
+/**
+ * Task run detail (pages/dashboard/task/[id]/run/[runId]). Back link, metric
+ * header (badge + name + meta | Duration / Status), 4 stat cards, and the
+ * titled execution-waterfall card.
+ */
+export const TaskRunSkeleton = () => (
+  <SkeletonScreen label="Loading task execution">
+    <SkeletonBackLink />
+    <SkeletonMetricHeader metaItems={2} />
+    <SkeletonStatGrid count={4} />
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1 h-5">
+        <Skeleton className="h-4 w-4 rounded" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <SkeletonWaterfall />
+    </div>
+  </SkeletonScreen>
+)
+
+/**
+ * Error group detail (pages/dashboard/errors/[id]). Back link, detail header
+ * (badge over title + meta + action buttons), 4 stats, the error-trend chart,
+ * the message card, and the recent-events list.
+ */
+export const ErrorDetailSkeleton = () => (
+  <SkeletonScreen label="Loading error details">
+    <SkeletonBackLink />
+    <SkeletonDetailHeader actions={3} />
+    <SkeletonStatGrid count={4} />
+    <SkeletonChartCard />
+    <div className="space-y-3">
+      <Skeleton className="h-6 w-44" />
+      <Card>
+        <CardContent className="p-6 space-y-2">
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-2/3" />
+        </CardContent>
+      </Card>
+    </div>
+    <div className="space-y-3">
+      <Skeleton className="h-6 w-56" />
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-4 flex items-center gap-4">
+              <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <Skeleton className="h-3 w-1/3" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+              <Skeleton className="h-6 w-16 rounded-md shrink-0" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  </SkeletonScreen>
+)
+
+/**
+ * Log management dashboard (pages/dashboard/logs). A special two-row header
+ * (identity row + actions toolbar), 4 stats, the volume chart, and the log
+ * table. Uses the wider container the real page uses.
+ */
+export const LogsPageSkeleton = () => (
+  <SkeletonScreen label="Loading logs" className="max-w-[1600px]">
+    <div className="bg-card/50 rounded-xl border">
+      <div className="flex items-center justify-between gap-4 p-4 border-b border-border/50">
+        <div className="flex items-center gap-3 min-w-0">
+          <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+          <div className="space-y-1.5 min-w-0">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-3 w-64 max-w-full" />
+          </div>
+        </div>
+        <Skeleton className="h-9 w-24 rounded-md shrink-0" />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-28 rounded-md" />
+          <Skeleton className="h-9 w-24 rounded-md" />
+          <Skeleton className="h-9 w-28 rounded-md" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-32 rounded-md" />
+          <Skeleton className="h-9 w-9 rounded-md" />
+        </div>
+      </div>
+    </div>
+    <SkeletonStatGrid count={4} />
+    <SkeletonChartCard />
+    <SkeletonTable columns={6} rows={12} />
+  </SkeletonScreen>
+)
+
+/**
+ * Alerts & incidents "mission control" (pages/dashboard/alerts). Header, then
+ * the Policies (two-line rows), Channels, and Silences tables stacked.
+ */
+export const AlertsPageSkeleton = () => (
+  <SkeletonScreen label="Loading alerts" className="pb-24">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/50 p-4 rounded-xl border">
+      <div className="min-w-0">
+        <div className="flex items-center gap-3 mb-2 h-8">
+          <Skeleton className="h-6 w-44" />
+          <SkeletonPill />
+        </div>
+        <div className="flex items-center gap-2 h-5">
+          <Skeleton className="h-5 w-16 rounded" />
+          <Skeleton className="h-3 w-40" />
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Skeleton className="h-9 w-28 rounded-md" />
+        <Skeleton className="h-9 w-28 rounded-md" />
+        <Skeleton className="h-9 w-28 rounded-md" />
+        <SkeletonIconButton />
+      </div>
+    </div>
+    <SkeletonTitledTableCard columns={5} rows={4} twoLineFirstCol rightBadge={false} />
+    <SkeletonTitledTableCard columns={4} rows={3} rightBadge={false} />
+    <SkeletonTitledTableCard columns={4} rows={2} rightBadge={false} />
+  </SkeletonScreen>
+)
+
+/**
+ * Alert policy detail (pages/dashboard/alerts/[id]). Back link, the policy
+ * header, then the Conditions and Incidents tables.
+ */
+export const AlertPolicyDetailSkeleton = () => (
+  <SkeletonScreen label="Loading alert policy" className="pb-24">
+    <SkeletonBackLink />
+    <SkeletonDetailHeader badgeInline actions={2} />
+    <SkeletonTitledTableCard columns={4} rows={4} rightBadge={false} />
+    <SkeletonTitledTableCard columns={5} rows={4} rightBadge={false} />
   </SkeletonScreen>
 )

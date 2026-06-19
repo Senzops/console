@@ -11,7 +11,7 @@ import {
   Button,
   DataError,
 } from "../../../../../components/Core";
-import { DetailPageSkeleton } from "../../../../../components/Skeletons";
+import { TaskRunSkeleton } from "../../../../../components/Skeletons";
 import { ErrorEventList } from "../../../../../components/TraceErrors";
 import { TraceWaterfall } from "../../../../../components/TraceWaterfall";
 import { SmartAnimatedValue } from "@/components/Tween";
@@ -144,8 +144,7 @@ export default function TaskRunDetail() {
     fetcher,
   );
 
-  if (isLoading || !data)
-    return <DetailPageSkeleton badgeInline table label="Loading task execution" />;
+  if (isLoading || !data) return <TaskRunSkeleton />;
   if (error)
     return (
       <>

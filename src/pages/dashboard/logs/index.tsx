@@ -14,7 +14,7 @@ import {
   Spinner,
   DataError,
 } from "../../../components/Core";
-import { TablePageSkeleton } from "../../../components/Skeletons";
+import { LogsPageSkeleton } from "../../../components/Skeletons";
 import {
   TimeRangePicker,
   buildTimeRangeQuery,
@@ -268,7 +268,7 @@ export default function GlobalLogsDashboard() {
   };
 
   if (!data && !error && isLoading) {
-    return <TablePageSkeleton stats={4} chart actions={1} columns={5} rows={10} label="Loading logs" maxWidthClass="max-w-[1600px]" />;
+    return <LogsPageSkeleton />;
   }
 
   if (error) {

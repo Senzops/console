@@ -24,7 +24,7 @@ import {
   SelectItem,
   cn,
 } from "../../../components/Core";
-import { DetailPageSkeleton } from "../../../components/Skeletons";
+import { AlertPolicyDetailSkeleton } from "../../../components/Skeletons";
 import {
   ArrowLeft,
   Plus,
@@ -844,8 +844,7 @@ export default function AlertPolicyDetail() {
     }
   };
 
-  if (!data && !error)
-    return <DetailPageSkeleton badgeInline headerActions={2} table label="Loading alert policy" />;
+  if (!data && !error) return <AlertPolicyDetailSkeleton />;
   if (error)
     return (
       <>
