@@ -11,12 +11,15 @@ import { formatAxisDate, getTimeSpanMs } from '@/lib/formatAxisDate';
 import { ChartTooltip } from '@/components/ChartTooltip';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
-  Layers, Trash2, Pencil, RefreshCw, Inbox, AlertTriangle, Users, Clock, TrendingDown, Pause, Activity, Maximize, X
+  Layers, Trash2, Pencil, RefreshCw, Inbox, AlertTriangle, Users, Clock, TrendingDown, Pause, Activity, Maximize, X,
+  Workflow, Sparkles
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { toast } from 'sonner';
 import { useServiceModal } from '@/components/ServiceModals/context';
+
+const authFetcher = (url: string) => api.get(url).then(res => res.data);
 
 const SYSTEM_LABELS: Record<string, string> = {
   bullmq: 'BullMQ',
@@ -111,6 +114,26 @@ export default function QueueDetail() {
     { refreshInterval: 60000 }
   );
 
+  // The queue currently being charted (explicit selection, else server default).
+  const chartQueue = selectedQueue || data?.selectedQueue || null;
+
+  // Push↔pull convergence — instrumented consumer executions for this queue.
+  // Authenticated dashboard only: execution data belongs to a different service
+  // and is never exposed through a public queue share.
+  const { data: execData } = useSWR(
+    !readOnly && token && id && chartQueue
+      ? `/queue/${id}/executions?queue=${encodeURIComponent(chartQueue)}&${buildTimeRangeQuery(timeRange)}`
+      : null,
+    authFetcher,
+    { refreshInterval: 60000 }
+  );
+
+  // Auto-discovery — queues seen in instrumented workers but not yet monitored.
+  const { data: discData } = useSWR(
+    !readOnly && token ? `/queue/discovered` : null,
+    authFetcher
+  );
+
   const chartData = useMemo(() => {
     if (!data?.history) return [];
     return data.history.map((p: any) => ({
@@ -159,7 +182,9 @@ export default function QueueDetail() {
   const source = data.source;
   const totals = data.totals || { pending: 0, active: 0, dlqDepth: 0, consumers: 0, queueCount: 0 };
   const queues = data.queues || [];
-  const active = selectedQueue || data.selectedQueue;
+  const active = chartQueue;
+  const discovered = (discData?.discovered || []) as Array<{ queueName: string; runs: number }>;
+  const exec = execData?.correlated ? execData : null;
 
   const statusVariant = source.status === 'online' ? 'success' : source.status === 'error' ? 'destructive' : 'secondary';
 
@@ -196,6 +221,25 @@ export default function QueueDetail() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+        {/* Auto-discovered queues (from instrumented workers, not yet monitored) */}
+        {discovered.length > 0 && (
+          <Card className="border-cyan-500/30 bg-cyan-500/5">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Sparkles className="h-4 w-4 text-cyan-500 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium">Detected in your instrumented workers</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  These queues are running in your apps but aren&apos;t monitored yet. Register the broker to track their backlog:{' '}
+                  <span className="font-mono text-foreground">
+                    {discovered.slice(0, 8).map(d => d.queueName).join(', ')}
+                  </span>
+                  {discovered.length > 8 ? ` +${discovered.length - 8} more` : ''}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Source-level stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard title="Total Backlog" value={<SmartAnimatedValue value={totals.pending} />} subtext="Pending across all queues" icon={Inbox} />
@@ -350,6 +394,56 @@ export default function QueueDetail() {
               <StatCard title="Drain ETA" value={fmtEta(data.latest?.etaToEmptyMs)} subtext="Projected time to empty" icon={Clock} />
               <StatCard title="Oldest Job" value={fmtAge(data.latest?.oldestWaitingAgeMs)} subtext="Head-of-line wait" icon={AlertTriangle} color="text-amber-500" />
             </div>
+
+            {/* Push↔pull convergence: instrumented consumer executions for this queue */}
+            {exec && exec.summary && (
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-3 border-b border-border/40 flex flex-row items-center gap-2 space-y-0">
+                  <Workflow className="h-4 w-4 text-indigo-500" />
+                  <CardTitle className="text-sm font-medium">Instrumented Executions</CardTitle>
+                  <Badge variant="outline" className="text-[10px]">via apm-node</Badge>
+                  <span className="text-xs text-muted-foreground ml-auto">What&apos;s draining this queue</span>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><div className="text-xs text-muted-foreground">Runs</div><div className="text-lg font-bold tabular-nums">{fmtNum(exec.summary.runs)}</div></div>
+                    <div><div className="text-xs text-muted-foreground">Failure Rate</div><div className={`text-lg font-bold tabular-nums ${exec.summary.failureRate > 0.1 ? 'text-destructive' : ''}`}>{(exec.summary.failureRate * 100).toFixed(1)}%</div></div>
+                    <div><div className="text-xs text-muted-foreground">Dead Letters</div><div className={`text-lg font-bold tabular-nums ${exec.summary.deadLetters > 0 ? 'text-destructive' : ''}`}>{fmtNum(exec.summary.deadLetters)}</div></div>
+                    <div><div className="text-xs text-muted-foreground">Avg Processing</div><div className="text-lg font-bold tabular-nums">{fmtAge(exec.summary.avgDurationMs)}</div></div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs uppercase text-muted-foreground border-b border-border/40">
+                        <tr>
+                          <th className="py-2 pr-4">Job</th>
+                          <th className="py-2 px-2">Service</th>
+                          <th className="py-2 px-2 text-right">Duration</th>
+                          <th className="py-2 px-2">Status</th>
+                          <th className="py-2 pl-2 text-right">When</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {exec.recent.map((r: any) => (
+                          <tr key={r.runId} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/task/${r.serviceId}`)}>
+                            <td className="py-2 pr-4 font-mono truncate max-w-[200px]">{r.taskName}</td>
+                            <td className="py-2 px-2 text-muted-foreground">{r.serviceName}</td>
+                            <td className="py-2 px-2 text-right tabular-nums">{fmtAge(r.duration)}</td>
+                            <td className="py-2 px-2">
+                              {r.isDeadLetter
+                                ? <Badge variant="secondary" className="text-destructive bg-destructive/10">Dead Letter</Badge>
+                                : r.status === 'failed'
+                                  ? <Badge variant="secondary" className="text-destructive bg-destructive/10">Failed</Badge>
+                                  : <Badge variant="secondary" className="text-emerald-500 bg-emerald-500/10">Success</Badge>}
+                            </td>
+                            <td className="py-2 pl-2 text-right text-muted-foreground text-xs">{new Date(r.timestamp).toLocaleTimeString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </div>
