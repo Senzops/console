@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
+import { useShareApi, useShareMode, useShareScopeId } from '../../../lib/share';
+import { ShareButton } from '../../../components/ShareModal';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError } from '../../../components/Core';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../../../components/TimeRangePicker';
 import { usePlanRetention } from '@/lib/usePlanRetention';
@@ -15,8 +17,6 @@ import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { toast } from 'sonner';
 import { useServiceModal } from '@/components/ServiceModals/context';
-
-const fetcher = (url: string) => api.get(url).then(res => res.data);
 
 const SYSTEM_LABELS: Record<string, string> = {
   bullmq: 'BullMQ',
@@ -90,8 +90,10 @@ const StatCard = ({ title, value, subtext, icon: Icon, color = 'text-cyan-500' }
 
 export default function QueueDetail() {
   const router = useRouter();
-  const { id } = router.query;
+  const id = useShareScopeId(router.query.id as string | undefined);
   const { token } = useAuth();
+  const { fetcher: shareFetcher } = useShareApi();
+  const { readOnly } = useShareMode();
   const { openModal } = useServiceModal();
 
   const retentionDays = usePlanRetention();
@@ -104,8 +106,8 @@ export default function QueueDetail() {
 
   const queueParam = selectedQueue ? `&queue=${encodeURIComponent(selectedQueue)}` : '';
   const { data, error, mutate, isValidating } = useSWR(
-    token && id ? `/queue/${id}/stats?${buildTimeRangeQuery(timeRange)}${queueParam}` : null,
-    fetcher,
+    (token || readOnly) && id ? `/queue/${id}/stats?${buildTimeRangeQuery(timeRange)}${queueParam}` : null,
+    shareFetcher,
     { refreshInterval: 60000 }
   );
 
@@ -187,8 +189,9 @@ export default function QueueDetail() {
           <Button variant="outline" size="icon" onClick={() => mutate()} disabled={isValidating}>
             <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="outline" size="icon" onClick={openEdit}><Pencil className="h-4 w-4" /></Button>
-          <Button variant="outline" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+          {!readOnly && <ShareButton scopeType="queue" scopeId={id as string} dashboardName={source?.name} />}
+          {!readOnly && <Button variant="outline" size="icon" onClick={openEdit}><Pencil className="h-4 w-4" /></Button>}
+          {!readOnly && <Button variant="outline" size="icon" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
         </div>
       </div>
 
@@ -328,14 +331,21 @@ export default function QueueDetail() {
               </ChartCard>
             </div>
 
-            {/* Drain projection */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {/* Drain projection + throughput */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 title="Net Rate"
                 value={`${(data.latest?.netRate ?? 0) > 0 ? '+' : ''}${(data.latest?.netRate ?? 0).toFixed(2)}/s`}
                 subtext={(data.latest?.netRate ?? 0) < 0 ? 'Draining' : (data.latest?.netRate ?? 0) > 0 ? 'Growing' : 'Stable'}
                 icon={TrendingDown}
                 color={(data.latest?.netRate ?? 0) < 0 ? 'text-emerald-500' : (data.latest?.netRate ?? 0) > 0 ? 'text-amber-500' : 'text-muted-foreground'}
+              />
+              <StatCard
+                title="Throughput"
+                value={`${(data.latest?.completedRate ?? 0).toFixed(1)}/s`}
+                subtext={(data.latest?.failedRate ?? 0) > 0 ? `${(data.latest.failedRate).toFixed(1)}/s failing` : 'Processed'}
+                icon={Activity}
+                color="text-emerald-500"
               />
               <StatCard title="Drain ETA" value={fmtEta(data.latest?.etaToEmptyMs)} subtext="Projected time to empty" icon={Clock} />
               <StatCard title="Oldest Job" value={fmtAge(data.latest?.oldestWaitingAgeMs)} subtext="Head-of-line wait" icon={AlertTriangle} color="text-amber-500" />

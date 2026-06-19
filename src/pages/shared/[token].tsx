@@ -12,6 +12,7 @@ import ApmView from "@/components/ApmView";
 // and route all reads through the public share endpoints (useShareApi).
 import MonitorDetail from "@/pages/dashboard/monitor/[id]";
 import DatabaseDetail from "@/pages/dashboard/db/[id]";
+import QueueDetail from "@/pages/dashboard/queue/[id]";
 import FirebaseDetail from "@/pages/dashboard/firebase/[id]";
 import WebDetail from "@/pages/dashboard/web/[id]";
 import ServerDetail from "@/pages/dashboard/server/[id]";
@@ -47,6 +48,8 @@ const SharedDashboardBody = ({ meta }: { meta: ShareMeta }) => {
       return <MonitorDetail />;
     case "database":
       return <DatabaseDetail />;
+    case "queue":
+      return <QueueDetail />;
     case "firebase":
       return <FirebaseDetail />;
     case "task":

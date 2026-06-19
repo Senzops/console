@@ -87,6 +87,7 @@ export type ShareScopeType =
   | "rum"
   | "uptime"
   | "database"
+  | "queue"
   | "firebase"
   | "task"
   | "web"
