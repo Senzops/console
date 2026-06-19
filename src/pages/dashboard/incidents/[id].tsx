@@ -46,6 +46,7 @@ import {
   Maximize,
   X,
   Bug,
+  Layers,
   Cpu,
   Globe,
   Brain,
@@ -117,6 +118,8 @@ const getTargetIcon = (target: string) => {
       return <Cpu className="h-4 w-4 text-violet-500" />;
     case "web":
       return <Globe className="h-4 w-4 text-cyan-500" />;
+    case "queue":
+      return <Layers className="h-4 w-4 text-cyan-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }

@@ -83,7 +83,8 @@ import {
   Bug,
   Cpu,
   Globe,
-  Flame
+  Flame,
+  Layers
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -125,6 +126,8 @@ const getTargetIcon = (target: string) => {
       return <Globe className="h-4 w-4 text-cyan-500" />;
     case "firebase":
       return <Flame className="h-4 w-4 text-amber-500" />;
+    case "queue":
+      return <Layers className="h-4 w-4 text-cyan-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -206,6 +209,7 @@ const DEFAULT_QUERIES: Record<string, string> = {
   runtime: '[\n  { "$match": { "eventLoopLagMs": { "$gt": 50 } } },\n  { "$project": { "time": "$timestamp", "eventLoopLagMs": 1, "eventLoopLagP99Ms": 1, "heapUsedPercent": 1, "gcTotalDurationMs": 1, "activeHandles": 1, "rssBytes": 1, "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   web: '[\n  { "$match": { "type": "pageview" } },\n  { "$project": { "time": "$createdAt", "path": 1, "title": 1, "referrer": 1, "channel": 1, "browser": 1, "device": 1, "country": 1, "duration": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   firebase: '[\n  { "$project": { "time": "$timestamp", "totalUsers": "$auth.totalUsers", "dau": "$auth.activeUsersDaily", "mau": "$auth.activeUsersMonthly", "signups": "$auth.newSignups24h", "mfaEnrolled": "$auth.mfaEnrolledCount", "recentSignIns": "$auth.recentSignIns1h", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  queue: '[\n  { "$project": { "time": "$timestamp", "queue": "$queueName", "backlog": "$pending", "dlq": "$dlqDepth", "consumers": "$consumerCount", "oldestSec": { "$divide": ["$oldestWaitingAgeMs", 1000] }, "netRate": "$netRate", "source": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
 // Universal Pipeline Templates
@@ -333,6 +337,28 @@ const QUICK_TEMPLATES: Record<string, any[]> = {
       label: "Memory Usage",
       config: { viz: "line" },
       query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Resident MB": { "$avg": "$memory.resident" },\n    "Virtual MB": { "$avg": "$memory.virtual" }\n  }},\n  { "$project": { "time": "$_id", "Resident MB": 1, "Virtual MB": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+  ],
+  queue: [
+    {
+      label: "Backlog Trend",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Backlog": { "$avg": "$pending" }\n  }},\n  { "$project": { "time": "$_id", "Backlog": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Dead Letter Queue",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "DLQ": { "$max": "$dlqDepth" }\n  }},\n  { "$project": { "time": "$_id", "DLQ": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Consumers",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Consumers": { "$avg": "$consumerCount" }\n  }},\n  { "$project": { "time": "$_id", "Consumers": 1, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Backlog by Queue",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": { "_id": "$queueName", "Backlog": { "$max": "$pending" } } },\n  { "$project": { "name": "$_id", "Backlog": 1, "_id": 0 } },\n  { "$sort": { "Backlog": -1 } },\n  { "$limit": 20 }\n]`,
     },
   ],
   uptime: [
@@ -2153,6 +2179,7 @@ export default function CustomDashboardView() {
                         <SelectItem value="apm">Backend APM</SelectItem>
                         <SelectItem value="logs">Logs</SelectItem>
                         <SelectItem value="database">Database</SelectItem>
+                        <SelectItem value="queue">Queues</SelectItem>
                         <SelectItem value="vps">VPS Infra</SelectItem>
                         <SelectItem value="task">Tasks</SelectItem>
                         <SelectItem value="rum">Web RUM</SelectItem>

@@ -23,6 +23,7 @@ import {
   MonitorSmartphone,
   LayoutTemplate,
   Flame,
+  Layers,
 } from "lucide-react";
 import useSWR from "swr";
 import { api, useAuth } from "../../lib/auth";
@@ -54,6 +55,7 @@ interface DashboardViewProps {
     | "apm"
     | "monitor"
     | "database"
+    | "queue"
     | "task"
     | "rum"
     | "firebase"
@@ -96,6 +98,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutate: mutateDb,
   } = useSWR(token ? "/database/list" : null, fetcher);
   const {
+    data: queueList,
+    error: queueErr,
+    mutate: mutateQueue,
+  } = useSWR(token ? "/queue/list" : null, fetcher);
+  const {
     data: taskList,
     error: taskErr,
     mutate: mutateTask,
@@ -127,6 +134,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     monitorErr ||
     apmErr ||
     dbErr ||
+    queueErr ||
     taskErr ||
     rumErr ||
     firebaseErr ||
@@ -138,6 +146,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     !monitorList &&
     !apmList &&
     !dbList &&
+    !queueList &&
     !taskList &&
     !rumList &&
     !firebaseList &&
@@ -150,6 +159,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     (webList?.length || 0) === 0 &&
     (monitorList?.length || 0) === 0 &&
     (dbList?.length || 0) === 0 &&
+    (queueList?.length || 0) === 0 &&
     (apmList?.length || 0) === 0 &&
     (taskList?.length || 0) === 0 &&
     (rumList?.length || 0) === 0 &&
@@ -167,6 +177,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutateMonitor();
     mutateApm();
     mutateDb();
+    mutateQueue();
     mutateTask();
     mutateRum();
     mutateFirebase();
@@ -225,6 +236,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
       type: "firebase",
       meta: f.projectId,
     })),
+    ...(queueList || []).map((q: any) => ({
+      ...q,
+      type: "queue",
+      meta: `${q.discoveredQueues ?? 0} queues`,
+    })),
     ...(webList || []).map((w: any) => ({ ...w, type: "web" })),
     ...(rumList || []).map((r: any) => ({ ...r, type: "rum" })),
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
@@ -247,6 +263,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     if (item.type === "apm") return `/dashboard/apm/${item._id}`;
     if (item.type === "task") return `/dashboard/task/${item._id}`;
     if (item.type === "database") return `/dashboard/db/${item._id}`;
+    if (item.type === "queue") return `/dashboard/queue/${item._id}`;
     if (item.type === "firebase") return `/dashboard/firebase/${item._id}`;
     if (item.type === "view") return `/dashboard/views/${item._id}`;
     if (item.type === "board") return `/dashboard/monitor/board/${item._id}`;
@@ -270,6 +287,15 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         </Badge>
       );
     if (item.type === "firebase")
+      return (
+        <Badge
+          variant={item.status === "online" ? "success" : "destructive"}
+          className="px-2 py-0 text-[10px]"
+        >
+          {item.status === "online" ? "ONLINE" : item.status === "error" ? "ERROR" : "OFFLINE"}
+        </Badge>
+      );
+    if (item.type === "queue")
       return (
         <Badge
           variant={item.status === "online" ? "success" : "destructive"}
@@ -385,6 +411,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         return <Workflow className={`h-5 w-5 text-indigo-500`} />;
       case "database":
         return <Database className={`h-5 w-5 text-emerald-500`} />;
+      case "queue":
+        return <Layers className={`h-5 w-5 text-cyan-500`} />;
       case "firebase":
         return <Flame className={`h-5 w-5 text-amber-500`} />;
       case "view":
@@ -447,6 +475,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
       return (
         <>
           <Flame className="h-3 w-3" /> {item.meta}
+        </>
+      );
+    if (item.type === "queue")
+      return (
+        <>
+          <Layers className="h-3 w-3" /> {item.meta}
         </>
       );
     if (item.type === "view")
@@ -640,6 +674,35 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
 
                           <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
                             <Flame className="h-3 w-3" /> {item.meta}
+                          </div>
+
+                          <Badge
+                            variant={
+                              item.status === "online"
+                                ? "success"
+                                : "destructive"
+                            }
+                            className="px-2 py-0 text-[10px]"
+                          >
+                            {item.status === "online" ? "ONLINE" : item.status === "error" ? "ERROR" : "OFFLINE"}
+                          </Badge>
+                        </>
+                      )}
+
+                      {item.type === "queue" && (
+                        <>
+                          <div
+                            className={`mb-3 p-3 rounded-full transition-colors ${item.status === "online" ? "bg-cyan-500/10 text-cyan-500" : item.status === "error" ? "bg-destructive/10 text-destructive" : "bg-secondary text-muted-foreground"}`}
+                          >
+                            <Layers className="h-6 w-6" />
+                          </div>
+
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-2 leading-tight">
+                            {item.name}
+                          </h3>
+
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-70">
+                            <Layers className="h-3 w-3" /> {item.meta}
                           </div>
 
                           <Badge
@@ -887,6 +950,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                                   ? "bg-emerald-500/5"
                                   : item.type === "firebase"
                                     ? "bg-amber-500/5"
+                                    : item.type === "queue"
+                                    ? "bg-cyan-500/5"
                                     : item.type === "apm"
                                     ? "bg-orange-500/5"
                                     : item.type === "task"

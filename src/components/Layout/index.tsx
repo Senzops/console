@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   List,
   Database,
+  Layers,
   Flame,
   EyeOff,
   Eye,
@@ -809,6 +810,7 @@ export const DashboardLayout = ({
   const { mutate: mutateMonitors } = useSWR(token ? "/uptime/list" : null, fetcher);
   const { mutate: mutateApm } = useSWR(token ? "/apm/list" : null, fetcher);
   const { mutate: mutateDb } = useSWR(token ? "/database/list" : null, fetcher);
+  const { mutate: mutateQueue } = useSWR(token ? "/queue/list" : null, fetcher);
   const { mutate: mutateFirebase } = useSWR(token ? "/firebase/list" : null, fetcher);
   const { mutate: mutateTask } = useSWR(token ? "/task/list" : null, fetcher);
   const { mutate: mutateRum } = useSWR(token ? "/rum/list" : null, fetcher);
@@ -822,6 +824,7 @@ export const DashboardLayout = ({
       monitor: mutateMonitors,
       apm: mutateApm,
       database: mutateDb,
+      queue: mutateQueue,
       firebase: mutateFirebase,
       task: mutateTask,
       rum: mutateRum,
@@ -1040,6 +1043,7 @@ const DashboardLayoutInner = ({
   const { data: monitorList } = useSWR(token ? "/uptime/list" : null, fetcher);
   const { data: apmList } = useSWR(token ? "/apm/list" : null, fetcher);
   const { data: dbList } = useSWR(token ? "/database/list" : null, fetcher);
+  const { data: queueList } = useSWR(token ? "/queue/list" : null, fetcher);
   const { data: firebaseList } = useSWR(token ? "/firebase/list" : null, fetcher);
   const { data: taskList } = useSWR(token ? "/task/list" : null, fetcher);
   const { data: rumList } = useSWR(token ? "/rum/list" : null, fetcher);
@@ -1267,6 +1271,27 @@ const DashboardLayoutInner = ({
                   linkPrefix: "/dashboard/db",
                   onAdd: !user.isDemo ? () => openModal('database') : undefined,
                   icon: <Database className="h-3.5 w-3.5 text-blue-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              <SidebarSection
+                title="Queues"
+                items={queueList}
+                hrefPrefix="/dashboard/queue"
+                linkPrefix="/dashboard/queue"
+                onAdd={!user.isDemo ? () => openModal('queue') : undefined}
+                icon={<Layers className="h-3 w-3 text-cyan-500 shrink-0" />}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "queues",
+                  title: "Queues",
+                  items: queueList,
+                  hrefPrefix: "/dashboard/queue",
+                  linkPrefix: "/dashboard/queue",
+                  onAdd: !user.isDemo ? () => openModal('queue') : undefined,
+                  icon: <Layers className="h-3.5 w-3.5 text-cyan-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
                 onMouseLeave={handleSectionMouseLeave}

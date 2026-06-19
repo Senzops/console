@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { api } from "../../lib/auth";
@@ -154,6 +154,29 @@ export const ServiceModals: React.FC = () => {
 
   const isEdit = mode === "edit";
   const apmTabsRef = useRef<HTMLDivElement>(null);
+
+  // Queue-modal-local fields (not part of the shared form state).
+  const [queueSystem, setQueueSystem] = useState<string>("bullmq");
+  const [qc, setQc] = useState<Record<string, any>>({ prefix: "bull", vhost: "/", ssl: false });
+  const [queueFilter, setQueueFilter] = useState("");
+  const setQcField = (k: string, v: any) => setQc((p) => ({ ...p, [k]: v }));
+
+  // Sync queue-specific fields whenever the queue modal opens.
+  useEffect(() => {
+    if (activeModal !== "queue") return;
+    if (mode === "edit" && editData) {
+      setQueueSystem(editData.system || "bullmq");
+      const meta: Record<string, any> = { ...(editData.connectionMeta || {}) };
+      if (Array.isArray(meta.brokers)) meta.brokers = meta.brokers.join("\n");
+      setQc(meta);
+      setQueueFilter(editData.queueFilter || "");
+    } else {
+      setQueueSystem("bullmq");
+      setQc({ prefix: "bull", vhost: "/", ssl: false });
+      setQueueFilter("");
+      setInterval("1");
+    }
+  }, [activeModal, mode, editData, setInterval]);
 
   const scrollApmTabs = (direction: "left" | "right") => {
     if (!apmTabsRef.current) return;
@@ -451,6 +474,79 @@ export const ServiceModals: React.FC = () => {
       }
     } catch (e: any) {
       handleApiError(e, isEdit ? "Failed to update database" : "Failed to connect database.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Build a broker-specific connection object from the local form state.
+  // In edit mode, empty values are dropped so unchanged secrets (never sent
+  // back to the client) are preserved server-side via a merge.
+  const buildQueueConnection = (): Record<string, any> => {
+    const t = (v: any) => (typeof v === "string" ? v.trim() : v);
+    switch (queueSystem) {
+      case "bullmq":
+        return { uri: t(qc.uri), prefix: t(qc.prefix) || "bull" };
+      case "rabbitmq":
+        return { apiUrl: t(qc.apiUrl), username: t(qc.username), password: t(qc.password), vhost: t(qc.vhost) || "/" };
+      case "kafka":
+        return {
+          brokers: String(qc.brokers || "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
+          ssl: Boolean(qc.ssl),
+          saslMechanism: qc.saslMechanism || undefined,
+          username: t(qc.username) || undefined,
+          password: t(qc.password) || undefined,
+        };
+      case "sqs":
+        return { region: t(qc.region), accessKeyId: t(qc.accessKeyId), secretAccessKey: t(qc.secretAccessKey) };
+      default:
+        return {};
+    }
+  };
+
+  const handleQueueSubmit = async () => {
+    if (!isEdit && !name.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const filterArr = queueFilter
+        .split(/[\n,]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      let connection = buildQueueConnection();
+      // In edit mode, strip empty values so we don't clobber stored secrets.
+      if (isEdit) {
+        connection = Object.fromEntries(
+          Object.entries(connection).filter(([, v]) =>
+            Array.isArray(v) ? v.length > 0 : v !== "" && v !== undefined && v !== null
+          )
+        );
+      }
+
+      if (isEdit && editData?.id) {
+        const body: any = { queueFilter: filterArr };
+        if (name.trim()) body.name = name.trim();
+        if (interval) body.interval = Number(interval);
+        if (Object.keys(connection).length > 0) body.connection = connection;
+        await api.put(`/queue/${editData.id}`, body);
+        await editData.onSuccess?.();
+        closeModal();
+        toast.success("Queue source updated");
+      } else {
+        await api.post("/queue/register", {
+          name: name.trim(),
+          system: queueSystem,
+          connection,
+          queueFilter: filterArr,
+          interval: Number(interval),
+        });
+        closeModal();
+        mutateFns.queue?.();
+        toast.success("Queue Source Connected & Monitored!");
+      }
+    } catch (e: any) {
+      handleApiError(e, isEdit ? "Failed to update queue source" : "Failed to connect queue source.");
     } finally {
       setLoading(false);
     }
@@ -1434,6 +1530,290 @@ export const ServiceModals: React.FC = () => {
               ) : (
                 "Connect & Monitor"
               )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* ================================================================= */}
+      {/* QUEUE MODAL (multi-broker: BullMQ / RabbitMQ / Kafka / SQS)        */}
+      {/* ================================================================= */}
+      <Dialog
+        open={activeModal === "queue"}
+        onClose={closeModal}
+        title={isEdit ? "Edit Queue Source" : "Connect Queue Source"}
+      >
+        <div className="space-y-4">
+          <ErrorBanner />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Queue System</label>
+            <Select value={queueSystem} onValueChange={(v) => { setQueueSystem(v); setQc(v === "bullmq" ? { prefix: "bull" } : v === "rabbitmq" ? { vhost: "/" } : v === "kafka" ? { ssl: false } : {}); }} disabled={loading || isEdit}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bullmq">BullMQ (Redis)</SelectItem>
+                <SelectItem value="rabbitmq">RabbitMQ</SelectItem>
+                <SelectItem value="kafka">Apache Kafka</SelectItem>
+                <SelectItem value="sqs">AWS SQS</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Display Name</label>
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+              placeholder="e.g. Production Workers"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={loading}
+              maxLength={50}
+            />
+          </div>
+
+          {/* --- BullMQ --- */}
+          {queueSystem === "bullmq" && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Redis Connection URI
+                  {isEdit && <span className="text-muted-foreground font-normal text-xs ml-2">(leave blank to keep current)</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono pr-10"
+                    placeholder={isEdit ? "Leave blank to keep current URI" : "redis://:password@host:6379/0  (rediss:// for TLS)"}
+                    value={qc.uri || ""}
+                    onChange={(e) => setQcField("uri", e.target.value)}
+                    disabled={loading}
+                    type={showUri ? "text" : "password"}
+                  />
+                  <button type="button" className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground" onClick={() => setShowUri(!showUri)}>
+                    {showUri ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Key Prefix</label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+                  placeholder="bull"
+                  value={qc.prefix ?? "bull"}
+                  onChange={(e) => setQcField("prefix", e.target.value)}
+                  disabled={loading}
+                  maxLength={100}
+                />
+              </div>
+            </>
+          )}
+
+          {/* --- RabbitMQ --- */}
+          {queueSystem === "rabbitmq" && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Management API URL</label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+                  placeholder="http://host:15672"
+                  value={qc.apiUrl || ""}
+                  onChange={(e) => setQcField("apiUrl", e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Username</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="guest"
+                    value={qc.username || ""}
+                    onChange={(e) => setQcField("username", e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Virtual Host</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+                    placeholder="/"
+                    value={qc.vhost ?? "/"}
+                    onChange={(e) => setQcField("vhost", e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Password
+                  {isEdit && <span className="text-muted-foreground font-normal text-xs ml-2">(leave blank to keep current)</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none pr-10"
+                    placeholder={isEdit ? "••••••••" : "Password"}
+                    value={qc.password || ""}
+                    onChange={(e) => setQcField("password", e.target.value)}
+                    disabled={loading}
+                    type={showUri ? "text" : "password"}
+                  />
+                  <button type="button" className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground" onClick={() => setShowUri(!showUri)}>
+                    {showUri ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* --- Kafka --- */}
+          {queueSystem === "kafka" && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Bootstrap Brokers</label>
+                <textarea
+                  className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+                  placeholder={"broker1:9092\nbroker2:9092"}
+                  value={qc.brokers || ""}
+                  onChange={(e) => setQcField("brokers", e.target.value)}
+                  disabled={loading}
+                />
+                <p className="text-[10px] text-muted-foreground">One host:port per line (or comma-separated).</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">SASL Mechanism</label>
+                  <Select value={qc.saslMechanism || "none"} onValueChange={(v) => setQcField("saslMechanism", v === "none" ? undefined : v)} disabled={loading}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (PLAINTEXT)</SelectItem>
+                      <SelectItem value="plain">PLAIN</SelectItem>
+                      <SelectItem value="scram-sha-256">SCRAM-SHA-256</SelectItem>
+                      <SelectItem value="scram-sha-512">SCRAM-SHA-512</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">TLS / SSL</label>
+                  <Select value={qc.ssl ? "true" : "false"} onValueChange={(v) => setQcField("ssl", v === "true")} disabled={loading}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">Disabled</SelectItem>
+                      <SelectItem value="true">Enabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {qc.saslMechanism && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Username</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                      value={qc.username || ""}
+                      onChange={(e) => setQcField("username", e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Password
+                      {isEdit && <span className="text-muted-foreground font-normal text-[10px] ml-1">(blank=keep)</span>}
+                    </label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                      placeholder={isEdit ? "••••••••" : ""}
+                      value={qc.password || ""}
+                      onChange={(e) => setQcField("password", e.target.value)}
+                      disabled={loading}
+                      type="password"
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* --- AWS SQS --- */}
+          {queueSystem === "sqs" && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">AWS Region</label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+                  placeholder="us-east-1"
+                  value={qc.region || ""}
+                  onChange={(e) => setQcField("region", e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Access Key ID</label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+                  placeholder="AKIA..."
+                  value={qc.accessKeyId || ""}
+                  onChange={(e) => setQcField("accessKeyId", e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Secret Access Key
+                  {isEdit && <span className="text-muted-foreground font-normal text-xs ml-2">(leave blank to keep current)</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono pr-10"
+                    placeholder={isEdit ? "••••••••" : ""}
+                    value={qc.secretAccessKey || ""}
+                    onChange={(e) => setQcField("secretAccessKey", e.target.value)}
+                    disabled={loading}
+                    type={showUri ? "text" : "password"}
+                  />
+                  <button type="button" className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground" onClick={() => setShowUri(!showUri)}>
+                    {showUri ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Use an IAM user scoped to <span className="font-mono">sqs:ListQueues</span> and <span className="font-mono">sqs:GetQueueAttributes</span> only.</p>
+            </>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Poll Interval</label>
+            <Select value={interval} onValueChange={(v) => setInterval(v)} disabled={loading}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Every 1 minute (High Detail)</SelectItem>
+                <SelectItem value="5">Every 5 minutes (Standard)</SelectItem>
+                <SelectItem value="15">Every 15 minutes (Low Footprint)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              {queueSystem === "kafka" ? "Consumer Group Allowlist" : "Queue Allowlist"}
+              <span className="text-muted-foreground font-normal text-xs ml-2">(optional — blank = auto-discover all)</span>
+            </label>
+            <textarea
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none font-mono"
+              placeholder={queueSystem === "kafka" ? "orders-consumer\npayments-consumer" : "emails\npayments\nimage-processing"}
+              value={queueFilter}
+              onChange={(e) => setQueueFilter(e.target.value)}
+              disabled={loading}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              One name per line (or comma-separated). {!isEdit && "Credentials are AES-256 encrypted in our secure vault."}
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" onClick={closeModal} disabled={loading}>Cancel</Button>
+            <Button onClick={handleQueueSubmit} disabled={loading} className="min-w-[140px]">
+              {loading ? (
+                <><Spinner className="mr-2 h-4 w-4" /> {isEdit ? "Updating..." : "Connecting..."}</>
+              ) : isEdit ? "Update" : "Connect & Save"}
             </Button>
           </div>
         </div>

@@ -52,6 +52,7 @@ import {
   Cpu,
   Globe,
   Flame,
+  Layers,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ const DEFAULT_ALERT_QUERIES: Record<string, string> = {
   runtime: '[\n  { "$match": {\n    "$or": [\n      { "eventLoopLagMs": { "$gt": 100 } },\n      { "heapUsedPercent": { "$gt": 90 } }\n    ]\n  } }\n]',
   web: '[\n  { "$match": {\n    "type": "pageview",\n    "duration": 0\n  } }\n]',
   firebase: '[\n  { "$match": {\n    "auth.newSignups24h": { "$gt": 100 }\n  } }\n]',
+  queue: '[\n  { "$match": {\n    "$or": [\n      { "pending": { "$gt": 1000 } },\n      { "dlqDepth": { "$gt": 50 } },\n      { "consumerCount": 0, "pending": { "$gt": 0 } }\n    ]\n  } }\n]',
 };
 
 const getTargetIcon = (target: string) => {
@@ -101,6 +103,8 @@ const getTargetIcon = (target: string) => {
       return <Globe className="h-4 w-4 text-cyan-500" />;
     case "firebase":
       return <Flame className="h-4 w-4 text-amber-500" />;
+    case "queue":
+      return <Layers className="h-4 w-4 text-cyan-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -1020,6 +1024,7 @@ export default function AlertPolicyDetail() {
                           <SelectItem value="apm">Backend APM</SelectItem>
                           <SelectItem value="logs">Logs</SelectItem>
                           <SelectItem value="database">Database</SelectItem>
+                          <SelectItem value="queue">Queues</SelectItem>
                           <SelectItem value="vps">VPS Infra</SelectItem>
                           <SelectItem value="task">Tasks</SelectItem>
                           <SelectItem value="rum">Web RUM</SelectItem>

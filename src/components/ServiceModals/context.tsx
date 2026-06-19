@@ -14,6 +14,7 @@ export type ServiceType =
   | "monitor"
   | "database"
   | "firebase"
+  | "queue"
   | "view"
   | "board";
 
@@ -29,6 +30,12 @@ export interface EditData {
   interval?: string;
   framework?: string;
   dbType?: string;
+  /** Queue monitoring: broker system (bullmq | rabbitmq | kafka | sqs). */
+  system?: string;
+  /** Queue monitoring: non-secret connection fields for edit prefill. */
+  connectionMeta?: Record<string, any>;
+  /** Queue monitoring: newline/comma-separated allowlist of queue names. */
+  queueFilter?: string;
   description?: string;
   method?: string;
   headers?: Record<string, string>;

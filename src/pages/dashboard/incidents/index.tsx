@@ -35,6 +35,7 @@ import {
   Filter,
   Check,
   Bug,
+  Layers,
   Cpu,
   Globe,
 } from "lucide-react";
@@ -99,6 +100,8 @@ const getTargetIcon = (target: string) => {
       return <Cpu className="h-3.5 w-3.5 text-violet-500" />;
     case "web":
       return <Globe className="h-3.5 w-3.5 text-cyan-500" />;
+    case "queue":
+      return <Layers className="h-3.5 w-3.5 text-cyan-500" />;
     default:
       return <Activity className="h-3.5 w-3.5 text-muted-foreground" />;
   }
