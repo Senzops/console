@@ -162,6 +162,7 @@ export default function QueueDetail() {
       id: id as string,
       name: data.source.name,
       system: data.source.system,
+      mode: data.source.mode,
       connectionMeta: data.source.connectionMeta || {},
       interval: String(data.source.interval),
       queueFilter: (data.source.queueFilter || []).join('\n'),
@@ -200,6 +201,7 @@ export default function QueueDetail() {
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
               {source.name}
               <Badge variant={statusVariant as any} className="uppercase text-[10px]">{source.status}</Badge>
+              {source.mode === 'collector' && <Badge variant="outline" className="text-[10px]">Collector</Badge>}
             </h1>
             <p className="text-muted-foreground text-sm mt-0.5 font-mono">
               {SYSTEM_LABELS[source.system] || source.system} · {totals.queueCount} {source.system === 'kafka' ? 'group/topics' : 'queues'}{source.version ? ` · v${source.version}` : ''}

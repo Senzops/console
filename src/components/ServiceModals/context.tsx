@@ -32,6 +32,8 @@ export interface EditData {
   dbType?: string;
   /** Queue monitoring: broker system (bullmq | rabbitmq | kafka | sqs). */
   system?: string;
+  /** Queue monitoring: connection mode (agentless | collector). */
+  mode?: string;
   /** Queue monitoring: non-secret connection fields for edit prefill. */
   connectionMeta?: Record<string, any>;
   /** Queue monitoring: newline/comma-separated allowlist of queue names. */

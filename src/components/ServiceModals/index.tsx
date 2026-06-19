@@ -97,6 +97,17 @@ const getTaskSnippet = (apiKey?: string) => {
   return `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\n// Initialize as early as possible in your worker entry file\nSenzor.init({\n  apiKey: "${apiKey}"\n});\n\n// BullMQ and Node-Cron are now automatically instrumented!`;
 };
 
+const getCollectorEnv = (system: string, apiKey: string) => {
+  const base = `SENZOR_API_ENDPOINT=https://api.senzor.dev\nSENZOR_QUEUE_API_KEY=${apiKey}\nSENZOR_QUEUE_SYSTEM=${system}`;
+  const perSystem: Record<string, string> = {
+    bullmq: `\nSENZOR_QUEUE_REDIS_URL=redis://:password@host:6379/0\nSENZOR_QUEUE_PREFIX=bull`,
+    rabbitmq: `\nSENZOR_QUEUE_RABBIT_API_URL=http://host:15672\nSENZOR_QUEUE_RABBIT_USER=guest\nSENZOR_QUEUE_RABBIT_PASS=********`,
+    kafka: `\nSENZOR_QUEUE_KAFKA_BROKERS=broker1:9092,broker2:9092\nSENZOR_QUEUE_KAFKA_SSL=false`,
+    sqs: `\nAWS_REGION=us-east-1\nAWS_ACCESS_KEY_ID=AKIA...\nAWS_SECRET_ACCESS_KEY=********`,
+  };
+  return `${base}${perSystem[system] || ""}\n\n# Then run the Senzor queue collector in your infrastructure:\n# node dist/collector/queue.js`;
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -157,21 +168,26 @@ export const ServiceModals: React.FC = () => {
 
   // Queue-modal-local fields (not part of the shared form state).
   const [queueSystem, setQueueSystem] = useState<string>("bullmq");
+  const [queueMode, setQueueMode] = useState<"agentless" | "collector">("agentless");
   const [qc, setQc] = useState<Record<string, any>>({ prefix: "bull", vhost: "/", ssl: false });
   const [queueFilter, setQueueFilter] = useState("");
+  const [collectorResult, setCollectorResult] = useState<{ apiKey: string } | null>(null);
   const setQcField = (k: string, v: any) => setQc((p) => ({ ...p, [k]: v }));
 
   // Sync queue-specific fields whenever the queue modal opens.
   useEffect(() => {
     if (activeModal !== "queue") return;
+    setCollectorResult(null);
     if (mode === "edit" && editData) {
       setQueueSystem(editData.system || "bullmq");
+      setQueueMode((editData.mode as any) || "agentless");
       const meta: Record<string, any> = { ...(editData.connectionMeta || {}) };
       if (Array.isArray(meta.brokers)) meta.brokers = meta.brokers.join("\n");
       setQc(meta);
       setQueueFilter(editData.queueFilter || "");
     } else {
       setQueueSystem("bullmq");
+      setQueueMode("agentless");
       setQc({ prefix: "bull", vhost: "/", ssl: false });
       setQueueFilter("");
       setInterval("1");
@@ -513,6 +529,31 @@ export const ServiceModals: React.FC = () => {
         .split(/[\n,]/)
         .map((s) => s.trim())
         .filter(Boolean);
+
+      // Collector (push) mode — no server-side connection; issue/keep an API key.
+      if (queueMode === "collector") {
+        if (isEdit && editData?.id) {
+          const body: any = { queueFilter: filterArr };
+          if (name.trim()) body.name = name.trim();
+          if (interval) body.interval = Number(interval);
+          await api.put(`/queue/${editData.id}`, body);
+          await editData.onSuccess?.();
+          closeModal();
+          toast.success("Queue collector updated");
+        } else {
+          const res = await api.post("/queue/register", {
+            name: name.trim(),
+            system: queueSystem,
+            mode: "collector",
+            queueFilter: filterArr,
+            interval: Number(interval),
+          });
+          mutateFns.queue?.();
+          setCollectorResult({ apiKey: res.data.apiKey });
+          toast.success("Collector registered — copy your key");
+        }
+        return;
+      }
 
       let connection = buildQueueConnection();
       // In edit mode, strip empty values so we don't clobber stored secrets.
@@ -1545,6 +1586,43 @@ export const ServiceModals: React.FC = () => {
       >
         <div className="space-y-4">
           <ErrorBanner />
+          {collectorResult ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
+                Collector registered. Run the Senzor Queue Collector in your own infrastructure with the environment below — data appears here once it starts pushing.
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Collector API Key</label>
+                <div className="flex gap-2">
+                  <input readOnly value={collectorResult.apiKey} className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono" />
+                  <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(collectorResult.apiKey); toast.success("Key copied"); }}><Copy className="h-4 w-4" /></Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Store it securely — it authenticates metric ingestion for this source.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Environment</label>
+                <pre className="rounded-md border border-border bg-muted/40 p-3 text-xs font-mono overflow-x-auto whitespace-pre">{getCollectorEnv(queueSystem, collectorResult.apiKey)}</pre>
+                <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(getCollectorEnv(queueSystem, collectorResult.apiKey)); toast.success("Copied"); }}>Copy environment</Button>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => closeModal()}>Done</Button>
+              </div>
+            </div>
+          ) : (<>
+          {/* Connection method */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Connection Method</label>
+            <Select value={queueMode} onValueChange={(v) => setQueueMode(v as any)} disabled={loading || isEdit}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="agentless">Agentless — Senzor polls your broker</SelectItem>
+                <SelectItem value="collector">Collector — you run it, pushes to us</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              {queueMode === "collector" ? "For locked-down / VPC environments — your broker is never exposed to Senzor." : "Senzor connects out to your broker on an interval."}
+            </p>
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Queue System</label>
             <Select value={queueSystem} onValueChange={(v) => { setQueueSystem(v); setQc(v === "bullmq" ? { prefix: "bull" } : v === "rabbitmq" ? { vhost: "/" } : v === "kafka" ? { ssl: false } : {}); }} disabled={loading || isEdit}>
@@ -1573,7 +1651,7 @@ export const ServiceModals: React.FC = () => {
           </div>
 
           {/* --- BullMQ --- */}
-          {queueSystem === "bullmq" && (
+          {queueMode === "agentless" && queueSystem === "bullmq" && (
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium">
@@ -1609,7 +1687,7 @@ export const ServiceModals: React.FC = () => {
           )}
 
           {/* --- RabbitMQ --- */}
-          {queueSystem === "rabbitmq" && (
+          {queueMode === "agentless" && queueSystem === "rabbitmq" && (
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Management API URL</label>
@@ -1666,7 +1744,7 @@ export const ServiceModals: React.FC = () => {
           )}
 
           {/* --- Kafka --- */}
-          {queueSystem === "kafka" && (
+          {queueMode === "agentless" && queueSystem === "kafka" && (
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Bootstrap Brokers</label>
@@ -1734,7 +1812,7 @@ export const ServiceModals: React.FC = () => {
           )}
 
           {/* --- AWS SQS --- */}
-          {queueSystem === "sqs" && (
+          {queueMode === "agentless" && queueSystem === "sqs" && (
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium">AWS Region</label>
@@ -1816,6 +1894,7 @@ export const ServiceModals: React.FC = () => {
               ) : isEdit ? "Update" : "Connect & Save"}
             </Button>
           </div>
+          </>)}
         </div>
       </Dialog>
 
