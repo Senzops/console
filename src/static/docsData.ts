@@ -191,6 +191,33 @@ export const DOCS_DATA: DocsConfig = {
       ]
     },
     {
+      id: "queue",
+      title: "Queue Monitoring",
+      iconName: "Layers",
+      shortDescription: "Agentless backlog, throughput, consumer & dead-letter monitoring for BullMQ, RabbitMQ, Kafka & SQS.",
+      overview: "Get full visibility into your message queues and streams. Senzor connects to your broker read-only (or runs a lightweight collector inside your network) and tracks backlog depth, throughput, consumer count, oldest-message age, drain ETA, and dead-letter accumulation — across BullMQ (Redis), RabbitMQ, Apache Kafka, and AWS SQS. When you also run @senzops/apm-node, queue backlog is correlated to the exact consumer executions draining it.",
+      prerequisites: [
+        "A supported broker: BullMQ (Redis), RabbitMQ, Apache Kafka, or AWS SQS.",
+        "Read-only access — a Redis ACL, RabbitMQ management user, Kafka consumer-group read, or an IAM user scoped to sqs:ListQueues and sqs:GetQueueAttributes."
+      ],
+      registrationSteps: [
+        { title: "Add a Queue Source", description: "Click '+' next to Queues and choose your broker system (BullMQ, RabbitMQ, Kafka, or SQS)." },
+        { title: "Choose Connection Method", description: "Agentless — Senzor polls your broker on an interval. Or Collector — run the Senzor queue collector inside your own network (for locked-down / VPC environments) and it pushes metrics to us." },
+        { title: "Provide Credentials", description: "Enter the broker connection details. Secrets are AES-256 encrypted at rest; for BullMQ the key prefix (including the Redis-Cluster '{bull}' hash-tag) is auto-detected." },
+        { title: "Set Interval & Runbook", description: "Choose the polling frequency (1m, 5m, or 15m). Optionally add a management/runbook URL for one-click hand-off when dead letters accumulate." }
+      ],
+      troubleshooting: [
+        {
+          issue: "Metrics show 0 / no queues discovered",
+          solution: "For BullMQ, confirm the key prefix matches your broker — Senzor auto-detects the common 'bull' and Redis-Cluster '{bull}' prefixes. Ensure the connection points at the same Redis database your workers use."
+        },
+        {
+          issue: "Throughput is 0 right after adding a source",
+          solution: "Throughput is derived across consecutive samples, so it appears after the second poll cycle. A backlog of 0 is normal for a healthy, drained queue."
+        }
+      ]
+    },
+    {
       id: "firebase",
       title: "Firebase Monitoring",
       iconName: "Flame",

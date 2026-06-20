@@ -1418,8 +1418,78 @@ const DiagramAiAssistant = () => (
 // DIAGRAM RENDERER
 // ============================================================================
 
+/** Queue Monitoring — throughput-led overview with backlog, dead-letters & consumers */
+const DiagramQueue = () => (
+  <DiagramFrame>
+    <FrameHeader
+      title="Production Workers"
+      icon={<Layers className="w-3.5 h-3.5 text-cyan-500" />}
+      badge={{ label: "ONLINE", style: BADGE_STYLE.online, pulse: true }}
+    />
+    <div className="flex-1 p-4 flex flex-col gap-3">
+      {/* Stat row — throughput leads */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: "Thrpt", value: "1.2k/s", icon: <Activity className="w-3 h-3 text-emerald-500" />, accent: "text-emerald-500" },
+          { label: "Backlog", value: "318", icon: <Layers className="w-3 h-3 text-blue-500" />, accent: "text-foreground" },
+          { label: "Dead Ltr", value: "12", icon: <AlertOctagon className="w-3 h-3 text-red-500" />, accent: "text-red-500" },
+          { label: "Consumers", value: "8", icon: <Users className="w-3 h-3 text-purple-500" />, accent: "text-foreground" },
+        ].map((s, i) => (
+          <div
+            key={s.label}
+            className="bg-background border border-border/50 rounded-lg p-2 shadow-sm flex flex-col gap-1 animate-[diag-fade-in-up_0.4s_ease-out_both]"
+            style={{ animationDelay: `${i * 0.06}s` }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wide">{s.label}</span>
+              {s.icon}
+            </div>
+            <span className={`text-sm font-bold tabular-nums ${s.accent}`}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Throughput sparkline (the hero signal) */}
+      <div
+        className="bg-background border border-border/50 rounded-lg p-2.5 shadow-sm flex items-end gap-1 h-14 animate-[diag-fade-in-up_0.4s_ease-out_both]"
+        style={{ animationDelay: "0.3s" }}
+      >
+        {[40, 55, 48, 70, 62, 85, 78, 92, 72, 88, 95, 80].map((h, i) => (
+          <div
+            key={i}
+            className="flex-1 bg-gradient-to-t from-emerald-500/20 to-emerald-500/70 rounded-sm"
+            style={{ height: `${h}%` }}
+          />
+        ))}
+      </div>
+
+      {/* Per-queue rows */}
+      <div className="flex flex-col gap-1">
+        {[
+          { name: "ingest.apm", backlog: "204", state: "Active", style: BADGE_STYLE.online },
+          { name: "ingest.task", backlog: "0", state: "Idle", style: BADGE_STYLE.uptime },
+        ].map((q, i) => (
+          <div
+            key={q.name}
+            className="flex items-center justify-between bg-background border border-border/40 rounded-md px-2.5 py-1.5 animate-[diag-fade-in-up_0.4s_ease-out_both]"
+            style={{ animationDelay: `${0.36 + i * 0.06}s` }}
+          >
+            <span className="text-[10px] font-mono text-foreground truncate">{q.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-muted-foreground tabular-nums">{q.backlog}</span>
+              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${q.style}`}>{q.state}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </DiagramFrame>
+);
+
 export const renderDiagram = (id: string): React.ReactNode => {
   switch (id) {
+    case "queue":
+      return <DiagramQueue />;
     case "views":
       return <DiagramViews />;
     case "infra":
@@ -1513,6 +1583,22 @@ export const FEATURES_DATA: FeatureData[] = [
     diagramId: "database",
     href: "/features/database",
     colorClasses: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+  },
+  {
+    id: "queue",
+    title: "Queue Monitoring",
+    subtitle: "Keep your message queues flowing.",
+    description:
+      "Monitor backlog, throughput, consumers, oldest-message age, and dead letters across BullMQ, RabbitMQ, Kafka, and AWS SQS — agentless or via a lightweight in-network collector. Correlate a growing backlog to the exact consumer executions behind it.",
+    points: [
+      "Backlog, throughput & drain-ETA tracking",
+      "Dead-letter & consumer-lag observability",
+      "BullMQ, RabbitMQ, Kafka & AWS SQS",
+      "Agentless polling or in-network collector",
+    ],
+    diagramId: "queue",
+    href: "/features/queue",
+    colorClasses: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
   },
   {
     id: "firebase",

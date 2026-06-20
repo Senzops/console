@@ -30,6 +30,7 @@ const LIFECYCLE_STAGES = [
     services: [
       "Infrastructure",
       "Database",
+      "Queue Monitoring",
       "Firebase",
       "Web Analytics",
       "Real User Monitoring",
