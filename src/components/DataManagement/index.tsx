@@ -73,6 +73,8 @@ const TELEMETRY_TYPES = [
   { id: "task-runs", label: "Task Runs", group: "Tasks" },
   { id: "task-metrics", label: "Task Metrics", group: "Tasks" },
   { id: "db-metrics", label: "Database Metrics", group: "Database" },
+  { id: "queue-metrics", label: "Queue Metrics", group: "Queue" },
+  { id: "queue-rollups", label: "Queue Rollups", group: "Queue" },
   { id: "web-events", label: "Web Events", group: "Web Analytics" },
   { id: "web-metrics", label: "Web Metrics", group: "Web Analytics" },
   { id: "logs", label: "Logs", group: "Logs" },
