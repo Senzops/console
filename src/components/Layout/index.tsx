@@ -419,6 +419,24 @@ export const getSidebarItemIcon = (hrefPrefix: string, item: any, DefaultIcon: a
   return Icon;
 };
 
+// Human-readable singular nouns per service section, used for empty-state CTAs.
+// Each entry pluralizes cleanly with a trailing "s" (e.g. "No websites yet").
+const SIDEBAR_SECTION_NOUNS: Record<string, string> = {
+  "Saved Views": "view",
+  Servers: "server",
+  Databases: "database",
+  Queues: "queue source",
+  Firebase: "Firebase project",
+  "Web Analytics": "website",
+  "Web APM (RUM)": "RUM app",
+  "APM Services": "API service",
+  "Background Tasks": "background task",
+  Uptime: "uptime monitor",
+  "Status Boards": "status board",
+};
+
+const getSectionNoun = (title: string) => SIDEBAR_SECTION_NOUNS[title] || "item";
+
 // Helper for Sidebar Sections
 export const SidebarSection = ({
   title,
@@ -517,6 +535,7 @@ export const SidebarSection = ({
           <Button
             variant="ghost"
             size="icon"
+            data-sidebar-active={isAnyChildActive ? "true" : undefined}
             className={cn(
               "h-9 w-9 rounded-xl transition-all duration-200 border border-transparent hover:border-border/40 hover:bg-secondary/40",
               isAnyChildActive
@@ -604,6 +623,7 @@ export const SidebarSection = ({
                 <Link href={`${hrefPrefix}/${item._id}`} key={item._id}>
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
+                    data-sidebar-active={isActive ? "true" : undefined}
                     className={cn(
                       "w-full justify-start gap-2.5 h-8 px-2 text-xs transition-colors",
                       isActive
@@ -633,10 +653,10 @@ export const SidebarSection = ({
               </Link>
             )}
 
-            {/* Empty State */}
+            {/* Empty State — minimal muted hint (add affordance lives in the header) */}
             {items?.length === 0 && (
-              <div className="px-2 py-1.5 text-[10px] text-muted-foreground italic">
-                No service items
+              <div className="px-2 py-1.5 text-[11px] text-muted-foreground/60">
+                No {getSectionNoun(title)}s yet
               </div>
             )}
           </div>
@@ -700,6 +720,7 @@ export const SidebarGroup = ({
           <Button
             variant="ghost"
             size="icon"
+            data-sidebar-active={isAnyChildActive ? "true" : undefined}
             className={cn(
               "h-9 w-9 rounded-xl transition-all duration-200 border border-transparent hover:border-border/40 hover:bg-secondary/40",
               isAnyChildActive
@@ -766,6 +787,7 @@ export const SidebarGroup = ({
                 <Link href={link.href} key={idx}>
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
+                    data-sidebar-active={isActive ? "true" : undefined}
                     className={cn(
                       "w-full justify-start gap-2.5 h-8 px-2 text-xs transition-colors",
                       isActive
@@ -1093,6 +1115,78 @@ const DashboardLayoutInner = ({
     taskList,
     rumList,
     viewsList,
+  ]);
+
+  // ENTERPRISE FIX: Auto-scroll the active item into view on navigation.
+  // Only intervenes when the active item is off-screen, and only once per route
+  // (tracked via ref) so background SWR refreshes never yank the sidebar while the
+  // user is reading it. The scroll target is mirrored to sessionStorage so the
+  // restoration effects above stay consistent and don't fight the animation.
+  const lastAutoScrolledPathRef = useRef<string | null>(null);
+  const hasAutoScrolledOnceRef = useRef(false);
+
+  useEffect(() => {
+    const container = sidebarRef.current;
+    if (!container) return;
+    if (lastAutoScrolledPathRef.current === router.asPath) return;
+
+    // Defer one frame so freshly-rendered list items are laid out before measuring.
+    const raf = requestAnimationFrame(() => {
+      const active = container.querySelector<HTMLElement>(
+        '[data-sidebar-active="true"]',
+      );
+      // No active item yet — lists may still be loading, or this is a non-service
+      // route. Leave the ref unset so we retry once the data paints.
+      if (!active) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const itemRect = active.getBoundingClientRect();
+
+      // Skip hidden/clipped items (e.g. inside a collapsed section).
+      if (itemRect.height < 1) return;
+
+      // We now have a measurable active item — mark this route handled.
+      lastAutoScrolledPathRef.current = router.asPath;
+
+      const margin = 16;
+      const fullyVisible =
+        itemRect.top >= containerRect.top + margin &&
+        itemRect.bottom <= containerRect.bottom - margin;
+      if (fullyVisible) return;
+
+      // Center the active item within the scroll viewport, clamped to bounds.
+      const itemOffsetWithin =
+        itemRect.top - containerRect.top + container.scrollTop;
+      const target =
+        itemOffsetWithin - container.clientHeight / 2 + itemRect.height / 2;
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      const top = Math.max(0, Math.min(target, maxScroll));
+
+      // Persist the target up-front so a racing restoration effect lands here too.
+      sessionStorage.setItem("senzor-sidebar-scroll", String(top));
+
+      container.scrollTo({
+        top,
+        behavior: hasAutoScrolledOnceRef.current ? "smooth" : "auto",
+      });
+      hasAutoScrolledOnceRef.current = true;
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [
+    router.asPath,
+    serverList,
+    webList,
+    monitorList,
+    apmList,
+    dbList,
+    queueList,
+    firebaseList,
+    taskList,
+    rumList,
+    viewsList,
+    boardsData,
+    isMobileSidebarOpen,
   ]);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -1902,8 +1996,8 @@ const DashboardLayoutInner = ({
                       )}
 
                       {hoveredSection.items?.length === 0 && (
-                        <div className="px-2 py-1.5 text-[10px] text-muted-foreground italic">
-                          No service items
+                        <div className="px-2 py-1.5 text-[11px] text-muted-foreground/60">
+                          No {getSectionNoun(hoveredSection.title)}s yet
                         </div>
                       )}
                     </>
