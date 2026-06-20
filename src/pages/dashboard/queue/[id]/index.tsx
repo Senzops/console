@@ -344,14 +344,15 @@ export default function QueueOverview() {
           <StatCard title="Consumers" value={fmtNum(totals.consumers)} sub="Connected workers" icon={Users} color="text-purple-500" isMono={isMono} />
         </div>
 
-        {/* Overall charts */}
+        {/* Overall charts — throughput leads (primary vital sign) */}
         <DynamicChart
-          title="Backlog & Dead Letters"
+          title="Throughput (processed / sec)"
           data={chartData}
-          series={[{ key: 'pending', name: 'Backlog', color: '#3b82f6' }, { key: 'dlqDepth', name: 'Dead Letters', color: '#ef4444' }]}
+          tooltipSuffix="/s"
+          series={[{ key: 'completedRate', name: 'Processed', color: '#10b981' }]}
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <DynamicChart title="Throughput (processed / sec)" data={chartData} tooltipSuffix="/s" series={[{ key: 'completedRate', name: 'Processed', color: '#10b981' }]} />
+          <DynamicChart title="Backlog & Dead Letters" data={chartData} series={[{ key: 'pending', name: 'Backlog', color: '#3b82f6' }, { key: 'dlqDepth', name: 'Dead Letters', color: '#ef4444' }]} />
           <DynamicChart title="Consumers" data={chartData} series={[{ key: 'consumerCount', name: 'Consumers', color: '#8b5cf6' }]} />
         </div>
 

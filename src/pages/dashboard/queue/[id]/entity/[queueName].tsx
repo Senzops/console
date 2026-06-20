@@ -208,11 +208,11 @@ export default function QueueEntityDetail() {
         <StatCard title="Consumers" value={fmtNum(latest.consumerCount ?? 0)} sub={`Oldest ${fmtAge(latest.oldestWaitingAgeMs)}`} icon={Users} color="text-purple-500" isMono={isMono} />
       </div>
 
-      {/* Charts */}
-      <DynamicChart title="Backlog (pending jobs)" data={chartData} series={[{ key: 'pending', name: 'Backlog', color: '#3b82f6' }]} />
+      {/* Charts — throughput leads (primary vital sign) */}
+      <DynamicChart title="Throughput (processed / sec)" data={chartData} tooltipSuffix="/s" series={[{ key: 'completedRate', name: 'Processed', color: '#10b981' }]} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <DynamicChart title="Backlog (pending jobs)" data={chartData} series={[{ key: 'pending', name: 'Backlog', color: '#3b82f6' }]} />
         <DynamicChart title="Dead Letter Queue" data={chartData} series={[{ key: 'dlqDepth', name: 'DLQ', color: '#ef4444' }]} />
-        <DynamicChart title="Throughput (processed / sec)" data={chartData} tooltipSuffix="/s" series={[{ key: 'completedRate', name: 'Processed', color: '#10b981' }]} />
         <DynamicChart title="Oldest waiting job" data={chartData} tooltipFormatter={(v: number) => fmtAge(v * 1000)} series={[{ key: 'oldestWaitingAgeSec', name: 'Oldest', color: '#f59e0b' }]} />
         <DynamicChart title="Consumers" data={chartData} series={[{ key: 'consumerCount', name: 'Consumers', color: '#8b5cf6' }]} />
       </div>
