@@ -406,6 +406,56 @@ export const AI_TOOLS: ToolSchema[] = [
     },
   },
 
+  // --- Queue Monitoring Tools (BullMQ, RabbitMQ, Kafka, AWS SQS) ---
+  {
+    type: 'function',
+    function: {
+      name: 'queue_list',
+      description:
+        'List monitored queue sources (BullMQ, RabbitMQ, Kafka, AWS SQS), their broker system, mode, and status.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'queue_get_stats',
+      description:
+        'Get a queue source overview: total backlog, in-flight, dead-letter depth, consumer count, the per-queue table, and overall throughput/backlog history across all queues.',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string' }, range: { type: 'string' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'queue_get_entity_detail',
+      description:
+        "Get one queue's detail within a source: backlog, dead letters, throughput, oldest-message age, consumers, drain ETA, and time-series history. queueName is the exact name from queue_get_stats.",
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string' }, queueName: { type: 'string' }, range: { type: 'string' } },
+        required: ['id', 'queueName'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'queue_get_executions',
+      description:
+        'Get instrumented consumer executions correlated to a queue (run count, failure rate, dead letters, avg processing time, recent runs). Explains WHY a queue is backing up or draining.',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string' }, queue: { type: 'string' }, range: { type: 'string' } },
+        required: ['id', 'queue'],
+      },
+    },
+  },
+
   // --- Alerts & Incident Tools ---
   {
     type: 'function',
@@ -666,6 +716,25 @@ export async function fetchToolData(
       return (await api.get('/database/list')).data;
     case 'database_get_stats':
       return (await api.get(`/database/${args.id}/stats`, { params })).data;
+
+    // Queue Monitoring
+    case 'queue_list':
+      return (await api.get('/queue/list')).data;
+    case 'queue_get_stats':
+      return (await api.get(`/queue/${args.id}/stats`, { params })).data;
+    case 'queue_get_entity_detail':
+      return (
+        await api.get(
+          `/queue/${args.id}/entity/${encodeURIComponent(args.queueName)}`,
+          { params },
+        )
+      ).data;
+    case 'queue_get_executions':
+      return (
+        await api.get(`/queue/${args.id}/executions`, {
+          params: { ...params, queue: args.queue },
+        })
+      ).data;
 
     // Firebase
     case 'firebase_list':
