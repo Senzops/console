@@ -21,9 +21,6 @@ export default function Custom404() {
         <div className="relative z-10 w-full max-w-2xl text-center space-y-8">
           <div className="space-y-4">
             <Mascot mood="searching" size="xl" interactive className="mx-auto" />
-            <h1 className="text-7xl md:text-8xl font-bold font-display tracking-tighter text-foreground">
-              404
-            </h1>
             <h2 className="text-2xl md:text-3xl font-bold font-display tracking-tight text-foreground">
               Page not found
             </h2>
