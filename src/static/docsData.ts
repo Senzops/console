@@ -320,14 +320,14 @@ export const DOCS_DATA: DocsConfig = {
       registrationSteps: [
         { title: "Create an AI Source", description: "Click '+' next to AI Monitoring in the sidebar, name it, and choose Server or Browser (WebLLM)." },
         { title: "Copy the Source Key", description: "The dashboard issues a one-time sz_ai_ key — copy it now; it is shown only once." },
-        { title: "Initialize the SDK", description: "Call Senzor.init({ apiKey }) as early as possible. Supported providers (OpenAI, Anthropic, Gemini/Vertex, Azure OpenAI, Cohere, Mistral, Groq, Ollama, the Vercel AI SDK and LangChain) are then auto-instrumented." }
+        { title: "Initialize the SDK", description: "Call Senzor.init({ ai: { apiKey } }) as early as possible — AI Monitoring sources carry their own key. If you already run Senzor APM/Task, keep your existing top-level apiKey and just add the ai key. Supported providers (OpenAI, Anthropic, Gemini/Vertex, Azure OpenAI, Cohere, Mistral, Groq, Ollama, the Vercel AI SDK and LangChain) are then auto-instrumented." }
       ],
       installation: [
         {
           framework: "Auto-instrumentation",
           language: "typescript",
-          code: `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\nSenzor.init({\n  apiKey: "<YOUR_AI_KEY>",\n  ai: { captureContent: false } // set true to store masked prompts/outputs\n});\n\n// OpenAI, Anthropic, Gemini, Cohere, Mistral, Groq, Ollama,\n// the Vercel AI SDK and LangChain are now captured automatically.`,
-          notes: "Cost is recomputed server-side — the SDK never sends a cost field. Set ai.sampleRate (0–1) for high-volume head sampling."
+          code: `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\n// Already using Senzor APM/Task? Keep your existing apiKey and just add \`ai\`.\nSenzor.init({\n  ai: { apiKey: "<YOUR_AI_KEY>", captureContent: false } // captureContent: store masked prompts/outputs\n});\n\n// OpenAI, Anthropic, Gemini, Cohere, Mistral, Groq, Ollama,\n// the Vercel AI SDK and LangChain are now captured automatically.`,
+          notes: "AI sources use a dedicated key under ai.apiKey, separate from APM/Task. Cost is recomputed server-side — the SDK never sends a cost field. Set ai.sampleRate (0–1) for high-volume head sampling."
         },
         {
           framework: "Manual wrap (any model)",
@@ -338,7 +338,7 @@ export const DOCS_DATA: DocsConfig = {
         {
           framework: "Browser (WebLLM)",
           language: "typescript",
-          code: `import Senzor from '@senzops/apm-node';\n\nSenzor.init({ apiKey: "<YOUR_AI_KEY>" });\n\n// In-browser models make no network call, so wrap them manually.\nawait Senzor.ai.wrapGeneration(\n  { provider: 'webllm', model: 'Llama-3-8B', operation: 'chat' },\n  () => engine.chat.completions.create({ messages })\n);`,
+          code: `import Senzor from '@senzops/apm-node';\n\nSenzor.init({ ai: { apiKey: "<YOUR_AI_KEY>" } });\n\n// In-browser models make no network call, so wrap them manually.\nawait Senzor.ai.wrapGeneration(\n  { provider: 'webllm', model: 'Llama-3-8B', operation: 'chat' },\n  () => engine.chat.completions.create({ messages })\n);`,
           notes: "Browser sources never store prompt/output content, regardless of settings, for privacy."
         }
       ],
