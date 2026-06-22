@@ -97,6 +97,13 @@ const getTaskSnippet = (apiKey?: string) => {
   return `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\n// Initialize as early as possible in your worker entry file\nSenzor.init({\n  apiKey: "${apiKey}"\n});\n\n// BullMQ and Node-Cron are now automatically instrumented!`;
 };
 
+const getAiSnippet = (apiKey?: string, type: string = "server") => {
+  if (type === "browser") {
+    return `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\nSenzor.init({ apiKey: "${apiKey}" });\n\n// Wrap an in-browser model (e.g. WebLLM) — content capture stays off in the browser\nawait Senzor.ai.wrapGeneration(\n  { provider: 'webllm', model: 'Llama-3-8B', operation: 'chat' },\n  () => engine.chat.completions.create({ messages })\n);`;
+  }
+  return `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\n// Initialize as early as possible in your entry file\nSenzor.init({\n  apiKey: "${apiKey}",\n  ai: { captureContent: false } // opt-in to store prompts/outputs\n});\n\n// OpenAI, Anthropic, Gemini, etc. are auto-instrumented.\n// Or monitor ANY model manually:\nawait Senzor.ai.wrapGeneration(\n  {\n    provider: 'openai', model: 'gpt-4o', operation: 'chat',\n    extract: (r) => ({ tokensIn: r.usage.prompt_tokens, tokensOut: r.usage.completion_tokens })\n  },\n  () => openai.chat.completions.create({ model: 'gpt-4o', messages })\n);`;
+};
+
 const getCollectorEnv = (system: string, apiKey: string) => {
   const base = `SENZOR_API_ENDPOINT=https://api.senzor.dev\nSENZOR_QUEUE_API_KEY=${apiKey}\nSENZOR_QUEUE_SYSTEM=${system}`;
   const perSystem: Record<string, string> = {
@@ -174,6 +181,32 @@ export const ServiceModals: React.FC = () => {
   const [queueMgmtUrl, setQueueMgmtUrl] = useState("");
   const [collectorResult, setCollectorResult] = useState<{ apiKey: string } | null>(null);
   const setQcField = (k: string, v: any) => setQc((p) => ({ ...p, [k]: v }));
+
+  // AI monitoring source type (server vs in-browser).
+  const [aiType, setAiType] = useState<"server" | "browser">("server");
+  const [aiCaptureContent, setAiCaptureContent] = useState(false);
+  const [aiSampleRate, setAiSampleRate] = useState("1");
+  const [aiMaskingRules, setAiMaskingRules] = useState("");
+  const [aiManagementUrl, setAiManagementUrl] = useState("");
+
+  // Sync AI settings into the form whenever the AI modal opens in edit mode.
+  React.useEffect(() => {
+    if (activeModal !== "ai") return;
+    if (mode === "edit" && editData) {
+      const s = (editData as any).aiSettings || {};
+      setAiType(((editData as any).aiType as "server" | "browser") || "server");
+      setAiCaptureContent(!!s.captureContent);
+      setAiSampleRate(String(s.sampleRate ?? 1));
+      setAiMaskingRules(Array.isArray(s.maskingRules) ? s.maskingRules.join(", ") : "");
+      setAiManagementUrl((editData as any).managementUrl || "");
+    } else if (mode === "register") {
+      setAiType("server");
+      setAiCaptureContent(false);
+      setAiSampleRate("1");
+      setAiMaskingRules("");
+      setAiManagementUrl("");
+    }
+  }, [activeModal, mode, editData]);
 
   // Sync queue-specific fields whenever the queue modal opens.
   useEffect(() => {
@@ -416,6 +449,41 @@ export const ServiceModals: React.FC = () => {
       }
     } catch (e: any) {
       handleApiError(e, isEdit ? "Failed to update task service" : "Failed to create task environment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAiSubmit = async () => {
+    if (!name.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      if (isEdit && editData?.id) {
+        await api.put(`/ai/observability/${editData.id}`, {
+          name: name.trim(),
+          managementUrl: aiManagementUrl,
+          settings: {
+            captureContent: (editData as any).aiType === "browser" ? false : aiCaptureContent,
+            sampleRate: Math.max(0, Math.min(1, parseFloat(aiSampleRate) || 1)),
+            maskingRules: aiMaskingRules.split(",").map((s) => s.trim()).filter(Boolean),
+          },
+        });
+        await editData.onSuccess?.();
+        closeModal();
+        toast.success("AI source updated");
+      } else {
+        const res = await api.post("/ai/observability/register", {
+          name: name.trim(),
+          type: aiType,
+        });
+        setCreds(res.data);
+        setName("");
+        mutateFns.ai?.();
+        toast.success("AI source registered!");
+      }
+    } catch (e: any) {
+      handleApiError(e, isEdit ? "Failed to update AI source" : "Failed to register AI source.");
     } finally {
       setLoading(false);
     }
@@ -1342,6 +1410,154 @@ export const ServiceModals: React.FC = () => {
                   {getTaskSnippet(creds.apiKey)}
                 </pre>
                 <CopyButton text={getTaskSnippet(creds.apiKey)} />
+              </div>
+            </div>
+            <Button className="w-full" onClick={closeModal} variant="outline">
+              Done
+            </Button>
+          </div>
+        )}
+      </Dialog>
+
+      {/* ================================================================= */}
+      {/* AI MONITORING MODAL                                               */}
+      {/* ================================================================= */}
+      <Dialog
+        open={activeModal === "ai"}
+        onClose={closeModal}
+        title={isEdit ? "Edit AI Source" : "Connect AI Monitoring"}
+      >
+        {!creds || isEdit ? (
+          <div className="space-y-4">
+            <ErrorBanner />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Source Name</label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-violet-500 outline-none transition-all"
+                placeholder="e.g. Production LLM App"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+                disabled={loading}
+                maxLength={50}
+              />
+            </div>
+            {!isEdit && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Environment</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { v: "server", label: "Server / Backend" },
+                    { v: "browser", label: "Browser (WebLLM)" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setAiType(opt.v)}
+                      className={`rounded-md border px-3 py-2 text-sm transition-all ${
+                        aiType === opt.v
+                          ? "border-violet-500 bg-violet-500/10 text-violet-500"
+                          : "border-input text-muted-foreground hover:border-violet-500/40"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Browser sources never store prompt/output content for privacy.
+                </p>
+              </div>
+            )}
+            {isEdit && (
+              <>
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-input p-3">
+                  <div>
+                    <p className="text-sm font-medium">Capture prompts &amp; outputs</p>
+                    <p className="text-xs text-muted-foreground">
+                      {editData?.aiType === "browser"
+                        ? "Disabled for browser sources for privacy."
+                        : "Stores masked prompts/completions for debugging. Off by default."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={editData?.aiType === "browser"}
+                    onClick={() => setAiCaptureContent((v) => !v)}
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${aiCaptureContent && editData?.aiType !== "browser" ? "bg-violet-500" : "bg-muted"} ${editData?.aiType === "browser" ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${aiCaptureContent && editData?.aiType !== "browser" ? "translate-x-5" : ""}`} />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Sample rate (0–1)</label>
+                  <input
+                    type="number" min="0" max="1" step="0.05"
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-violet-500 outline-none"
+                    value={aiSampleRate}
+                    onChange={(e) => setAiSampleRate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Masking rules</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-violet-500 outline-none"
+                    placeholder="email, ssn, address"
+                    value={aiMaskingRules}
+                    onChange={(e) => setAiMaskingRules(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Comma-separated field names to redact from captured content.</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Management URL (optional)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-violet-500 outline-none"
+                    placeholder="https://platform.openai.com/usage"
+                    value={aiManagementUrl}
+                    onChange={(e) => setAiManagementUrl(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="ghost" onClick={closeModal} disabled={loading}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAiSubmit}
+                disabled={loading || !name.trim()}
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+              >
+                {loading ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" />{" "}
+                    {isEdit ? "Updating..." : "Generating..."}
+                  </>
+                ) : isEdit ? (
+                  "Update"
+                ) : (
+                  "Generate Key"
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Key className="h-3 w-3" /> Source Key
+              </label>
+              <div className="p-2 bg-muted rounded border text-sm font-mono truncate select-all text-violet-500">
+                {creds.apiKey}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Install &amp; Configure</label>
+              <div className="rounded-lg bg-black/80 p-4 border border-border/50 relative group">
+                <pre className="text-xs font-mono text-violet-300 break-all pr-8 leading-relaxed whitespace-pre-wrap">
+                  {getAiSnippet(creds.apiKey, aiType)}
+                </pre>
+                <CopyButton text={getAiSnippet(creds.apiKey, aiType)} />
               </div>
             </div>
             <Button className="w-full" onClick={closeModal} variant="outline">

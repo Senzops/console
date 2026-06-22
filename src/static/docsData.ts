@@ -308,6 +308,56 @@ export const DOCS_DATA: DocsConfig = {
       ]
     },
     {
+      id: "ai-monitoring",
+      title: "AI Monitoring (LLM Observability)",
+      iconName: "Bot",
+      shortDescription: "Cost, tokens, latency and traces for every LLM call.",
+      overview: "A first-class observability pillar for AI. Track spend, token usage, latency and errors across every model and provider — with full multi-step traces (agents, RAG, tool calls), per-user and per-session cost attribution, and opt-in prompt/completion capture. Major providers are auto-instrumented; anything else (custom, self-hosted, in-browser WebLLM) is one wrap call away. Cost is computed server-side from a maintained pricing table.",
+      prerequisites: [
+        "A Node.js / edge runtime using @senzops/apm-node (v1.4+), or any runtime that can POST to the AI ingest endpoint.",
+        "Prompt/completion content is opt-in and OFF by default; enable it per-source in Settings if you need it for debugging."
+      ],
+      registrationSteps: [
+        { title: "Create an AI Source", description: "Click '+' next to AI Monitoring in the sidebar, name it, and choose Server or Browser (WebLLM)." },
+        { title: "Copy the Source Key", description: "The dashboard issues a one-time sz_ai_ key — copy it now; it is shown only once." },
+        { title: "Initialize the SDK", description: "Call Senzor.init({ apiKey }) as early as possible. Supported providers (OpenAI, Anthropic, Gemini/Vertex, Azure OpenAI, Cohere, Mistral, Groq, Ollama, the Vercel AI SDK and LangChain) are then auto-instrumented." }
+      ],
+      installation: [
+        {
+          framework: "Auto-instrumentation",
+          language: "typescript",
+          code: `npm install @senzops/apm-node\n\nimport Senzor from '@senzops/apm-node';\n\nSenzor.init({\n  apiKey: "<YOUR_AI_KEY>",\n  ai: { captureContent: false } // set true to store masked prompts/outputs\n});\n\n// OpenAI, Anthropic, Gemini, Cohere, Mistral, Groq, Ollama,\n// the Vercel AI SDK and LangChain are now captured automatically.`,
+          notes: "Cost is recomputed server-side — the SDK never sends a cost field. Set ai.sampleRate (0–1) for high-volume head sampling."
+        },
+        {
+          framework: "Manual wrap (any model)",
+          language: "typescript",
+          code: `import Senzor from '@senzops/apm-node';\n\n// Group a multi-step workflow (agent / RAG) into one trace:\nawait Senzor.ai.trace({ name: 'support-agent', sessionId, userId }, async () => {\n  // Record any LLM call — unsupported providers, self-hosted, etc.\n  await Senzor.ai.wrapGeneration(\n    {\n      provider: 'openai', model: 'gpt-4o', operation: 'chat',\n      extract: (r) => ({ tokensIn: r.usage.prompt_tokens, tokensOut: r.usage.completion_tokens })\n    },\n    () => openai.chat.completions.create({ model: 'gpt-4o', messages })\n  );\n});`,
+          notes: "Use Senzor.ai.generation() to record a finished call directly. sessionId/userId power the per-user and per-session cost breakdowns. Attach quality/eval scores with Senzor.ai.score({ name: 'relevance', value: 0.9 })."
+        },
+        {
+          framework: "Browser (WebLLM)",
+          language: "typescript",
+          code: `import Senzor from '@senzops/apm-node';\n\nSenzor.init({ apiKey: "<YOUR_AI_KEY>" });\n\n// In-browser models make no network call, so wrap them manually.\nawait Senzor.ai.wrapGeneration(\n  { provider: 'webllm', model: 'Llama-3-8B', operation: 'chat' },\n  () => engine.chat.completions.create({ messages })\n);`,
+          notes: "Browser sources never store prompt/output content, regardless of settings, for privacy."
+        }
+      ],
+      troubleshooting: [
+        {
+          issue: "Cost shows as $0 for some models.",
+          solution: "The model isn't in the built-in pricing table (e.g. a new snapshot or a self-hosted model). Add a price under the source's Settings → pricing overrides (USD per 1M input/output tokens)."
+        },
+        {
+          issue: "Streaming calls show 0 output tokens (OpenAI).",
+          solution: "OpenAI only returns usage on streamed responses when you pass stream_options: { include_usage: true }. Anthropic and Gemini report streaming usage natively. Time-to-first-token is always captured."
+        },
+        {
+          issue: "Prompts/outputs aren't appearing in traces.",
+          solution: "Content capture is opt-in. Enable it on the source (Settings → Capture prompt & output) AND set ai.captureContent: true in the SDK. It is masked on ingest and stored under your plan's retention."
+        }
+      ]
+    },
+    {
       id: "apm",
       title: "Application Performance Monitoring",
       iconName: "Box",

@@ -84,7 +84,8 @@ import {
   Cpu,
   Globe,
   Flame,
-  Layers
+  Layers,
+  Bot
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -128,6 +129,8 @@ const getTargetIcon = (target: string) => {
       return <Flame className="h-4 w-4 text-amber-500" />;
     case "queue":
       return <Layers className="h-4 w-4 text-cyan-500" />;
+    case "ai":
+      return <Bot className="h-4 w-4 text-violet-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -210,10 +213,38 @@ const DEFAULT_QUERIES: Record<string, string> = {
   web: '[\n  { "$match": { "type": "pageview" } },\n  { "$project": { "time": "$createdAt", "path": 1, "title": 1, "referrer": 1, "channel": 1, "browser": 1, "device": 1, "country": 1, "duration": 1 } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   firebase: '[\n  { "$project": { "time": "$timestamp", "totalUsers": "$auth.totalUsers", "dau": "$auth.activeUsersDaily", "mau": "$auth.activeUsersMonthly", "signups": "$auth.newSignups24h", "mfaEnrolled": "$auth.mfaEnrolledCount", "recentSignIns": "$auth.recentSignIns1h", "service": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
   queue: '[\n  { "$project": { "time": "$timestamp", "queue": "$queueName", "backlog": "$pending", "dlq": "$dlqDepth", "consumers": "$consumerCount", "oldestSec": { "$divide": ["$oldestWaitingAgeMs", 1000] }, "netRate": "$netRate", "source": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
+  ai: '[\n  { "$project": { "time": "$timestamp", "provider": 1, "model": "$responseModel", "operation": 1, "tokensIn": 1, "tokensOut": 1, "costUsd": 1, "latencyMs": 1, "status": 1, "source": "$service.name" } },\n  { "$sort": { "time": -1 } },\n  { "$limit": 100 }\n]',
 };
 
 // Universal Pipeline Templates
 const QUICK_TEMPLATES: Record<string, any[]> = {
+  ai: [
+    {
+      label: "Cost Over Time",
+      config: { viz: "area" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "Cost USD": { "$sum": "$costUsd" }\n  }},\n  { "$project": { "time": "$_id", "Cost USD": { "$round": ["$Cost USD", 4] }, "_id": 0 } },\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Cost by Model",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": { "_id": "$responseModel", "cost": { "$sum": "$costUsd" } } },\n  { "$project": { "name": "$_id", "cost": { "$round": ["$cost", 4] }, "_id": 0 } },\n  { "$sort": { "cost": -1 } },\n  { "$limit": 20 }\n]`,
+    },
+    {
+      label: "Tokens by Provider",
+      config: { viz: "bar" },
+      query: `[\n  { "$group": { "_id": "$provider", "tokens": { "$sum": { "$add": ["$tokensIn", "$tokensOut"] } } } },\n  { "$project": { "name": "$_id", "tokens": 1, "_id": 0 } },\n  { "$sort": { "tokens": -1 } }\n]`,
+    },
+    {
+      label: "Error Rate",
+      config: { viz: "line" },
+      query: `[\n  { "$group": {\n    "_id": { "$dateToString": { "format": "%Y-%m-%d %H:%M", "date": "$timestamp" } },\n    "total": { "$sum": 1 },\n    "errors": { "$sum": { "$cond": [{ "$eq": ["$status", "error"] }, 1, 0] } }\n  }},\n  { "$project": {\n    "time": "$_id",\n    "Error Rate %": { "$round": [{ "$multiply": [{ "$divide": ["$errors", "$total"] }, 100] }, 2] },\n    "_id": 0\n  }},\n  { "$sort": { "time": 1 } }\n]`,
+    },
+    {
+      label: "Slow Generations",
+      config: { viz: "table" },
+      query: `[\n  { "$match": { "latencyMs": { "$gt": 5000 } } },\n  { "$project": { "time": "$timestamp", "provider": 1, "model": "$responseModel", "operation": 1, "latencyMs": 1, "costUsd": 1, "status": 1, "source": "$service.name" } },\n  { "$sort": { "latencyMs": -1 } },\n  { "$limit": 100 }\n]`,
+    },
+  ],
   apm: [
     {
       label: "Avg Latency",
@@ -2188,6 +2219,7 @@ export default function CustomDashboardView() {
                         <SelectItem value="runtime">Runtime Metrics</SelectItem>
                         <SelectItem value="web">Web Analytics</SelectItem>
                         <SelectItem value="firebase">Firebase</SelectItem>
+                        <SelectItem value="ai">AI Monitoring</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

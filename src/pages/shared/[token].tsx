@@ -20,6 +20,7 @@ import RumDashboard from "@/pages/dashboard/rum/[id]";
 import TaskServiceDashboard from "@/pages/dashboard/task/[id]";
 import CustomDashboardView from "@/pages/dashboard/views/[id]";
 import MonitorBoardView from "@/pages/dashboard/monitor/board/[id]";
+import AiMonitoringView from "@/components/AiMonitoringView";
 import { Unlink, Clock, ArrowRight, Eye } from "lucide-react";
 
 interface ShareMeta {
@@ -52,6 +53,8 @@ const SharedDashboardBody = ({ meta }: { meta: ShareMeta }) => {
       return <QueueDetail />;
     case "firebase":
       return <FirebaseDetail />;
+    case "ai":
+      return <AiMonitoringView sourceId={meta.scopeId} />;
     case "task":
       return <TaskServiceDashboard />;
     case "web":

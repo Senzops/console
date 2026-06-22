@@ -24,6 +24,7 @@ import {
   LayoutTemplate,
   Flame,
   Layers,
+  Bot,
 } from "lucide-react";
 import useSWR from "swr";
 import { api, useAuth } from "../../lib/auth";
@@ -59,6 +60,7 @@ interface DashboardViewProps {
     | "task"
     | "rum"
     | "firebase"
+    | "ai"
     | "view"
     | "board";
 }
@@ -118,6 +120,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutate: mutateFirebase,
   } = useSWR(token ? "/firebase/list" : null, fetcher);
   const {
+    data: aiList,
+    error: aiErr,
+    mutate: mutateAi,
+  } = useSWR(token ? "/ai/observability/list" : null, fetcher);
+  const {
     data: viewsData,
     error: viewsErr,
     mutate: mutateViews,
@@ -138,6 +145,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     taskErr ||
     rumErr ||
     firebaseErr ||
+    aiErr ||
     viewsErr ||
     boardsErr;
   const isLoading =
@@ -150,6 +158,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     !taskList &&
     !rumList &&
     !firebaseList &&
+    !aiList &&
     !viewsData &&
     !boardsData &&
     !hasError;
@@ -164,6 +173,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     (taskList?.length || 0) === 0 &&
     (rumList?.length || 0) === 0 &&
     (firebaseList?.length || 0) === 0 &&
+    (aiList?.length || 0) === 0 &&
     (viewsData?.views?.length || 0) === 0 &&
     (boardsData?.boards?.length || 0) === 0;
 
@@ -181,6 +191,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     mutateTask();
     mutateRum();
     mutateFirebase();
+    mutateAi();
     mutateViews();
     mutateBoards();
   };
@@ -245,6 +256,11 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     ...(rumList || []).map((r: any) => ({ ...r, type: "rum" })),
     ...(apmList || []).map((a: any) => ({ ...a, type: "apm" })),
     ...(taskList || []).map((t: any) => ({ ...t, type: "task" })),
+    ...(aiList || []).map((a: any) => ({
+      ...a,
+      type: "ai",
+      meta: a.type === "browser" ? "Browser" : "Server",
+    })),
     ...(monitorList || []).map((m: any) => ({ ...m, type: "monitor" })),
     ...(boardsData?.boards || []).map((b: any) => ({ ...b, type: "board" })), // Status Boards last (matches sidebar order: after Uptime)
   ];
@@ -265,6 +281,7 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
     if (item.type === "database") return `/dashboard/db/${item._id}`;
     if (item.type === "queue") return `/dashboard/queue/${item._id}`;
     if (item.type === "firebase") return `/dashboard/firebase/${item._id}`;
+    if (item.type === "ai") return `/dashboard/ai-monitoring/${item._id}`;
     if (item.type === "view") return `/dashboard/views/${item._id}`;
     if (item.type === "board") return `/dashboard/monitor/board/${item._id}`;
     return `/dashboard/monitor/${item._id}`;
@@ -318,6 +335,24 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           {item.status.toUpperCase()}
         </Badge>
       );
+    if (item.type === "ai") {
+      const isAiActive =
+        item.lastSeen &&
+        new Date().getTime() - new Date(item.lastSeen).getTime() <
+          15 * 60 * 1000;
+      return isAiActive ? (
+        <Badge
+          variant="outline"
+          className="text-violet-500 border-violet-500/30 bg-violet-500/5"
+        >
+          LIVE
+        </Badge>
+      ) : (
+        <span className="text-xs text-muted-foreground font-mono">
+          Inactive
+        </span>
+      );
+    }
     if (item.type === "view")
       return (
         <Badge
@@ -415,6 +450,8 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
         return <Layers className={`h-5 w-5 text-cyan-500`} />;
       case "firebase":
         return <Flame className={`h-5 w-5 text-amber-500`} />;
+      case "ai":
+        return <Bot className={`h-5 w-5 text-violet-500`} />;
       case "view":
         return <LayoutTemplate className={`h-5 w-5 text-teal-500`} />;
       case "board":
@@ -483,6 +520,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
           <Layers className="h-3 w-3" /> {item.meta}
         </>
       );
+    if (item.type === "ai")
+      return (
+        <>
+          <Bot className="h-3 w-3" /> {item.meta || "LLM"}
+        </>
+      );
     if (item.type === "view")
       return (
         <>
@@ -515,7 +558,9 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
               ? "Status Boards"
               : filterType === "firebase"
                 ? "Firebase Projects"
-                : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
+                : filterType === "ai"
+                  ? "AI Monitoring"
+                  : `${filterType.charAt(0).toUpperCase() + filterType.slice(1)}s`
     : "Global Infra";
 
   return (

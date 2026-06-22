@@ -1150,6 +1150,25 @@ export const ApmDashboardSkeleton = () => (
 )
 
 /**
+ * AI Monitoring dashboard (components/AiMonitoringView). Header, a 4-up stat
+ * grid (cost / calls / tokens / latency), the primary cost chart, a two-up
+ * chart row (calls&errors / latency), the token chart, the full-width models
+ * table, a two-up providers/operations row, and the recent activity table.
+ */
+export const AiMonitoringSkeleton = () => (
+  <SkeletonScreen label="Loading AI monitoring">
+    <SkeletonHeaderBar />
+    <SkeletonStatGrid count={4} />
+    <SkeletonChartCard />
+    <SkeletonChartGrid count={2} />
+    <SkeletonChartCard />
+    <SkeletonTable columns={4} rows={5} />
+    <SkeletonChartGrid count={2} />
+    <SkeletonTable columns={6} rows={6} />
+  </SkeletonScreen>
+)
+
+/**
  * Trace detail (pages/dashboard/rum|apm/[id]/trace/[traceId]). Back link, the
  * metric header (badge + path + meta | Duration / Status metrics), a 4-up row
  * of horizontal stat cards, and the network waterfall.

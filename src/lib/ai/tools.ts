@@ -1,7 +1,7 @@
 // ============================================================================
 // AI Assistant — Tool Registry & Executor
 // ============================================================================
-// Synced with backend MCP tools (src/mcp/tools.ts) — 45 tools across 13
+// Synced with backend MCP tools (src/mcp/tools.ts) — 50 tools across 14
 // categories. Each tool maps to a backend API endpoint accessed via the
 // authenticated axios instance.
 
@@ -9,7 +9,7 @@ import { api } from '@/lib/auth';
 import type { ToolSchema } from './types';
 
 // ---------------------------------------------------------------------------
-// Tool Definitions (45 tools)
+// Tool Definitions (50 tools)
 // ---------------------------------------------------------------------------
 
 export const AI_TOOLS: ToolSchema[] = [
@@ -577,6 +577,84 @@ export const AI_TOOLS: ToolSchema[] = [
     },
   },
 
+  // --- AI Monitoring (LLM Observability) Tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'ai_list_sources',
+      description:
+        'List all AI Monitoring sources (LLM observability projects), their type (server/browser) and last-seen time.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ai_get_stats',
+      description:
+        'AI source overview for a range: total cost (USD), LLM calls, tokens, error rate, latency p50/p95/p99, cost/token/latency time series, and breakdowns by model, provider and operation.',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'AI source ID' },
+          range: { type: 'string', description: 'Time range (default: 24h)' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ai_get_consumers',
+      description:
+        'Top users and top sessions for an AI source by cost (also calls, tokens, traces) — attributes LLM spend to end-users or conversations.',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          range: { type: 'string' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ai_get_traces',
+      description:
+        "List recent AI traces (workflows) with status, generation count, cost, tokens and latency. Filter by status ('ok'|'error') and sessionId.",
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          range: { type: 'string' },
+          status: { type: 'string' },
+          sessionId: { type: 'string' },
+          limit: { type: 'number' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ai_get_trace_detail',
+      description:
+        'One AI trace and its generation waterfall (each LLM/tool/retrieval/embedding call with provider, model, tokens, cost, latency, finish reason and status).',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          traceId: { type: 'string' },
+        },
+        required: ['id', 'traceId'],
+      },
+    },
+  },
+
   // --- Dynamic Schema Explorer Tool ---
   {
     type: 'function',
@@ -734,6 +812,26 @@ export async function fetchToolData(
         await api.get(`/queue/${args.id}/executions`, {
           params: { ...params, queue: args.queue },
         })
+      ).data;
+
+    // AI Monitoring (LLM Observability)
+    case 'ai_list_sources':
+      return (await api.get('/ai/observability/list')).data;
+    case 'ai_get_stats':
+      return (await api.get(`/ai/observability/${args.id}/stats`, { params })).data;
+    case 'ai_get_consumers':
+      return (await api.get(`/ai/observability/${args.id}/consumers`, { params })).data;
+    case 'ai_get_traces':
+      return (
+        await api.get(`/ai/observability/${args.id}/traces`, {
+          params: { ...params, status: args.status, sessionId: args.sessionId, limit: args.limit },
+        })
+      ).data;
+    case 'ai_get_trace_detail':
+      return (
+        await api.get(
+          `/ai/observability/${args.id}/trace/${encodeURIComponent(args.traceId)}`,
+        )
       ).data;
 
     // Firebase

@@ -53,6 +53,7 @@ import {
   Globe,
   Flame,
   Layers,
+  Bot,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -79,6 +80,7 @@ const DEFAULT_ALERT_QUERIES: Record<string, string> = {
   web: '[\n  { "$match": {\n    "type": "pageview",\n    "duration": 0\n  } }\n]',
   firebase: '[\n  { "$match": {\n    "auth.newSignups24h": { "$gt": 100 }\n  } }\n]',
   queue: '[\n  { "$match": {\n    "$or": [\n      { "pending": { "$gt": 1000 } },\n      { "dlqDepth": { "$gt": 50 } },\n      { "consumerCount": 0, "pending": { "$gt": 0 } }\n    ]\n  } }\n]',
+  ai: '[\n  { "$match": {\n    "$or": [\n      { "status": "error" },\n      { "costUsd": { "$gt": 0.5 } },\n      { "latencyMs": { "$gt": 10000 } }\n    ]\n  } }\n]',
 };
 
 const getTargetIcon = (target: string) => {
@@ -105,6 +107,8 @@ const getTargetIcon = (target: string) => {
       return <Flame className="h-4 w-4 text-amber-500" />;
     case "queue":
       return <Layers className="h-4 w-4 text-cyan-500" />;
+    case "ai":
+      return <Bot className="h-4 w-4 text-violet-500" />;
     default:
       return <Activity className="h-4 w-4 text-muted-foreground" />;
   }
@@ -1033,6 +1037,7 @@ export default function AlertPolicyDetail() {
                           <SelectItem value="runtime">Runtime Metrics</SelectItem>
                           <SelectItem value="web">Web Analytics</SelectItem>
                           <SelectItem value="firebase">Firebase</SelectItem>
+                          <SelectItem value="ai">AI Monitoring</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -15,6 +15,7 @@ export type ServiceType =
   | "database"
   | "firebase"
   | "queue"
+  | "ai"
   | "view"
   | "board";
 
@@ -38,8 +39,12 @@ export interface EditData {
   connectionMeta?: Record<string, any>;
   /** Queue monitoring: newline/comma-separated allowlist of queue names. */
   queueFilter?: string;
-  /** Queue monitoring: management/runbook deep-link for DLQ hand-off. */
+  /** Queue monitoring + AI monitoring: management/runbook deep-link. */
   managementUrl?: string;
+  /** AI monitoring: source environment (server | browser). */
+  aiType?: string;
+  /** AI monitoring: capture/sampling/masking settings for edit prefill. */
+  aiSettings?: any;
   description?: string;
   method?: string;
   headers?: Record<string, string>;

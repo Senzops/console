@@ -836,6 +836,7 @@ export const DashboardLayout = ({
   const { mutate: mutateFirebase } = useSWR(token ? "/firebase/list" : null, fetcher);
   const { mutate: mutateTask } = useSWR(token ? "/task/list" : null, fetcher);
   const { mutate: mutateRum } = useSWR(token ? "/rum/list" : null, fetcher);
+  const { mutate: mutateAi } = useSWR(token ? "/ai/observability/list" : null, fetcher);
   const { mutate: mutateViews } = useSWR(token ? "/views" : null, fetcher);
   const { mutate: mutateBoards } = useSWR(token ? "/monitor-board" : null, fetcher);
 
@@ -850,10 +851,11 @@ export const DashboardLayout = ({
       firebase: mutateFirebase,
       task: mutateTask,
       rum: mutateRum,
+      ai: mutateAi,
       view: mutateViews,
       board: mutateBoards,
     }),
-    [mutateServers, mutateWeb, mutateMonitors, mutateApm, mutateDb, mutateFirebase, mutateTask, mutateRum, mutateViews, mutateBoards],
+    [mutateServers, mutateWeb, mutateMonitors, mutateApm, mutateDb, mutateFirebase, mutateTask, mutateRum, mutateAi, mutateViews, mutateBoards],
   );
 
   return (
@@ -1069,6 +1071,7 @@ const DashboardLayoutInner = ({
   const { data: firebaseList } = useSWR(token ? "/firebase/list" : null, fetcher);
   const { data: taskList } = useSWR(token ? "/task/list" : null, fetcher);
   const { data: rumList } = useSWR(token ? "/rum/list" : null, fetcher);
+  const { data: aiList } = useSWR(token ? "/ai/observability/list" : null, fetcher);
   const { data: viewsList } = useSWR(token ? "/views" : null, fetcher);
   const { data: boardsData } = useSWR(token ? "/monitor-board" : null, fetcher);
 
@@ -1492,6 +1495,28 @@ const DashboardLayoutInner = ({
                   linkPrefix: "/dashboard/task",
                   onAdd: !user.isDemo ? () => openModal('task') : undefined,
                   icon: <Workflow className="h-3.5 w-3.5 text-indigo-500 shrink-0" />,
+                  type: "section"
+                }, e.currentTarget)}
+                onMouseLeave={handleSectionMouseLeave}
+              />
+
+              {/* --- AI Monitoring (LLM Observability) --- */}
+              <SidebarSection
+                title="AI Monitoring"
+                items={aiList}
+                hrefPrefix="/dashboard/ai-monitoring"
+                linkPrefix="/dashboard/ai-monitoring"
+                onAdd={!user.isDemo ? () => openModal('ai') : undefined}
+                icon={<Bot className="h-3 w-3 text-violet-500 shrink-0" />}
+                isMinimized={isActuallyMinimized}
+                onMouseEnter={(e: any) => handleSectionMouseEnter({
+                  id: "ai",
+                  title: "AI Monitoring",
+                  items: aiList,
+                  hrefPrefix: "/dashboard/ai-monitoring",
+                  linkPrefix: "/dashboard/ai-monitoring",
+                  onAdd: !user.isDemo ? () => openModal('ai') : undefined,
+                  icon: <Bot className="h-3.5 w-3.5 text-violet-500 shrink-0" />,
                   type: "section"
                 }, e.currentTarget)}
                 onMouseLeave={handleSectionMouseLeave}

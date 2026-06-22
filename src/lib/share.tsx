@@ -92,6 +92,7 @@ export type ShareScopeType =
   | "task"
   | "web"
   | "vps"
+  | "ai"
   | "savedview"
   | "monitorboard";
 

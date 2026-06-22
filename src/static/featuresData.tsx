@@ -28,6 +28,8 @@ import {
   ShieldCheck,
   UserPlus,
   Users,
+  DollarSign,
+  Hash,
 } from "lucide-react";
 
 // ============================================================================
@@ -1486,8 +1488,72 @@ const DiagramQueue = () => (
   </DiagramFrame>
 );
 
+/** AI Monitoring — cost-led LLM observability with token/latency and model spend */
+const DiagramAiMonitoring = () => (
+  <DiagramFrame>
+    <FrameHeader
+      title="Production LLM App"
+      icon={<Bot className="w-3.5 h-3.5 text-violet-500" />}
+      badge={{ label: "ACTIVE", style: BADGE_STYLE.online, pulse: true }}
+    />
+    <div className="flex-1 p-4 flex flex-col gap-3">
+      {/* Stat row — cost leads */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: "Cost", value: "$42.18", icon: <DollarSign className="w-3 h-3 text-violet-500" />, accent: "text-violet-500" },
+          { label: "Calls", value: "8.4k", icon: <Activity className="w-3 h-3 text-blue-500" />, accent: "text-foreground" },
+          { label: "Tokens", value: "12.1M", icon: <Hash className="w-3 h-3 text-emerald-500" />, accent: "text-foreground" },
+          { label: "Err Rate", value: "0.4%", icon: <AlertOctagon className="w-3 h-3 text-red-500" />, accent: "text-red-500" },
+        ].map((s, i) => (
+          <div
+            key={s.label}
+            className="bg-background border border-border/50 rounded-lg p-2 shadow-sm flex flex-col gap-1 animate-[diag-fade-in-up_0.4s_ease-out_both]"
+            style={{ animationDelay: `${i * 0.06}s` }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wide">{s.label}</span>
+              {s.icon}
+            </div>
+            <span className={`text-sm font-bold tabular-nums ${s.accent}`}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Cost sparkline (hero signal) */}
+      <div
+        className="bg-background border border-border/50 rounded-lg p-2.5 shadow-sm flex items-end gap-1 h-14 animate-[diag-fade-in-up_0.4s_ease-out_both]"
+        style={{ animationDelay: "0.3s" }}
+      >
+        {[35, 50, 44, 62, 58, 74, 68, 86, 70, 90, 82, 96].map((h, i) => (
+          <div key={i} className="flex-1 bg-gradient-to-t from-violet-500/20 to-violet-500/70 rounded-sm" style={{ height: `${h}%` }} />
+        ))}
+      </div>
+
+      {/* Top models by spend */}
+      <div className="flex flex-col gap-1">
+        {[
+          { name: "gpt-4o", spend: "$28.40", pct: 68, style: BADGE_STYLE.active },
+          { name: "claude-3-5-sonnet", spend: "$10.10", pct: 24, style: BADGE_STYLE.tracking },
+        ].map((m, i) => (
+          <div
+            key={m.name}
+            className="flex items-center justify-between bg-background border border-border/40 rounded-md px-2.5 py-1.5 relative overflow-hidden animate-[diag-fade-in-up_0.4s_ease-out_both]"
+            style={{ animationDelay: `${0.36 + i * 0.06}s` }}
+          >
+            <div className="absolute inset-y-0 left-0 bg-violet-500/5" style={{ width: `${m.pct}%` }} />
+            <span className="text-[10px] font-mono text-foreground truncate relative">{m.name}</span>
+            <span className="text-[10px] font-mono font-bold text-foreground relative">{m.spend}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </DiagramFrame>
+);
+
 export const renderDiagram = (id: string): React.ReactNode => {
   switch (id) {
+    case "ai-monitoring":
+      return <DiagramAiMonitoring />;
     case "queue":
       return <DiagramQueue />;
     case "views":
@@ -1663,6 +1729,22 @@ export const FEATURES_DATA: FeatureData[] = [
     diagramId: "apm",
     href: "/features/apm",
     colorClasses: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+  },
+  {
+    id: "ai-monitoring",
+    title: "AI Monitoring",
+    subtitle: "LLM observability — cost, tokens, latency & traces.",
+    description:
+      "A first-class observability pillar for AI. Track spend, token usage, latency and errors across every model and provider, with full multi-step traces, per-user and per-session cost attribution, and opt-in prompt/output capture.",
+    points: [
+      "Server-side cost & token accounting per model",
+      "Auto-instrumentation for OpenAI, Anthropic, Gemini, the Vercel AI SDK, LangChain & more",
+      "Multi-step agent / RAG trace waterfalls",
+      "Quality scores, evals & user feedback",
+    ],
+    diagramId: "ai-monitoring",
+    href: "/features/ai-monitoring",
+    colorClasses: "text-violet-500 bg-violet-500/10 border-violet-500/20",
   },
   {
     id: "tasks",
