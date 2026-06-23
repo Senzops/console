@@ -225,6 +225,15 @@ const COMPARE_FEATURES = [
         business: true,
         enterprise: true,
       },
+      {
+        name: "MCP Server (AI Integration)",
+        tooltip:
+          "Connect Claude, Cursor, or any MCP client to your telemetry via the Model Context Protocol. Includes 50+ read-only tools, investigation prompts, and resources. Request throughput is rate-limited per plan.",
+        starter: "30 req/min",
+        pro: "120 req/min",
+        business: "300 req/min",
+        enterprise: "1,000 req/min",
+      },
     ],
   },
   {

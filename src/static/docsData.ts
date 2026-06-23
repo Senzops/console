@@ -588,26 +588,27 @@ export const DOCS_DATA: DocsConfig = {
       title: "MCP Server (AI Integration)",
       iconName: "Bot",
       shortDescription: "Natural language operational intelligence.",
-      overview: "Seamlessly integrate your telemetry data with advanced Large Language Models like Claude or Cursor IDE. Use the Model Context Protocol (MCP) to query, summarize, and analyze incidents using natural language.",
+      overview: "Seamlessly integrate your telemetry data with advanced Large Language Models like Claude or Cursor IDE. The Model Context Protocol (MCP) server exposes 50+ read-only tools spanning every pillar — APM, RUM, Logs, Uptime, Infrastructure, Databases, Queues, Errors, Alerts & Incidents, AI Monitoring and Billing — plus built-in investigation prompts (root-cause, incident triage, AI cost review) and addressable resources, so an agent can query, correlate and summarize your observability data in natural language. Connections use the modern Streamable HTTP transport.",
       prerequisites: [
         "An active Senzor workspace with existing telemetry.",
-        "An MCP-compatible client (Cursor IDE, Claude Desktop)."
+        "An MCP-compatible client (Cursor IDE, Claude Desktop, or any Streamable HTTP client)."
       ],
       registrationSteps: [
-        { title: "Generate MCP Key", description: "Navigate to AI Integrations in the dashboard and generate a scoped MCP API Key." }
+        { title: "Generate MCP Key", description: "Navigate to AI Integrations in the dashboard and generate a dedicated MCP API Key. Keys are hashed at rest, shown once, and revocable at any time." },
+        { title: "Connect & Explore", description: "Add the server to your client using the configuration below. Your agent can then list every tool, read resources, and run the built-in investigation prompts as slash-commands." }
       ],
       installation: [
         {
           framework: "Cursor IDE",
           language: "json",
-          code: `{\n  "mcpServers": {\n    "senzor": {\n      "url": "https://api.senzor.dev/api/mcp/sse",\n      "headers": {\n        "Authorization": "Bearer <YOUR_MCP_KEY>"\n      }\n    }\n  }\n}`,
-          notes: "Add this configuration to your Cursor settings under Features > MCP."
+          code: `{\n  "mcpServers": {\n    "senzor": {\n      "url": "https://api.senzor.dev/api/mcp",\n      "headers": {\n        "Authorization": "Bearer <YOUR_MCP_KEY>"\n      }\n    }\n  }\n}`,
+          notes: "Add this configuration to your Cursor settings under Features > MCP. Cursor auto-detects the Streamable HTTP transport."
         },
         {
           framework: "Claude Desktop",
           language: "bash",
-          code: `claude mcp add --transport http senzor-api https://api.senzor.dev/api/mcp/sse --header "Authorization: Bearer <YOUR_MCP_KEY>"`,
-          notes: "Run this command in your terminal if you have the Claude CLI installed."
+          code: `claude mcp add --transport http senzor-api https://api.senzor.dev/api/mcp --header "Authorization: Bearer <YOUR_MCP_KEY>"`,
+          notes: "Run this command in your terminal if you have the Claude CLI installed. Request throughput is rate-limited per plan (see Pricing)."
         }
       ]
     },

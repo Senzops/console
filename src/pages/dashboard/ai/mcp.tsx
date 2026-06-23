@@ -460,7 +460,7 @@ export default function McpSettingsDashboard() {
                 Online
               </div>
               <span className="text-muted-foreground font-mono ml-2">
-                Protocol: SSE Transport
+                Protocol: Streamable HTTP
               </span>
             </div>
           </div>
@@ -637,8 +637,8 @@ export default function McpSettingsDashboard() {
                           Click <strong>+ Add New MCP Server</strong>
                         </li>
                         <li>
-                          Select <strong>SSE</strong> as the type and paste the
-                          configuration.
+                          Paste the configuration below. Cursor auto-detects the{" "}
+                          <strong>Streamable HTTP</strong> transport.
                         </li>
                       </ol>
                     </div>
@@ -650,7 +650,7 @@ export default function McpSettingsDashboard() {
                         className="absolute top-2 right-2 h-7 w-7 bg-muted/50 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                         onClick={() =>
                           copyToClipboard(
-                            `{\n  "mcpServers": {\n    "senzor": {\n      "url": "https://api.senzor.dev/api/mcp/sse",\n      "headers": {\n        "Authorization": "Bearer <YOUR_KEY>"\n      }\n    }\n  }\n}`,
+                            `{\n  "mcpServers": {\n    "senzor": {\n      "url": "https://api.senzor.dev/api/mcp",\n      "headers": {\n        "Authorization": "Bearer <YOUR_KEY>"\n      }\n    }\n  }\n}`,
                             "cursor_json",
                           )
                         }
@@ -665,7 +665,7 @@ export default function McpSettingsDashboard() {
                         {`{
   "mcpServers": {
     "senzor": {
-      "url": "https://api.senzor.dev/api/mcp/sse",
+      "url": "https://api.senzor.dev/api/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_KEY>"
       }
@@ -699,7 +699,7 @@ export default function McpSettingsDashboard() {
                         className="absolute top-2 right-2 h-7 w-7 bg-muted/50 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                         onClick={() =>
                           copyToClipboard(
-                            `claude mcp add --transport http senzor-api https://api.senzor.dev/api/mcp/sse --header "Authorization: Bearer <YOUR_KEY>"`,
+                            `claude mcp add --transport http senzor-api https://api.senzor.dev/api/mcp --header "Authorization: Bearer <YOUR_KEY>"`,
                             "claude_cli",
                           )
                         }
@@ -714,7 +714,7 @@ export default function McpSettingsDashboard() {
                         {`claude mcp add \\
   --transport http \\
   senzor-api \\
-  https://api.senzor.dev/api/mcp/sse \\
+  https://api.senzor.dev/api/mcp \\
   --header "Authorization: Bearer <YOUR_KEY>"`}
                       </pre>
                     </div>
