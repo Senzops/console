@@ -8,10 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "../../.
 import { TraceDetailSkeleton } from "../../../../../components/Skeletons";
 import {
   ArrowLeft, ArrowUpRight, ChevronRight, ChevronDown,
-  DollarSign, Hash, Clock, Layers, Calendar, Code, Star, ThumbsUp, ThumbsDown, FileWarning,
+  DollarSign, Hash, Clock, Layers, Calendar, Code,
 } from "lucide-react";
 import { SmartAnimatedValue } from "@/components/Tween";
-import { toast } from "sonner";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -56,25 +55,31 @@ const GenerationRow = ({ gen, totalDuration }: any) => {
   const left = Math.min(99, ((gen.startTime || 0) / span) * 100);
   const width = Math.max(1, Math.min(100 - left, ((gen.latencyMs || 0) / span) * 100));
 
+  const isError = gen.status === "error";
+
   return (
     <div className="border-b border-border/40 last:border-0">
-      <button type="button" onClick={() => hasContent && setOpen((v) => !v)} className={`w-full text-left px-4 py-3 hover:bg-muted/20 transition-colors ${hasContent ? "cursor-pointer" : "cursor-default"}`}>
-        <div className="flex items-center gap-3">
+      <button type="button" onClick={() => hasContent && setOpen((v) => !v)} className={`w-full text-left px-3 sm:px-4 py-3 hover:bg-muted/20 transition-colors ${hasContent ? "cursor-pointer" : "cursor-default"}`}>
+        {/* Row 1 — identity (wraps gracefully; secondary info hides on small screens) */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-4 shrink-0 text-muted-foreground">{hasContent ? (open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />) : null}</div>
           <Badge variant="outline" className={`text-[10px] shrink-0 ${TYPE_COLORS[gen.type] || TYPE_COLORS.span}`}>{gen.type}</Badge>
-          <span className="font-mono text-xs text-foreground truncate min-w-[120px] max-w-[260px]" title={gen.responseModel || gen.requestModel}>{gen.responseModel || gen.requestModel || gen.name}</span>
+          <span className="font-mono text-xs text-foreground truncate flex-1 min-w-0" title={gen.responseModel || gen.requestModel}>{gen.responseModel || gen.requestModel || gen.name}</span>
           <span className="text-xs text-muted-foreground shrink-0 hidden md:inline">{gen.provider}</span>
-          <div className="flex-1 h-2 bg-muted/40 rounded relative mx-2 min-w-[60px]">
-            <div className={`absolute h-2 rounded ${gen.status === "error" ? "bg-red-500" : "bg-violet-500"}`} style={{ left: `${left}%`, width: `${width}%` }} />
+          {isError && <Badge variant="outline" className="text-[10px] shrink-0 border-red-500/30 text-red-500 bg-red-500/10">ERR</Badge>}
+        </div>
+        {/* Row 2 — full-width timeline bar + right-aligned metrics */}
+        <div className="flex items-center gap-3 mt-2 pl-6">
+          <div className="flex-1 h-2 bg-muted-foreground/10 rounded-full relative overflow-hidden min-w-[40px]">
+            <div className={`absolute h-full rounded-full ${isError ? "bg-red-500" : "bg-violet-500"}`} style={{ left: `${left}%`, width: `${width}%` }} />
           </div>
-          <span className="text-xs text-muted-foreground w-16 text-right shrink-0 font-mono">{formatMs(gen.latencyMs)}</span>
-          <span className="text-xs text-muted-foreground w-20 text-right shrink-0 font-mono hidden sm:inline">{formatTokens((gen.tokensIn || 0) + (gen.tokensOut || 0))} tok</span>
-          <span className="text-xs font-medium w-16 text-right shrink-0 font-mono">{formatUsd(gen.costUsd)}</span>
-          {gen.status === "error" && <Badge variant="outline" className="text-[10px] shrink-0 border-red-500/30 text-red-500 bg-red-500/10">ERR</Badge>}
+          <span className="text-[11px] text-muted-foreground w-14 text-right shrink-0 font-mono">{formatMs(gen.latencyMs)}</span>
+          <span className="text-[11px] text-muted-foreground w-16 text-right shrink-0 font-mono hidden sm:inline">{formatTokens((gen.tokensIn || 0) + (gen.tokensOut || 0))} tok</span>
+          <span className="text-[11px] font-medium w-14 text-right shrink-0 font-mono">{formatUsd(gen.costUsd)}</span>
         </div>
       </button>
       {open && hasContent && (
-        <div className="px-12 pb-4 space-y-3">
+        <div className="px-6 sm:px-12 pb-4 space-y-3">
           {gen.errorMessage && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded p-2 font-mono">{gen.errorType}: {gen.errorMessage}</div>}
           {gen.input !== undefined && <ContentBlock title="Input" value={gen.input} />}
           {gen.output !== undefined && <ContentBlock title="Output" value={gen.output} />}
@@ -105,7 +110,7 @@ export default function AiTraceDetail() {
   const { token } = useAuth();
   const ready = typeof id === "string" && typeof traceId === "string";
   const url = ready ? `/ai/observability/${id}/trace/${traceId}` : null;
-  const { data, error, mutate } = useSWR(token && url ? url : null, fetcher);
+  const { data, error } = useSWR(token && url ? url : null, fetcher);
 
   if (!data && !error) return <TraceDetailSkeleton />;
   if (error || !data?.trace)
@@ -113,14 +118,6 @@ export default function AiTraceDetail() {
 
   const { trace, generations, scores } = data;
   const totalDuration = trace.latencyMs || generations.reduce((m: number, g: any) => Math.max(m, (g.startTime || 0) + (g.latencyMs || 0)), 0);
-
-  const submitFeedback = async (value: number) => {
-    try {
-      await api.post(`/ai/observability/${id}/score`, { traceId, name: "user_feedback", dataType: "boolean", value });
-      toast.success("Feedback recorded");
-      mutate();
-    } catch { toast.error("Failed to record feedback"); }
-  };
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
@@ -157,12 +154,6 @@ export default function AiTraceDetail() {
               <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">Cost</div>
               <div className="text-2xl font-mono font-medium text-violet-500">{formatUsd(trace.totalCostUsd)}</div>
             </div>
-            <div className="h-10 w-px bg-border/60 hidden md:block" />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Rate</span>
-              <Button variant="outline" size="icon" className="h-8 w-8 hover:text-emerald-500" onClick={() => submitFeedback(1)} title="Good"><ThumbsUp className="h-4 w-4" /></Button>
-              <Button variant="outline" size="icon" className="h-8 w-8 hover:text-red-500" onClick={() => submitFeedback(0)} title="Bad"><ThumbsDown className="h-4 w-4" /></Button>
-            </div>
           </div>
         </div>
       </div>
@@ -175,10 +166,20 @@ export default function AiTraceDetail() {
         <StatCard label="Duration" value={formatMs(totalDuration)} sub="End to end" icon={Clock} color="bg-cyan-500" />
       </div>
 
-      {/* Scores */}
+      {/* Waterfall */}
+      <Card className="flex flex-col">
+        <CardHeader className="py-4 border-b border-border/40 h-14 shrink-0"><CardTitle className="text-sm font-medium text-muted-foreground">Generation waterfall ({generations.length})</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          {generations.length
+            ? generations.map((g: any) => <GenerationRow key={g.generationId} gen={g} totalDuration={totalDuration} />)
+            : <div className="p-8 text-center text-sm text-muted-foreground">No generations recorded for this trace.</div>}
+        </CardContent>
+      </Card>
+
+      {/* Quality & Feedback — read-only; scores are submitted by the end user / evals via the SDK */}
       {scores?.length > 0 && (
         <Card className="flex flex-col">
-          <CardHeader className="py-4 border-b border-border/40 h-14 shrink-0"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Star className="h-4 w-4 text-amber-500" /> Quality &amp; Feedback</CardTitle></CardHeader>
+          <CardHeader className="py-4 border-b border-border/40 h-14 shrink-0"><CardTitle className="text-sm font-medium text-muted-foreground">Quality &amp; Feedback</CardTitle></CardHeader>
           <CardContent className="p-0 overflow-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-muted/30 text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-2.5 font-medium">Score</th><th className="px-4 py-2.5 font-medium">Value</th><th className="px-4 py-2.5 font-medium">Source</th><th className="px-4 py-2.5 font-medium">Comment</th><th className="px-4 py-2.5 font-medium text-right">When</th></tr></thead>
@@ -197,16 +198,6 @@ export default function AiTraceDetail() {
           </CardContent>
         </Card>
       )}
-
-      {/* Waterfall */}
-      <Card className="flex flex-col">
-        <CardHeader className="py-4 border-b border-border/40 h-14 shrink-0"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileWarning className="h-4 w-4 text-violet-500" /> Generation waterfall ({generations.length})</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          {generations.length
-            ? generations.map((g: any) => <GenerationRow key={g.generationId} gen={g} totalDuration={totalDuration} />)
-            : <div className="p-8 text-center text-sm text-muted-foreground">No generations recorded for this trace.</div>}
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from '../
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   DollarSign, Activity, Clock, Hash, Trash2, RefreshCw,
-  ArrowLeft, Maximize, X, Search, Filter, Pencil, Star, AlertTriangle,
+  ArrowLeft, Maximize, X, Search, Pencil, AlertTriangle,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -86,7 +86,7 @@ const StatCard = ({ title, value, sub, icon: Icon, color }: any) => (
 );
 
 // --- Breakdown table (Models / Providers / Operations) — clickable drill-down --
-const BreakdownTable = ({ title, label, rows, totalCost, onSelect, formatKey }: any) => {
+const BreakdownTable = ({ title, label, rows, onSelect, formatKey }: any) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [filter, setFilter] = useState('');
   const filtered = useMemo(
@@ -117,31 +117,26 @@ const BreakdownTable = ({ title, label, rows, totalCost, onSelect, formatKey }: 
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
             <tr>
-              <th className="px-6 py-3 font-medium">{label}</th>
-              <th className="px-6 py-3 font-medium text-right">Calls</th>
-              <th className="px-6 py-3 font-medium text-right">Tokens</th>
-              <th className="px-6 py-3 font-medium text-right">Cost</th>
+              <th className="px-6 py-3 font-medium w-full">{label}</th>
+              <th className="px-6 py-3 font-medium text-right whitespace-nowrap">Calls</th>
+              <th className="px-6 py-3 font-medium text-right whitespace-nowrap">Tokens</th>
+              <th className="px-6 py-3 font-medium text-right whitespace-nowrap">Cost</th>
             </tr>
           </thead>
           <tbody>
-            {visible.map((r: any) => {
-              const pct = totalCost > 0 ? (r.costUsd / totalCost) * 100 : 0;
-              return (
-                <tr key={r.key} className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors group" onClick={() => onSelect(r.key)}>
-                  <td className="px-6 py-3 relative">
-                    <div className="absolute inset-y-0 left-0 bg-violet-500/5 group-hover:bg-violet-500/10 transition-colors" style={{ width: `${Math.min(pct, 100)}%` }} />
-                    <div className="relative flex items-center gap-2">
-                      <span className="font-mono text-xs text-foreground truncate max-w-[220px]" title={r.key}>{formatKey ? formatKey(r.key) : r.key}</span>
-                      {r.errors > 0 && <Badge variant="outline" className="text-[9px] border-red-500/30 text-red-500 bg-red-500/10 px-1 py-0">{r.errors} err</Badge>}
-                      <Filter className="w-3 h-3 opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity ml-auto" />
-                    </div>
-                  </td>
-                  <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground">{formatNumber(r.calls)}</td>
-                  <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground">{formatTokens((r.tokensIn || 0) + (r.tokensOut || 0))}</td>
-                  <td className="px-6 py-3 text-right font-mono text-xs font-medium text-foreground">{formatUsd(r.costUsd)}</td>
-                </tr>
-              );
-            })}
+            {visible.map((r: any) => (
+              <tr key={r.key} className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => onSelect(r.key)}>
+                <td className="px-6 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-foreground truncate max-w-[260px]" title={r.key}>{formatKey ? formatKey(r.key) : r.key}</span>
+                    {r.errors > 0 && <Badge variant="outline" className="text-[9px] border-red-500/30 text-red-500 bg-red-500/10 px-1 py-0">{r.errors} err</Badge>}
+                  </div>
+                </td>
+                <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">{formatNumber(r.calls)}</td>
+                <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">{formatTokens((r.tokensIn || 0) + (r.tokensOut || 0))}</td>
+                <td className="px-6 py-3 text-right font-mono text-xs font-medium text-foreground whitespace-nowrap">{formatUsd(r.costUsd)}</td>
+              </tr>
+            ))}
             {!isMaximized && hidden > 0 && (
               <tr className="border-b border-border/40 hover:bg-accent/50 transition-colors cursor-pointer group" onClick={() => setIsMaximized(true)}>
                 <td colSpan={4} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-violet-500 transition-colors">Show {hidden} more...</td>
@@ -313,7 +308,6 @@ export default function AiMonitoringView({ sourceId, filter }: AiMonitoringViewP
 
   const { meta, overview } = data;
   const isActive = meta.lastSeen && (new Date().getTime() - new Date(meta.lastSeen).getTime()) < 15 * 60 * 1000;
-  const totalCost = overview.totalCostUsd || 0;
 
   const areaDefs = (id: string, color: string) => (
     <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={getColor(color)} stopOpacity={0.3} /><stop offset="95%" stopColor={getColor(color)} stopOpacity={0} /></linearGradient></defs>
@@ -426,12 +420,12 @@ export default function AiMonitoringView({ sourceId, filter }: AiMonitoringViewP
         </ChartCard>
 
         {/* Top models — full width */}
-        <BreakdownTable title="Top models" label="Model" rows={data.models || []} totalCost={totalCost} onSelect={selectDimension('model')} />
+        <BreakdownTable title="Top models" label="Model" rows={data.models || []} onSelect={selectDimension('model')} />
 
         {/* Providers | Operations */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <BreakdownTable title="Providers" label="Provider" rows={data.providers || []} totalCost={totalCost} onSelect={selectDimension('provider')} />
-          <BreakdownTable title="Operations" label="Operation" rows={data.operations || []} totalCost={totalCost} onSelect={selectDimension('operation')} formatKey={(k: string) => OPERATION_LABEL[k] || k} />
+          <BreakdownTable title="Providers" label="Provider" rows={data.providers || []} onSelect={selectDimension('provider')} />
+          <BreakdownTable title="Operations" label="Operation" rows={data.operations || []} onSelect={selectDimension('operation')} formatKey={(k: string) => OPERATION_LABEL[k] || k} />
         </div>
 
         {/* Top consumers (main view only) */}
@@ -439,15 +433,6 @@ export default function AiMonitoringView({ sourceId, filter }: AiMonitoringViewP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ConsumerCard title="Top users by cost" label="User" rows={consumers?.users} />
             <ConsumerCard title="Top sessions by cost" label="Session" rows={consumers?.sessions} />
-          </div>
-        )}
-
-        {/* Quality scores */}
-        {!filter && data.scores?.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {data.scores.slice(0, 4).map((s: any) => (
-              <StatCard key={s.name} title={s.name} value={Number(s.avg ?? 0).toFixed(2)} sub={`${s.count} score${s.count === 1 ? '' : 's'}`} icon={Star} color="text-amber-500" />
-            ))}
           </div>
         )}
 

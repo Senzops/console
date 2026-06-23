@@ -629,6 +629,12 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                       new Date().getTime() - new Date(item.lastSeen).getTime() <
                         5 * 60 * 1000));
 
+                const isAiActive =
+                  item.type === "ai" &&
+                  item.lastSeen &&
+                  new Date().getTime() - new Date(item.lastSeen).getTime() <
+                    15 * 60 * 1000;
+
                 return (
                   <Link
                     href={getHref(item)}
@@ -864,6 +870,36 @@ export default function DashboardView({ filterType }: DashboardViewProps) {
                               className="px-2 py-0.5 text-[10px] text-indigo-500 border-indigo-500/30 bg-indigo-500/5"
                             >
                               ACTIVE
+                            </Badge>
+                          ) : (
+                            <span className="text-[9px] text-muted-foreground font-mono">
+                              {item.lastSeen
+                                ? formatDistanceToNow(new Date(item.lastSeen))
+                                : "Never"}
+                            </span>
+                          )}
+                        </>
+                      )}
+
+                      {item.type === "ai" && (
+                        <>
+                          <div
+                            className={`mb-3 p-3 rounded-full transition-colors ${isAiActive ? "bg-violet-500/10 text-violet-500" : "bg-secondary text-muted-foreground"}`}
+                          >
+                            <Bot className="h-6 w-6" />
+                          </div>
+                          <h3 className="font-bold text-sm mb-1 truncate w-full px-4">
+                            {item.name}
+                          </h3>
+                          <div className="text-[10px] text-muted-foreground font-mono mb-3 flex items-center gap-1 justify-center opacity-80">
+                            <Bot className="h-3 w-3" /> {item.meta || "LLM"}
+                          </div>
+                          {isAiActive ? (
+                            <Badge
+                              variant="outline"
+                              className="px-2 py-0.5 text-[10px] text-violet-500 border-violet-500/30 bg-violet-500/5"
+                            >
+                              LIVE
                             </Badge>
                           ) : (
                             <span className="text-[9px] text-muted-foreground font-mono">
