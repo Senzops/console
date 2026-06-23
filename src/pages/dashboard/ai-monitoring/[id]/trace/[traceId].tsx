@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from "react";
+import React from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import useSWR from "swr";
@@ -7,10 +7,10 @@ import { api, useAuth } from "../../../../../lib/auth";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "../../../../../components/Core";
 import { TraceDetailSkeleton } from "../../../../../components/Skeletons";
 import {
-  ArrowLeft, ArrowUpRight, ChevronRight, ChevronDown,
-  DollarSign, Hash, Clock, Layers, Calendar, Code,
+  ArrowLeft, ArrowUpRight, DollarSign, Hash, Clock, Layers, Calendar, Code, Bot,
 } from "lucide-react";
 import { SmartAnimatedValue } from "@/components/Tween";
+import { AiTraceTree } from "@/components/AiTraceTree";
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
@@ -22,14 +22,6 @@ const formatTokens = (v: number) => {
   return `${v}`;
 };
 const formatMs = (v: number) => (v == null ? "0ms" : v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(2)}s`);
-
-const TYPE_COLORS: Record<string, string> = {
-  generation: "border-violet-500/30 text-violet-500 bg-violet-500/10",
-  tool: "border-amber-500/30 text-amber-500 bg-amber-500/10",
-  retrieval: "border-blue-500/30 text-blue-500 bg-blue-500/10",
-  embedding: "border-emerald-500/30 text-emerald-500 bg-emerald-500/10",
-  span: "border-border text-muted-foreground bg-muted/30",
-};
 
 // --- Stat card (icon box) — mirrors APM trace detail ---
 const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
@@ -47,62 +39,85 @@ const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
   </Card>
 );
 
-// --- Generation waterfall row ---
-const GenerationRow = ({ gen, totalDuration }: any) => {
-  const [open, setOpen] = useState(false);
-  const hasContent = gen.input !== undefined || gen.output !== undefined || (gen.toolCalls && gen.toolCalls.length) || gen.errorMessage;
-  const span = totalDuration || 1;
-  const left = Math.min(99, ((gen.startTime || 0) / span) * 100);
-  const width = Math.max(1, Math.min(100 - left, ((gen.latencyMs || 0) / span) * 100));
+// --- Multi-agent graph: agents as nodes, handoffs as directed edges ---
+interface AgentNode { name: string; cost: number; calls: number; error: boolean; firstSeen: number }
+interface AgentEdge { from?: string; to: string; reason?: string }
 
-  const isError = gen.status === "error";
+const buildAgentGraph = (gens: any[]): { nodes: AgentNode[]; edges: AgentEdge[] } => {
+  const nodes = new Map<string, AgentNode>();
+  const edges: AgentEdge[] = [];
+  const ensure = (name: string, seen = Number.MAX_SAFE_INTEGER) => {
+    let n = nodes.get(name);
+    if (!n) { n = { name, cost: 0, calls: 0, error: false, firstSeen: seen }; nodes.set(name, n); }
+    else if (seen < n.firstSeen) n.firstSeen = seen;
+    return n;
+  };
+  for (const g of gens) {
+    if (g.type === "agent" && g.agent?.name) {
+      const n = ensure(g.agent.name, g.startTime || 0);
+      n.calls += 1;
+      n.cost += g.subtreeCostUsd ?? g.costUsd ?? 0;
+      if (g.status === "error") n.error = true;
+    }
+    if (g.type === "handoff" && g.handoff?.to) {
+      if (g.handoff.from) ensure(g.handoff.from, g.startTime || 0);
+      ensure(g.handoff.to, g.startTime || 0);
+      edges.push({ from: g.handoff.from, to: g.handoff.to, reason: g.handoff.reason });
+    }
+  }
+  return { nodes: [...nodes.values()].sort((a, b) => a.firstSeen - b.firstSeen), edges };
+};
+
+const NODE_W = 168, NODE_H = 58, GAP = 52, ARC_H = 64, PAD = 16;
+
+const AgentGraph = ({ nodes, edges }: { nodes: AgentNode[]; edges: AgentEdge[] }) => {
+  const idx = new Map(nodes.map((n, i) => [n.name, i]));
+  const xOf = (i: number) => PAD + i * (NODE_W + GAP);
+  const width = Math.max(PAD * 2 + nodes.length * NODE_W + Math.max(0, nodes.length - 1) * GAP, 320);
+  const height = PAD + ARC_H + NODE_H + PAD;
+  const nodeTop = PAD + ARC_H;
 
   return (
-    <div className="border-b border-border/40 last:border-0">
-      <button type="button" onClick={() => hasContent && setOpen((v) => !v)} className={`w-full text-left px-3 sm:px-4 py-3 hover:bg-muted/20 transition-colors ${hasContent ? "cursor-pointer" : "cursor-default"}`}>
-        {/* Row 1 — identity (wraps gracefully; secondary info hides on small screens) */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-4 shrink-0 text-muted-foreground">{hasContent ? (open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />) : null}</div>
-          <Badge variant="outline" className={`text-[10px] shrink-0 ${TYPE_COLORS[gen.type] || TYPE_COLORS.span}`}>{gen.type}</Badge>
-          <span className="font-mono text-xs text-foreground truncate flex-1 min-w-0" title={gen.responseModel || gen.requestModel}>{gen.responseModel || gen.requestModel || gen.name}</span>
-          <span className="text-xs text-muted-foreground shrink-0 hidden md:inline">{gen.provider}</span>
-          {isError && <Badge variant="outline" className="text-[10px] shrink-0 border-red-500/30 text-red-500 bg-red-500/10">ERR</Badge>}
-        </div>
-        {/* Row 2 — full-width timeline bar + right-aligned metrics */}
-        <div className="flex items-center gap-3 mt-2 pl-6">
-          <div className="flex-1 h-2 bg-muted-foreground/10 rounded-full relative overflow-hidden min-w-[40px]">
-            <div className={`absolute h-full rounded-full ${isError ? "bg-red-500" : "bg-violet-500"}`} style={{ left: `${left}%`, width: `${width}%` }} />
-          </div>
-          <span className="text-[11px] text-muted-foreground w-14 text-right shrink-0 font-mono">{formatMs(gen.latencyMs)}</span>
-          <span className="text-[11px] text-muted-foreground w-16 text-right shrink-0 font-mono hidden sm:inline">{formatTokens((gen.tokensIn || 0) + (gen.tokensOut || 0))} tok</span>
-          <span className="text-[11px] font-medium w-14 text-right shrink-0 font-mono">{formatUsd(gen.costUsd)}</span>
-        </div>
-      </button>
-      {open && hasContent && (
-        <div className="px-6 sm:px-12 pb-4 space-y-3">
-          {gen.errorMessage && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded p-2 font-mono">{gen.errorType}: {gen.errorMessage}</div>}
-          {gen.input !== undefined && <ContentBlock title="Input" value={gen.input} />}
-          {gen.output !== undefined && <ContentBlock title="Output" value={gen.output} />}
-          {gen.toolCalls?.length > 0 && <ContentBlock title="Tool calls" value={gen.toolCalls} />}
-          {gen.params && Object.keys(gen.params).length > 0 && (
-            <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
-              {Object.entries(gen.params).map(([k, v]) => <span key={k}><span className="font-mono text-foreground/70">{k}</span>: {String(v)}</span>)}
+    <div className="overflow-x-auto p-4">
+      <div className="relative" style={{ width, height }}>
+        {/* Edges (handoffs) drawn behind the nodes */}
+        <svg className="absolute inset-0 text-violet-500/50" width={width} height={height} style={{ pointerEvents: "none" }}>
+          <defs>
+            <marker id="ag-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+            </marker>
+          </defs>
+          {edges.map((e, k) => {
+            const si = e.from != null ? idx.get(e.from) : undefined;
+            const ti = idx.get(e.to);
+            if (ti == null) return null;
+            const tx = xOf(ti) + NODE_W / 2;
+            if (si == null) return null;
+            const sx = xOf(si) + NODE_W / 2;
+            const lift = nodeTop - (ARC_H - 10);
+            return (
+              <path key={k} d={`M ${sx} ${nodeTop} C ${sx} ${lift}, ${tx} ${lift}, ${tx} ${nodeTop}`}
+                fill="none" stroke="currentColor" strokeWidth={1.5} markerEnd="url(#ag-arrow)">
+                {e.reason && <title>{e.reason}</title>}
+              </path>
+            );
+          })}
+        </svg>
+        {/* Agent nodes */}
+        {nodes.map((n, i) => (
+          <div key={n.name} className={`absolute rounded-lg border bg-card shadow-sm flex flex-col justify-center px-3 ${n.error ? "border-red-500/40" : "border-indigo-500/30"}`}
+            style={{ left: xOf(i), top: nodeTop, width: NODE_W, height: NODE_H }}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Bot className={`h-3.5 w-3.5 shrink-0 ${n.error ? "text-red-500" : "text-indigo-500"}`} />
+              <span className="text-xs font-medium text-foreground truncate" title={n.name}>{n.name}</span>
             </div>
-          )}
-        </div>
-      )}
+            <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">{formatUsd(n.cost)} · {n.calls} call{n.calls === 1 ? "" : "s"}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
-
-const ContentBlock = ({ title, value }: any) => (
-  <div>
-    <p className="text-xs font-medium text-muted-foreground mb-1">{title}</p>
-    <pre className="text-xs bg-muted/40 border border-border/40 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap break-words text-foreground/90">
-      {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
-    </pre>
-  </div>
-);
 
 export default function AiTraceDetail() {
   const router = useRouter();
@@ -118,6 +133,8 @@ export default function AiTraceDetail() {
 
   const { trace, generations, scores } = data;
   const totalDuration = trace.latencyMs || generations.reduce((m: number, g: any) => Math.max(m, (g.startTime || 0) + (g.latencyMs || 0)), 0);
+  const graph = buildAgentGraph(generations);
+  const isMultiAgent = graph.nodes.length >= 2 || graph.edges.length >= 1;
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
@@ -161,20 +178,23 @@ export default function AiTraceDetail() {
       {/* Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Cost" value={formatUsd(trace.totalCostUsd)} sub="Total spend" icon={DollarSign} color="bg-violet-500" />
-        <StatCard label="Generations" value={trace.generationCount || generations.length} sub="LLM / tool calls" icon={Layers} color="bg-blue-500" />
+        <StatCard label="Generations" value={trace.generationCount || generations.length} sub="Model calls" icon={Layers} color="bg-blue-500" />
         <StatCard label="Tokens" value={formatTokens(trace.totalTokens)} sub="Input + output" icon={Hash} color="bg-emerald-500" />
         <StatCard label="Duration" value={formatMs(totalDuration)} sub="End to end" icon={Clock} color="bg-cyan-500" />
       </div>
 
-      {/* Waterfall */}
-      <Card className="flex flex-col">
-        <CardHeader className="py-4 border-b border-border/40 h-14 shrink-0"><CardTitle className="text-sm font-medium text-muted-foreground">Generation waterfall ({generations.length})</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          {generations.length
-            ? generations.map((g: any) => <GenerationRow key={g.generationId} gen={g} totalDuration={totalDuration} />)
-            : <div className="p-8 text-center text-sm text-muted-foreground">No generations recorded for this trace.</div>}
-        </CardContent>
-      </Card>
+      {/* Multi-agent graph — only when the trace involves multiple agents / handoffs */}
+      {isMultiAgent && (
+        <Card className="flex flex-col">
+          <CardHeader className="py-4 border-b border-border/40 h-14 shrink-0"><CardTitle className="text-sm font-medium text-muted-foreground">Agent graph ({graph.nodes.length} agent{graph.nodes.length === 1 ? "" : "s"}{graph.edges.length ? `, ${graph.edges.length} handoff${graph.edges.length === 1 ? "" : "s"}` : ""})</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <AgentGraph nodes={graph.nodes} edges={graph.edges} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Trace tree (agent → tool / mcp / generation) */}
+      <AiTraceTree generations={generations} totalDuration={totalDuration} />
 
       {/* Quality & Feedback — read-only; scores are submitted by the end user / evals via the SDK */}
       {scores?.length > 0 && (

@@ -247,6 +247,38 @@ const ConsumerCard = ({ title, label, rows }: any) => (
   </Card>
 );
 
+// --- Reliability card (tool / MCP-server health) — read-only debugging --------
+const ReliabilityCard = ({ title, label, rows }: any) => (
+  <Card className="flex flex-col h-auto min-h-[300px] overflow-hidden">
+    <CardHeader className="py-4 border-b border-border/40 h-16 shrink-0">
+      <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+    </CardHeader>
+    <CardContent className="p-0 flex-1 overflow-auto">
+      <table className="w-full text-sm text-left border-collapse">
+        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
+          <tr>
+            <th className="px-6 py-3 font-medium w-full">{label}</th>
+            <th className="px-6 py-3 font-medium text-right whitespace-nowrap">Calls</th>
+            <th className="px-6 py-3 font-medium text-right whitespace-nowrap">Err rate</th>
+            <th className="px-6 py-3 font-medium text-right whitespace-nowrap">Avg latency</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(rows || []).slice(0, 8).map((r: any) => (
+            <tr key={r.key} className="border-b border-border/40 hover:bg-muted/20">
+              <td className="px-6 py-3 font-mono text-xs text-foreground truncate max-w-[220px]" title={r.key}>{r.key}</td>
+              <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">{formatNumber(r.calls)}</td>
+              <td className={`px-6 py-3 text-right font-mono text-xs whitespace-nowrap ${r.errors > 0 ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>{(r.errorRate * 100).toFixed(1)}%</td>
+              <td className="px-6 py-3 text-right font-mono text-xs whitespace-nowrap"><span className={getLatencyColor(r.avgLatencyMs)}>{formatMs(r.avgLatencyMs)}</span></td>
+            </tr>
+          ))}
+          {(!rows || rows.length === 0) && <tr><td colSpan={4} className="py-12 text-center text-muted-foreground text-sm">No {label.toLowerCase()} activity in range</td></tr>}
+        </tbody>
+      </table>
+    </CardContent>
+  </Card>
+);
+
 export interface AiFilter { dimension: 'model' | 'provider' | 'operation'; value: string; }
 
 interface AiMonitoringViewProps {
@@ -280,6 +312,8 @@ export default function AiMonitoringView({ sourceId, filter }: AiMonitoringViewP
   const { data: activity, mutate: mutateActivity, isValidating: isValidatingActivity } = useSWR(canFetch && sourceId ? activityUrl : null, fetcher, { refreshInterval: 30000 });
 
   const { data: consumers } = useSWR(canFetch && sourceId && !filter ? `/ai/observability/${sourceId}/consumers?${rangeQuery}` : null, fetcher, { refreshInterval: 60000 });
+
+  const { data: reliability } = useSWR(canFetch && sourceId && !filter ? `/ai/observability/${sourceId}/reliability?${rangeQuery}` : null, fetcher, { refreshInterval: 60000 });
 
   const getColor = (c: string) => (isMono ? 'hsl(var(--chart-mono))' : c);
   const axisFormatter = useMemo(() => (str: string) => formatAxisDate(str, spanMs), [spanMs]);
@@ -433,6 +467,14 @@ export default function AiMonitoringView({ sourceId, filter }: AiMonitoringViewP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ConsumerCard title="Top users by cost" label="User" rows={consumers?.users} />
             <ConsumerCard title="Top sessions by cost" label="Session" rows={consumers?.sessions} />
+          </div>
+        )}
+
+        {/* Tool & MCP reliability (main view only; shown when agent/tool/MCP telemetry exists) */}
+        {!filter && (reliability?.tools?.length > 0 || reliability?.mcp?.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ReliabilityCard title="Tool reliability" label="Tool" rows={reliability?.tools} />
+            <ReliabilityCard title="MCP server reliability" label="Server" rows={reliability?.mcp} />
           </div>
         )}
 
