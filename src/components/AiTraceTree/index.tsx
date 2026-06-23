@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { Badge, cn, Button } from "../Core";
 import {
   Sparkles, Bot, Wrench, Server, Search, Hash, GitBranch, Brain, Workflow,
-  ShieldCheck, AlertCircle, CheckCircle2, ChevronRight, X, Layers, Tag, Copy, Check,
+  ShieldCheck, AlertCircle, CheckCircle2, ChevronRight, X, Layers, Copy, Check,
 } from "lucide-react";
 
 // ============================================================================
@@ -192,14 +192,61 @@ const Metric = ({ label, value, sub }: any) => (
   </div>
 );
 
-const ContentBlock = ({ title, value }: any) => (
-  <div className="space-y-1.5">
-    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{title}</div>
-    <pre className="text-xs bg-card border border-border/60 rounded-lg p-3 overflow-auto max-h-64 whitespace-pre-wrap break-words text-foreground/90 leading-relaxed">
-      {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
-    </pre>
+// Section heading — text-only, consistent with the breakdown/table titles.
+const Section = ({ title, count, children }: any) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{title}</span>
+      {count != null && <span className="text-[10px] font-mono text-muted-foreground/50">{count}</span>}
+    </div>
+    {children}
   </div>
 );
+
+// APM-style key/value attribute table — dense, scannable, professional.
+const AttrTable = ({ rows }: { rows: Array<{ label: string; value: React.ReactNode }> }) => {
+  if (!rows.length) return null;
+  return (
+    <div className="rounded-lg border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-start justify-between gap-4 px-3 py-2 hover:bg-muted/20 transition-colors">
+          <span className="text-[11px] font-mono text-muted-foreground shrink-0 pt-px">{r.label}</span>
+          <span className="text-xs font-mono text-foreground/90 text-right break-all">{r.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// JSON / content block with a copy affordance.
+const JsonBlock = ({ title, value }: any) => {
+  const [copied, setCopied] = useState(false);
+  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch { /* clipboard unavailable */ } };
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{title}</span>
+        <button type="button" onClick={copy} className="text-muted-foreground hover:text-violet-500 transition-colors">{copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}</button>
+      </div>
+      <pre className="text-xs bg-card border border-border/60 rounded-lg p-3 overflow-auto max-h-72 whitespace-pre-wrap break-words text-foreground/90 leading-relaxed">{text}</pre>
+    </div>
+  );
+};
+
+const fmtVal = (v: any): React.ReactNode => (typeof v === "boolean" ? (v ? "Yes" : "No") : String(v));
+
+// Split a free-form object (params / metadata) into scalar rows + nested-object blocks.
+const splitKv = (obj: Record<string, any>): { scalars: Array<{ label: string; value: React.ReactNode }>; objects: Array<{ title: string; value: any }> } => {
+  const scalars: Array<{ label: string; value: React.ReactNode }> = [];
+  const objects: Array<{ title: string; value: any }> = [];
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (v === undefined || v === null || v === "") continue;
+    if (typeof v === "object") objects.push({ title: k, value: v });
+    else scalars.push({ label: k, value: fmtVal(v) });
+  }
+  return { scalars, objects };
+};
 
 // Read-only export of the captured request — the user re-runs it in THEIR own
 // tooling. Senzor never executes anything.
@@ -231,8 +278,47 @@ const SpanDrawer = ({ gen, onClose }: any) => {
   const tokens = (gen.tokensIn || 0) + (gen.tokensOut || 0);
   const canCopy = gen.input !== undefined || gen.params || gen.tool?.args !== undefined;
 
+  // General attributes — descriptive fields, available even when content capture
+  // is off (so a tool/MCP/model span is never just a bare name).
+  const attrs: Array<{ label: string; value: React.ReactNode }> = [];
+  const addAttr = (label: string, v: any, t: (x: any) => React.ReactNode = fmtVal) => { if (v !== undefined && v !== null && v !== "") attrs.push({ label, value: t(v) }); };
+  addAttr("Type", gen.type);
+  if (!isStructural) addAttr("Provider", gen.provider);
+  addAttr("Operation", gen.operation);
+  addAttr("Request model", gen.requestModel);
+  addAttr("Response model", gen.responseModel);
+  addAttr("Finish reason", gen.finishReason);
+  if (gen.streaming) addAttr("Streaming", "Yes");
+  if (gen.statusCode != null) addAttr("Status code", gen.statusCode);
+  if (gen.costEstimated) addAttr("Cost basis", "Estimated (model not priced)");
+  if (gen.depth != null) addAttr("Tree depth", gen.depth);
+
+  // Usage detail (numeric breakdown beyond the headline cards).
+  const usage: Array<{ label: string; value: React.ReactNode }> = [];
+  const addU = (label: string, v: any, t: (x: any) => React.ReactNode) => { if (v) usage.push({ label, value: t(v) }); };
+  addU("Input tokens", gen.tokensIn, formatTokens);
+  addU("Output tokens", gen.tokensOut, formatTokens);
+  addU("Reasoning tokens", gen.reasoningTokens, formatTokens);
+  addU("Total tokens", tokens || gen.totalTokens, formatTokens);
+  addU("Cost", gen.costUsd, formatUsd);
+  if (isStructural) { addU("Subtree cost", gen.subtreeCostUsd, formatUsd); addU("Subtree tokens", gen.subtreeTokens, formatTokens); }
+  if (gen.timeToFirstTokenMs != null) usage.push({ label: "Time to first token", value: formatMs(gen.timeToFirstTokenMs) });
+
+  // Type-specific identity tables.
+  const kvRows = (pairs: any[][]) => pairs.filter(([, v]) => v != null && v !== "").map(([label, value]) => ({ label, value: String(value) }));
+  const toolRows = gen.tool ? kvRows([["name", gen.tool.name]]) : [];
+  const mcpRows = gen.mcp ? kvRows([["server", gen.mcp.server], ["transport", gen.mcp.transport], ["method", gen.mcp.method], ["tool", gen.mcp.toolName], ["resource uri", gen.mcp.resourceUri]]) : [];
+  const agentRows = gen.agent ? kvRows([["name", gen.agent.name], ["role", gen.agent.role], ["step", gen.agent.step]]) : [];
+  const handoffRows = gen.handoff ? kvRows([["from", gen.handoff.from], ["to", gen.handoff.to], ["reason", gen.handoff.reason]]) : [];
+
+  const params = splitKv(gen.params);
+  const metadata = splitKv(gen.metadata);
+
+  const expectsContent = gen.type === "generation" || gen.type === "tool" || gen.type === "mcp";
+  const hasContent = gen.input !== undefined || gen.output !== undefined || gen.tool?.args !== undefined || gen.tool?.result !== undefined || (gen.toolCalls?.length > 0);
+
   return (
-    <div className="absolute inset-y-0 right-0 w-full md:w-[450px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-50 animate-in slide-in-from-right duration-300 flex flex-col">
+    <div className="absolute inset-y-0 right-0 w-full md:w-[460px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-50 animate-in slide-in-from-right duration-300 flex flex-col">
       <div className="flex items-center justify-between h-12 px-4 border-b border-border bg-muted/20 shrink-0">
         <div className="flex items-center gap-2">
           <div className={cn("p-1 rounded", theme.bg, theme.text)}><Icon className="w-3.5 h-3.5" /></div>
@@ -245,20 +331,18 @@ const SpanDrawer = ({ gen, onClose }: any) => {
         {/* Name + copy */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{isStructural ? "Operation" : "Model"}</label>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{isStructural ? gen.type : "Model"}</span>
             {canCopy && <CopyRequestButton gen={gen} />}
           </div>
           <div className="text-sm font-mono break-all bg-card p-3 rounded-lg border border-border shadow-sm text-foreground">{nodeLabel(gen)}</div>
         </div>
 
-        {/* Metrics */}
+        {/* Headline metrics */}
         <div className="grid grid-cols-2 gap-3">
           <Metric label="Latency" value={formatMs(gen.latencyMs)} sub={gen.streaming && gen.timeToFirstTokenMs != null ? `TTFT ${formatMs(gen.timeToFirstTokenMs)}` : undefined} />
           <Metric label={isStructural ? "Subtree cost" : "Cost"} value={formatUsd(isStructural && gen.subtreeCostUsd != null ? gen.subtreeCostUsd : gen.costUsd)} sub={gen.costEstimated ? "estimated" : undefined} />
           {!isStructural && <Metric label="Tokens" value={formatTokens(tokens)} sub={`${formatTokens(gen.tokensIn || 0)} in · ${formatTokens(gen.tokensOut || 0)} out`} />}
-          {gen.reasoningTokens > 0 && <Metric label="Reasoning" value={formatTokens(gen.reasoningTokens)} sub="reasoning tokens" />}
           <Metric label="Start offset" value={`+${formatMs(gen.startTime || 0)}`} />
-          {gen.provider && !isStructural && <Metric label="Provider" value={gen.provider} sub={gen.operation} />}
         </div>
 
         {/* Status */}
@@ -274,38 +358,55 @@ const SpanDrawer = ({ gen, onClose }: any) => {
           <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3 font-mono break-words">{gen.errorType}: {gen.errorMessage}</div>
         )}
 
-        {/* MCP identity */}
-        {gen.mcp && (
-          <div className="grid gap-2">
-            {[["server", gen.mcp.server], ["transport", gen.mcp.transport], ["method", gen.mcp.method], ["tool", gen.mcp.toolName], ["resource", gen.mcp.resourceUri]].filter(([, v]) => v).map(([k, v]: any) => (
-              <div key={k} className="bg-card border border-border/40 rounded-lg p-3">
-                <div className="text-[10px] font-bold text-muted-foreground mb-1 font-mono uppercase opacity-70">{k}</div>
-                <div className="font-mono text-xs break-all text-foreground/90">{v}</div>
-              </div>
-            ))}
+        {/* Attributes — the verbose, always-available descriptive panel */}
+        {attrs.length > 0 && <Section title="Attributes"><AttrTable rows={attrs} /></Section>}
+
+        {/* Type-specific identity */}
+        {toolRows.length > 0 && <Section title="Tool"><AttrTable rows={toolRows} /></Section>}
+        {mcpRows.length > 0 && <Section title="MCP server"><AttrTable rows={mcpRows} /></Section>}
+        {agentRows.length > 0 && <Section title="Agent"><AttrTable rows={agentRows} /></Section>}
+        {handoffRows.length > 0 && <Section title="Handoff"><AttrTable rows={handoffRows} /></Section>}
+
+        {/* Usage breakdown */}
+        {usage.length > 0 && <Section title="Usage"><AttrTable rows={usage} /></Section>}
+
+        {/* Request parameters */}
+        {(params.scalars.length > 0 || params.objects.length > 0) && (
+          <Section title="Parameters" count={params.scalars.length + params.objects.length}>
+            {params.scalars.length > 0 && <AttrTable rows={params.scalars} />}
+            {params.objects.map((o) => <JsonBlock key={o.title} title={o.title} value={o.value} />)}
+          </Section>
+        )}
+
+        {/* Free-form metadata */}
+        {(metadata.scalars.length > 0 || metadata.objects.length > 0) && (
+          <Section title="Metadata" count={metadata.scalars.length + metadata.objects.length}>
+            {metadata.scalars.length > 0 && <AttrTable rows={metadata.scalars} />}
+            {metadata.objects.map((o) => <JsonBlock key={o.title} title={o.title} value={o.value} />)}
+          </Section>
+        )}
+
+        {/* Content payloads (only present when the source opts into content capture) */}
+        {gen.tool?.args !== undefined && <JsonBlock title="Tool args" value={gen.tool.args} />}
+        {gen.tool?.result !== undefined && <JsonBlock title="Tool result" value={gen.tool.result} />}
+        {gen.input !== undefined && <JsonBlock title="Input" value={gen.input} />}
+        {gen.output !== undefined && <JsonBlock title="Output" value={gen.output} />}
+        {gen.toolCalls?.length > 0 && <JsonBlock title="Tool calls" value={gen.toolCalls} />}
+
+        {expectsContent && !hasContent && (
+          <div className="text-[11px] text-muted-foreground bg-muted/30 border border-dashed border-border/60 rounded-lg p-3 leading-relaxed">
+            Prompt / argument content isn&apos;t captured for this source. Enable <span className="font-mono text-foreground/70">content capture</span> in the source settings to inspect inputs, outputs and tool arguments here.
           </div>
         )}
 
-        {/* Agent / handoff */}
-        {gen.agent?.role && <div className="text-xs text-muted-foreground">Role: <span className="text-foreground/80">{gen.agent.role}</span></div>}
-        {gen.handoff?.reason && <div className="text-xs text-muted-foreground">Reason: <span className="text-foreground/80">{gen.handoff.reason}</span></div>}
-
-        {/* Content + tool payloads */}
-        {gen.tool?.args !== undefined && <ContentBlock title="Tool args" value={gen.tool.args} />}
-        {gen.tool?.result !== undefined && <ContentBlock title="Tool result" value={gen.tool.result} />}
-        {gen.input !== undefined && <ContentBlock title="Input" value={gen.input} />}
-        {gen.output !== undefined && <ContentBlock title="Output" value={gen.output} />}
-        {gen.toolCalls?.length > 0 && <ContentBlock title="Tool calls" value={gen.toolCalls} />}
-
-        {/* Params */}
-        {gen.params && Object.keys(gen.params).length > 0 && (
-          <div className="space-y-2 pt-2 border-t border-border/50">
-            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider"><Tag className="w-3.5 h-3.5" /> Parameters</div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              {Object.entries(gen.params).map(([k, v]) => <span key={k}><span className="font-mono text-foreground/70">{k}</span>: {String(v)}</span>)}
-            </div>
-          </div>
-        )}
+        {/* Identifiers (correlation / debugging) */}
+        <Section title="Identifiers">
+          <AttrTable rows={[
+            { label: "observation id", value: gen.generationId },
+            ...(gen.parentGenerationId ? [{ label: "parent id", value: gen.parentGenerationId }] : []),
+            { label: "trace id", value: gen.traceId },
+          ]} />
+        </Section>
       </div>
     </div>
   );
