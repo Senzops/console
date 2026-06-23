@@ -1477,7 +1477,7 @@ export const ServiceModals: React.FC = () => {
                     <p className="text-xs text-muted-foreground">
                       {editData?.aiType === "browser"
                         ? "Disabled for browser sources for privacy."
-                        : "Stores masked prompts/completions for debugging. Off by default."}
+                        : "Stores masked prompts, outputs and tool arguments for debugging. Off by default. Also requires the SDK to send content: set ai.captureContent: true in Senzor.init()."}
                     </p>
                   </div>
                   <button

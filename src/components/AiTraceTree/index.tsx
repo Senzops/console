@@ -395,7 +395,7 @@ const SpanDrawer = ({ gen, onClose }: any) => {
 
         {expectsContent && !hasContent && (
           <div className="text-[11px] text-muted-foreground bg-muted/30 border border-dashed border-border/60 rounded-lg p-3 leading-relaxed">
-            Prompt / argument content isn&apos;t captured for this source. Enable <span className="font-mono text-foreground/70">content capture</span> in the source settings to inspect inputs, outputs and tool arguments here.
+            Prompt / argument content isn&apos;t captured for this source. Content capture is opt-in on <span className="text-foreground/80">both</span> gates: set <span className="font-mono text-foreground/70">ai.captureContent: true</span> in the SDK <span className="text-foreground/80">and</span> enable <span className="font-mono text-foreground/70">Capture prompts &amp; outputs</span> in this source&apos;s settings. Content is masked on ingest.
           </div>
         )}
 
