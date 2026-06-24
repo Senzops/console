@@ -47,9 +47,9 @@ const getServerSnippet = (method: string, vpsId?: string, apiKey?: string) => {
 const getWebSnippet = (method: string, webId?: string) => {
   switch (method) {
     case "CDN Script":
-      return `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.init({ webId: "${webId}" });\n</script>`;
+      return `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.init({ webId: "${webId}" });\n\n  // Track custom events anywhere in your app\n  window.Senzor.track("Signup", { plan: "pro" });\n</script>`;
     case "NPM Package":
-      return `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.init({\n  webId: "${webId}",\n});`;
+      return `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.init({\n  webId: "${webId}",\n});\n\n// Track custom events anywhere in your app\nSenzor.track("Signup", { plan: "pro" });`;
     default:
       return "";
   }

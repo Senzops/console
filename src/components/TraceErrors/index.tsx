@@ -120,9 +120,31 @@ export const ErrorEventList = ({
   const router = useRouter();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // RUM-only: symbolicated stack frames per error, and in-flight state.
+  const [symbolicated, setSymbolicated] = useState<Record<string, any>>({});
+  const [symbolicatingId, setSymbolicatingId] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const symbolicate = async (e: React.MouseEvent, serviceId: string, err: any) => {
+    e.stopPropagation();
+    if (symbolicated[err._id]) {
+      // Toggle back to the raw stack.
+      setSymbolicated((prev) => { const n = { ...prev }; delete n[err._id]; return n; });
+      return;
+    }
+    setSymbolicatingId(err._id);
+    try {
+      const release = err.context?.release || err.context?.version;
+      const res = await api.post(`/rum/${serviceId}/symbolicate`, { stackTrace: err.stackTrace, release });
+      setSymbolicated((prev) => ({ ...prev, [err._id]: res.data }));
+    } catch {
+      /* leave raw stack on failure */
+    } finally {
+      setSymbolicatingId(null);
+    }
   };
 
   const copyToClipboard = (e: React.MouseEvent, id: string, text: string) => {
@@ -424,43 +446,82 @@ export const ErrorEventList = ({
                       <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-border/40">
                         <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                           <Terminal className="h-3.5 w-3.5" /> Stack Trace
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                          onClick={(e) =>
-                            copyToClipboard(e, err._id, err.stackTrace)
-                          }
-                          title="Copy Stack Trace"
-                        >
-                          {copiedId === err._id ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
+                          {symbolicated[err._id] && (
+                            <Badge variant="outline" className="text-[9px] py-0 border-emerald-500/30 text-emerald-500">
+                              symbolicated {symbolicated[err._id].resolvedCount}/{symbolicated[err._id].frames?.length}
+                            </Badge>
                           )}
-                        </Button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {isRum && routeServiceId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                              onClick={(e) => symbolicate(e, routeServiceId, err)}
+                              disabled={symbolicatingId === err._id}
+                              title="De-minify with uploaded source maps"
+                            >
+                              {symbolicatingId === err._id ? (
+                                <Spinner className="h-3 w-3 mr-1" />
+                              ) : null}
+                              {symbolicated[err._id] ? 'Show raw' : 'Symbolicate'}
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            onClick={(e) =>
+                              copyToClipboard(e, err._id, err.stackTrace)
+                            }
+                            title="Copy Stack Trace"
+                          >
+                            {copiedId === err._id ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="p-4 overflow-x-auto overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-[#30363d] scrollbar-track-transparent">
-                        <pre className="text-[11.5px] leading-relaxed font-mono text-[#c9d1d9]">
-                          {err.stackTrace
-                            .split("\n")
-                            .map((line: string, i: number) => {
-                              const isNodeModule =
-                                line.includes("node_modules") ||
-                                line.includes("node:") ||
-                                line.includes("internal/");
-                              return (
-                                <div
-                                  key={i}
-                                  className={`hover:bg-[#161b22] px-1 -mx-1 rounded ${isNodeModule ? "opacity-40" : "text-[#e6edf3]"}`}
-                                >
-                                  {line}
-                                </div>
-                              );
-                            })}
-                        </pre>
+                        {symbolicated[err._id] ? (
+                          <pre className="text-[11.5px] leading-relaxed font-mono text-[#c9d1d9]">
+                            {symbolicated[err._id].frames.map((f: any, i: number) => (
+                              <div key={i} className={`hover:bg-[#161b22] px-1 -mx-1 rounded ${f.resolved ? 'text-[#e6edf3]' : 'opacity-40'}`}>
+                                {f.resolved ? (
+                                  <>
+                                    <span className="text-[#7ee787]">at {f.origName || f.function || '<anonymous>'}</span>
+                                    {' '}<span className="text-[#79c0ff]">{f.source}</span>:<span className="text-[#d2a8ff]">{f.origLine}</span>:{f.origColumn}
+                                  </>
+                                ) : (
+                                  f.raw
+                                )}
+                              </div>
+                            ))}
+                          </pre>
+                        ) : (
+                          <pre className="text-[11.5px] leading-relaxed font-mono text-[#c9d1d9]">
+                            {err.stackTrace
+                              .split("\n")
+                              .map((line: string, i: number) => {
+                                const isNodeModule =
+                                  line.includes("node_modules") ||
+                                  line.includes("node:") ||
+                                  line.includes("internal/");
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`hover:bg-[#161b22] px-1 -mx-1 rounded ${isNodeModule ? "opacity-40" : "text-[#e6edf3]"}`}
+                                  >
+                                    {line}
+                                  </div>
+                                );
+                              })}
+                          </pre>
+                        )}
                       </div>
                     </div>
                   )}

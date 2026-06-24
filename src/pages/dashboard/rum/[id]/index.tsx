@@ -23,6 +23,7 @@ import {
   DataError,
 } from "../../../../components/Core";
 import { RumDashboardSkeleton } from "../../../../components/Skeletons";
+import { RumInsights } from "@/components/RumInsights";
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
@@ -1014,6 +1015,14 @@ export default function RumDashboard() {
           serviceId={id}
           onRefresh={() => mutate()}
           isRefreshing={isValidating}
+        />
+
+        {/* 9. Core Web Vitals (p75/p95) · Sessions · Sampling */}
+        <RumInsights
+          serviceId={id as string}
+          timeRange={timeRange}
+          readOnly={readOnly}
+          samplingRate={service?.samplingRate}
         />
       </div>
 
