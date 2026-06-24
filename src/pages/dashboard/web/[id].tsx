@@ -18,7 +18,6 @@ import { createPortal } from 'react-dom';
 import { SmartAnimatedValue } from '@/components/Tween';
 import { WorldMap } from '@/components/WorldMap';
 import { WebFunnels } from '@/components/WebFunnels';
-import { WebRealtime } from '@/components/WebRealtime';
 import { WebAnnotationsDialog } from '@/components/WebAnnotations';
 import { WebJourneys } from '@/components/WebJourneys';
 import { WebApiKeys } from '@/components/WebApiKeys';
@@ -502,9 +501,6 @@ export default function WebDetail() {
           </div>
         </div>
 
-        {/* Realtime */}
-        <WebRealtime webId={id as string} />
-
         {/* Active segmentation filters */}
         {Object.keys(filters).length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
@@ -648,12 +644,6 @@ export default function WebDetail() {
           </DistributionCard>
         </div>
 
-        {/* Funnels & Conversions */}
-        <WebFunnels webId={id as string} timeRange={timeRange} />
-
-        {/* Retention & Journeys */}
-        <WebJourneys webId={id as string} timeRange={timeRange} />
-
         {/* SYSTEM & GEO Tables/Maps */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* System Environment */}
@@ -732,6 +722,12 @@ export default function WebDetail() {
             </BarChart>
           </ChartCard>
         </div>
+
+        {/* Retention & Journeys */}
+        <WebJourneys webId={id as string} timeRange={timeRange} />
+
+        {/* Funnels & Conversions */}
+        <WebFunnels webId={id as string} timeRange={timeRange} />
 
         {/* Query API */}
         {!readOnly && <WebApiKeys webId={id as string} />}

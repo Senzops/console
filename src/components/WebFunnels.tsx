@@ -4,7 +4,7 @@ import { api, useAuth } from '@/lib/auth';
 import { useShareApi, useShareMode } from '@/lib/share';
 import { buildTimeRangeQuery } from '@/components/TimeRangePicker';
 import { Card, CardContent, CardHeader, CardTitle, Button, Dialog, Input, Badge, Spinner, DataError } from '@/components/Core';
-import { Plus, Trash2, Pencil, FileText, Zap, ArrowDown, GitBranch } from 'lucide-react';
+import { Plus, Trash2, Pencil, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 
@@ -45,11 +45,7 @@ const FunnelBuilder = ({ webId, existing, onClose, onSaved }: { webId: string; e
     setSaving(true);
     const payload = {
       name: name.trim(),
-      steps: steps.map((s) => ({
-        type: s.type,
-        value: s.value.trim(),
-        match: s.type === 'page' ? s.match || 'exact' : 'exact',
-      })),
+      steps: steps.map((s) => ({ type: s.type, value: s.value.trim(), match: s.type === 'page' ? s.match || 'exact' : 'exact' })),
     };
     try {
       if (existing) await api.put(`/web/${webId}/funnels/${existing._id}`, payload);
@@ -81,7 +77,7 @@ const FunnelBuilder = ({ webId, existing, onClose, onSaved }: { webId: string; e
           <div className="space-y-2">
             {steps.map((s, i) => (
               <div key={i} className="flex items-center gap-2 rounded-lg border bg-muted/20 p-2">
-                <span className="text-xs font-mono text-muted-foreground w-5 text-center shrink-0">{i + 1}</span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground shrink-0">{i + 1}</span>
                 <select
                   value={s.type}
                   onChange={(e) => updateStep(i, { type: e.target.value as StepType })}
@@ -133,7 +129,7 @@ const FunnelBuilder = ({ webId, existing, onClose, onSaved }: { webId: string; e
 };
 
 // ---------------------------------------------------------------------------
-// Single funnel card with its computed conversion visualization
+// Single funnel card with conversion visualization
 // ---------------------------------------------------------------------------
 const FunnelCard = ({ webId, funnel, timeRange, fetcher, canQuery, readOnly, onEdit, onDelete }: any) => {
   const { data, error } = useSWR(
@@ -147,66 +143,67 @@ const FunnelCard = ({ webId, funnel, timeRange, fetcher, canQuery, readOnly, onE
 
   return (
     <Card className="flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <GitBranch className="h-4 w-4 text-[hsl(var(--chart-1))] shrink-0" />
-          <CardTitle className="text-sm font-semibold truncate">{funnel.name}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 py-4 border-b border-border/40 h-16 shrink-0">
+        <CardTitle className="text-sm font-medium text-muted-foreground truncate">{funnel.name}</CardTitle>
+        <div className="flex items-center gap-2 shrink-0">
           {data && (
-            <Badge variant="outline" className="text-[10px] font-mono shrink-0">
-              {overall.toFixed(1)}% conv.
-            </Badge>
+            <Badge variant="outline" className="text-[10px] font-mono">{overall.toFixed(1)}% conversion</Badge>
+          )}
+          {!readOnly && (
+            <>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(funnel)}>
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(funnel)}>
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </>
           )}
         </div>
-        {!readOnly && (
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(funnel)}>
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(funnel)}>
-              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          </div>
-        )}
       </CardHeader>
-      <CardContent className="flex-1">
+      <CardContent className="flex-1 p-5">
         {!data && !error && <div className="flex items-center justify-center py-10"><Spinner className="h-5 w-5" /></div>}
         {error && <div className="py-6"><DataError /></div>}
         {data && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {results.map((r: any, i: number) => {
-              const width = Math.max(r.conversionFromStart, r.visitors > 0 ? 3 : 0);
+              const width = Math.max(r.conversionFromStart, r.visitors > 0 ? 4 : 0);
               return (
                 <div key={i}>
-                  <div className="flex items-center justify-between text-xs mb-1 gap-2">
-                    <span className="flex items-center gap-1.5 text-foreground truncate min-w-0">
-                      {r.type === 'event' ? <Zap className="h-3 w-3 text-amber-500 shrink-0" /> : <FileText className="h-3 w-3 text-blue-500 shrink-0" />}
-                      <span className="text-muted-foreground">{i + 1}.</span>
-                      <span className="truncate" title={r.label || r.value}>{r.label || r.value}</span>
-                    </span>
-                    <span className="font-mono whitespace-nowrap">
-                      {formatNumber(r.visitors)}
-                      <span className="text-muted-foreground/70 ml-1">({r.conversionFromStart.toFixed(0)}%)</span>
-                    </span>
-                  </div>
-                  <div className="h-6 rounded-md bg-muted/40 overflow-hidden">
-                    <div
-                      className="h-full bg-[hsl(var(--chart-1))]/70 rounded-md transition-all duration-700"
-                      style={{ width: `${width}%` }}
-                    />
-                  </div>
                   {i > 0 && r.dropOff > 0 && (
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
-                      <ArrowDown className="h-3 w-3 text-destructive" />
-                      {formatNumber(r.dropOff)} dropped ({(100 - r.conversionFromPrev).toFixed(0)}% drop-off)
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5 pl-7">
+                      <ArrowDown className="h-3 w-3 text-destructive/70" />
+                      {formatNumber(r.dropOff)} dropped off · {(100 - r.conversionFromPrev).toFixed(0)}%
                     </div>
                   )}
+                  <div className="flex items-center justify-between mb-1.5 text-xs gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground shrink-0">{i + 1}</span>
+                      <span className="truncate font-medium text-foreground" title={r.label || r.value}>{r.label || r.value}</span>
+                      <Badge variant="outline" className="text-[9px] py-0 px-1.5 shrink-0">{r.type}</Badge>
+                    </div>
+                    <span className="font-mono whitespace-nowrap text-foreground">
+                      {formatNumber(r.visitors)}
+                      <span className="text-muted-foreground/70 ml-1.5">{r.conversionFromStart.toFixed(0)}%</span>
+                    </span>
+                  </div>
+                  <div className="h-7 rounded-md bg-muted/40 overflow-hidden">
+                    <div
+                      className="h-full bg-primary/80 rounded-md transition-all duration-700 flex items-center justify-end pr-2"
+                      style={{ width: `${width}%` }}
+                    >
+                      {r.conversionFromStart >= 18 && (
+                        <span className="text-[10px] font-medium text-primary-foreground">{r.conversionFromStart.toFixed(0)}%</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
             {results.length > 0 && (
-              <div className="flex items-center justify-between pt-2 border-t text-xs">
+              <div className="flex items-center justify-between pt-3 border-t border-border/40 text-xs">
                 <span className="text-muted-foreground">Entered → Converted</span>
-                <span className="font-mono">{formatNumber(data.totalEntered)} → {formatNumber(data.totalConverted)}</span>
+                <span className="font-mono text-foreground">{formatNumber(data.totalEntered)} → {formatNumber(data.totalConverted)}</span>
               </div>
             )}
           </div>
@@ -256,10 +253,7 @@ export const WebFunnels = ({ webId, timeRange }: { webId: string; timeRange: any
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <GitBranch className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Funnels &amp; Conversions</h2>
-        </div>
+        <h2 className="text-sm font-semibold text-foreground">Funnels &amp; Conversions</h2>
         {!readOnly && (
           <Button variant="outline" size="sm" onClick={openCreate}>
             <Plus className="h-3.5 w-3.5 mr-1.5" /> New Funnel
@@ -274,7 +268,6 @@ export const WebFunnels = ({ webId, timeRange }: { webId: string; timeRange: any
       ) : funnels.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-            <GitBranch className="h-7 w-7 text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground">No funnels yet</p>
             <p className="text-xs text-muted-foreground/70 max-w-sm">Define an ordered path of pages and events to measure how visitors convert and where they drop off.</p>
             {!readOnly && <Button variant="outline" size="sm" onClick={openCreate} className="mt-1"><Plus className="h-3.5 w-3.5 mr-1.5" /> Create your first funnel</Button>}
@@ -283,29 +276,12 @@ export const WebFunnels = ({ webId, timeRange }: { webId: string; timeRange: any
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {funnels.map((f) => (
-            <FunnelCard
-              key={f._id}
-              webId={webId}
-              funnel={f}
-              timeRange={timeRange}
-              fetcher={fetcher}
-              canQuery={canQuery}
-              readOnly={readOnly}
-              onEdit={openEdit}
-              onDelete={setDeleting}
-            />
+            <FunnelCard key={f._id} webId={webId} funnel={f} timeRange={timeRange} fetcher={fetcher} canQuery={canQuery} readOnly={readOnly} onEdit={openEdit} onDelete={setDeleting} />
           ))}
         </div>
       )}
 
-      {builderOpen && (
-        <FunnelBuilder
-          webId={webId}
-          existing={editing}
-          onClose={() => setBuilderOpen(false)}
-          onSaved={() => mutate()}
-        />
-      )}
+      {builderOpen && <FunnelBuilder webId={webId} existing={editing} onClose={() => setBuilderOpen(false)} onSaved={() => mutate()} />}
 
       <Dialog open={!!deleting} onClose={() => setDeleting(null)} title="Delete Funnel?">
         <div className="space-y-4">

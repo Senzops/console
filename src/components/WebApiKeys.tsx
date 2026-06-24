@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import useSWR from 'swr';
 import { api, useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Dialog, Badge, Spinner } from '@/components/Core';
-import { KeyRound, Copy, Check, Trash2, Plus } from 'lucide-react';
+import { Copy, Check, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 
@@ -114,16 +114,14 @@ export const WebApiKeys = ({ webId }: { webId: string }) => {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <KeyRound className="h-4 w-4" /> Query API
-        </CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 py-4 border-b border-border/40 h-16">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Query API</CardTitle>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-[10px]">Read-only · 120 req/min</Badge>
           <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Manage keys</Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-5">
         <p className="text-xs text-muted-foreground mb-3">
           Pull this site's analytics programmatically. Authenticate with <code className="px-1 py-0.5 rounded bg-muted font-mono text-[10px]">Authorization: Bearer &lt;key&gt;</code>. Add <code className="px-1 py-0.5 rounded bg-muted font-mono text-[10px]">format=csv</code> for spreadsheet exports.
         </p>

@@ -2,7 +2,7 @@ import React from 'react';
 import useSWR from 'swr';
 import { api } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Spinner } from '@/components/Core';
-import { FileCode2, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 
@@ -32,13 +32,11 @@ export const RumSourceMaps = ({ serviceId }: { serviceId: string }) => {
 
   return (
     <Card>
-      <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <FileCode2 className="h-4 w-4" /> Source Maps
-        </CardTitle>
+      <CardHeader className="py-4 border-b border-border/40 flex flex-row items-center justify-between space-y-0 h-16">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Source Maps</CardTitle>
         <Badge variant="outline" className="text-[10px]">{maps?.length ?? 0} uploaded</Badge>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 pt-5">
         <p className="text-xs text-muted-foreground">
           Upload source maps from your build/CI to de-minify error stack traces. Authenticate with your RUM ingest API key.
         </p>

@@ -1073,6 +1073,9 @@ export const WebDashboardSkeleton = () => (
     <SkeletonStatGrid count={4} />
     <SkeletonChartCard />
     <SkeletonChartGrid count={4} />
+    <SkeletonChartGrid count={2} />
+    <SkeletonChartGrid count={2} />
+    <SkeletonChartCard />
   </SkeletonScreen>
 )
 
@@ -1116,6 +1119,7 @@ export const RumDashboardSkeleton = () => (
     <SkeletonChartCard />
     <SkeletonChartGrid count={4} />
     <SkeletonTable columns={5} rows={5} />
+    <SkeletonTable columns={6} rows={4} />
   </SkeletonScreen>
 )
 

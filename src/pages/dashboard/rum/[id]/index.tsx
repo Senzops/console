@@ -864,6 +864,14 @@ export default function RumDashboard() {
                       stopOpacity={0}
                     />
                   </linearGradient>
+                  <linearGradient id="colorFcp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={getColor("#f59e0b")} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={getColor("#f59e0b")} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorTtfb" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={getColor("#06b6d4")} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={getColor("#06b6d4")} stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -900,6 +908,24 @@ export default function RumDashboard() {
                   strokeWidth={2}
                   name="Avg CLS (Score)"
                   strokeDasharray="2 2"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="fcpAvg"
+                  stroke={getColor("#f59e0b")}
+                  fill={"url(#colorFcp)"}
+                  strokeWidth={2}
+                  name="Avg FCP (ms)"
+                  strokeDasharray="6 3"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="ttfbAvg"
+                  stroke={getColor("#06b6d4")}
+                  fill={"url(#colorTtfb)"}
+                  strokeWidth={2}
+                  name="Avg TTFB (ms)"
+                  strokeDasharray="1 3"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -1017,12 +1043,11 @@ export default function RumDashboard() {
           isRefreshing={isValidating}
         />
 
-        {/* 9. Core Web Vitals (p75/p95) · Sessions · Sampling */}
+        {/* 9. Sessions · Source Maps */}
         <RumInsights
           serviceId={id as string}
           timeRange={timeRange}
           readOnly={readOnly}
-          samplingRate={service?.samplingRate}
         />
       </div>
 
