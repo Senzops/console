@@ -209,12 +209,6 @@ const FunnelCard = ({ webId, funnel, timeRange, fetcher, canQuery, readOnly, onE
                 Show {hidden} more {hidden === 1 ? 'step' : 'steps'}...
               </button>
             )}
-            {results.length > 0 && (
-              <div className="flex items-center justify-between pt-3 border-t border-border/40 text-xs">
-                <span className="text-muted-foreground">Entered → Converted</span>
-                <span className="font-mono text-foreground">{formatNumber(data.totalEntered)} → {formatNumber(data.totalConverted)}</span>
-              </div>
-            )}
           </div>
         )}
       </CardContent>

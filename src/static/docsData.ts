@@ -249,27 +249,34 @@ export const DOCS_DATA: DocsConfig = {
       id: "web-analytics",
       title: "Web Analytics",
       iconName: "Globe",
-      shortDescription: "Privacy-first, cookie-less traffic insights.",
-      overview: "Understand your audience without compromising their privacy. Track page views, unique visitors, referrers, and geographic distribution using a lightweight, zero-cookie script.",
+      shortDescription: "Product-grade insights, privacy-first.",
+      overview: "Understand your audience without compromising their privacy. Beyond page views, unique visitors, referrers and geography, you get custom events, multi-step funnels & conversion goals, click-to-filter segmentation, UTM campaign attribution, cohort retention, user journeys, realtime and period comparison — all from a lightweight, zero-cookie script. Pull any of it programmatically via the read-only Query API (JSON or CSV).",
       prerequisites: [
         "Access to your website's HTML `<head>` tag or a tag manager."
       ],
       registrationSteps: [
         { title: "Register Domain", description: "Enter your exact domain name in the Web Analytics modal." },
-        { title: "Install Script", description: "Copy the provided script and inject it into your website." }
+        { title: "Install Script", description: "Copy the provided script and inject it into your website." },
+        { title: "Track Events (optional)", description: "Call Senzor.track(name, props) to capture conversions, signups, purchases and more — then use them as funnel steps." }
       ],
       installation: [
         {
           framework: "CDN Script",
           language: "html",
-          code: `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>window.Senzor.init({ webId: "<YOUR_WEB_ID>" })</script>`,
+          code: `<script src="https://cdn.jsdelivr.net/gh/senzops/web-agent/dist/index.global.js"></script>\n<script>\n  window.Senzor.init({ webId: "<YOUR_WEB_ID>" });\n\n  // Track a custom event anywhere in your app\n  window.Senzor.track("Signup", { plan: "pro" });\n</script>`,
           notes: "Place this script in your <head> tag to accurately track pageviews before the user navigates away."
         },
         {
           framework: "NPM Package",
           language: "typescript",
-          code: `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.init({\n  webId: "<YOUR_WEB_ID>",\n});`,
+          code: `npm install @senzops/web\n\nimport { Senzor } from "@senzops/web";\n\nSenzor.init({\n  webId: "<YOUR_WEB_ID>",\n});\n\n// Track a custom event anywhere in your app\nSenzor.track("Signup", { plan: "pro" });`,
           notes: "Recommended for React, Vue, Svelte, and other SPA frameworks. Import and call init() as early as possible in your app entry point."
+        },
+        {
+          framework: "Custom Events",
+          language: "typescript",
+          code: `// Imperative — track conversions, signups, purchases, etc.\nSenzor.track("Purchase", { plan: "pro", amount: 49, trial: false });\n\n// Declarative — no JS needed; add data attributes to any element.\n// <button\n//   data-senzor-event="CTA Click"\n//   data-senzor-event-location="hero"\n// >Get started</button>`,
+          notes: "Events appear under Custom Events on your dashboard — drill in to break down by property, or use them as funnel steps. Property values must be strings, numbers or booleans (max 50 per event). Outbound-link and file-download auto-capture are opt-in via init({ outboundLinks: true, fileDownloads: true })."
         }
       ]
     },
@@ -277,14 +284,15 @@ export const DOCS_DATA: DocsConfig = {
       id: "rum",
       title: "Real User Monitoring (RUM)",
       iconName: "MonitorSmartphone",
-      shortDescription: "Core Web Vitals and client-side error capture.",
-      overview: "Capture client-side performance bottlenecks. Monitor Core Web Vitals (LCP, FID, CLS), network call latency, and frontend JavaScript exceptions directly from the browser.",
+      shortDescription: "Core Web Vitals, sessions and client-side errors.",
+      overview: "Capture client-side performance bottlenecks. Monitor Core Web Vitals at p75 (LCP, INP, CLS), network call latency, and frontend JavaScript exceptions directly from the browser. Drill into individual session timelines linking every page load, and upload your build's source maps to de-minify production stack traces back to original source.",
       prerequisites: [
         "Your frontend domain must be explicitly whitelisted in the Senzor dashboard to prevent CORS rejection."
       ],
       registrationSteps: [
         { title: "Navigate to Web APM", description: "Click the '+' icon next to Web APM (RUM)." },
-        { title: "Define Allowed Domains", description: "You must explicitly define comma-separated domains (e.g., 'senzor.dev, app.senzor.dev'). Telemetry from unauthorized origins is dropped." }
+        { title: "Define Allowed Domains", description: "You must explicitly define comma-separated domains (e.g., 'senzor.dev, app.senzor.dev'). Telemetry from unauthorized origins is dropped." },
+        { title: "Upload Source Maps (optional)", description: "From your CI, POST each build's source maps to de-minify error stack traces. Authenticate with your RUM ingest API key; see the Source Maps card on the dashboard for the exact command." }
       ],
       installation: [
         {

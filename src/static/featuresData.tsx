@@ -1685,14 +1685,14 @@ export const FEATURES_DATA: FeatureData[] = [
   {
     id: "web-analytics",
     title: "Web Analytics",
-    subtitle: "Privacy-first traffic insights.",
+    subtitle: "Product-grade insights, privacy-first.",
     description:
-      "Understand your audience without compromising their privacy. Track page views, unique visitors, referrers, and geographic distribution with zero cookies.",
+      "Go beyond page views without compromising privacy. Track custom events and conversions, build multi-step funnels, segment by any dimension, and follow user journeys — with campaign attribution and cohort retention, and zero cookies.",
     points: [
-      "Cookie-less, GDPR-compliant tracking",
-      "Real-time visitor analytics",
-      "Geographic and device breakdowns",
-      "Referrer and acquisition mapping",
+      "Custom events, funnels & conversion goals",
+      "Click-to-filter segmentation, UTM campaigns & retention",
+      "Realtime, period comparison & user journeys",
+      "Cookie-less, GDPR-compliant, with a query & CSV export API",
     ],
     diagramId: "web",
     href: "/features/web-analytics",
@@ -1703,11 +1703,11 @@ export const FEATURES_DATA: FeatureData[] = [
     title: "Real User Monitoring",
     subtitle: "Measure exactly what your users experience.",
     description:
-      "Capture client-side performance bottlenecks. Monitor Core Web Vitals, network call latency, and frontend JavaScript exceptions directly from the browser.",
+      "Capture client-side performance bottlenecks. Monitor Core Web Vitals at p75, drill into individual session timelines, and de-minify frontend exceptions with your own source maps.",
     points: [
-      "Core Web Vitals (LCP, FID, CLS)",
-      "Global geographic latency mapping",
-      "Frontend JavaScript error tracking",
+      "Core Web Vitals at p75 (LCP, INP, CLS)",
+      "Per-session timelines & page-load traces",
+      "Source-mapped, de-minified stack traces",
       "Rage click & UX frustration metrics",
     ],
     diagramId: "rum",

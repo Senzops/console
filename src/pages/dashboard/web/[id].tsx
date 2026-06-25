@@ -603,14 +603,7 @@ export default function WebDetail() {
 
         {/* Custom Events & Campaigns */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <DistributionCard
-            title="Custom Events"
-            actions={
-              <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground">
-                {formatNumber(overview.totalEvents || 0)} total
-              </Badge>
-            }
-          >
+          <DistributionCard title="Custom Events">
             {events.length > 0 ? (
               <DistributionTable data={events} total={overview.totalEvents || sumCounts(events)} type="pages" valueLabel="Events" onRowClick={setSelectedEvent} />
             ) : (
