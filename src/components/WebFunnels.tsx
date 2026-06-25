@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
+import { createPortal } from 'react-dom';
 import { api, useAuth } from '@/lib/auth';
 import { useShareApi, useShareMode } from '@/lib/share';
 import { buildTimeRangeQuery } from '@/components/TimeRangePicker';
 import { Card, CardContent, CardHeader, CardTitle, Button, Dialog, Input, Badge, Spinner, DataError } from '@/components/Core';
-import { Plus, Trash2, Pencil, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, Pencil, ArrowDown, Maximize, X } from 'lucide-react';
+
+const FUNNEL_STEP_LIMIT = 3;
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 
@@ -131,7 +134,38 @@ const FunnelBuilder = ({ webId, existing, onClose, onSaved }: { webId: string; e
 // ---------------------------------------------------------------------------
 // Single funnel card with conversion visualization
 // ---------------------------------------------------------------------------
+const FunnelStep = ({ r, i }: { r: any; i: number }) => {
+  const width = Math.max(r.conversionFromStart, r.visitors > 0 ? 4 : 0);
+  return (
+    <div>
+      {i > 0 && r.dropOff > 0 && (
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5 pl-7">
+          <ArrowDown className="h-3 w-3 text-destructive/70" />
+          {formatNumber(r.dropOff)} dropped off · {(100 - r.conversionFromPrev).toFixed(0)}%
+        </div>
+      )}
+      <div className="flex items-center justify-between mb-1.5 text-xs gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground shrink-0">{i + 1}</span>
+          <span className="truncate font-medium text-foreground" title={r.label || r.value}>{r.label || r.value}</span>
+          <Badge variant="outline" className="text-[9px] py-0 px-1.5 shrink-0">{r.type}</Badge>
+        </div>
+        <span className="font-mono whitespace-nowrap text-foreground">
+          {formatNumber(r.visitors)}
+          <span className="text-muted-foreground/70 ml-1.5">{r.conversionFromStart.toFixed(0)}%</span>
+        </span>
+      </div>
+      <div className="h-7 rounded-md bg-muted/40 overflow-hidden">
+        <div className="h-full bg-primary/80 rounded-md transition-all duration-700 flex items-center justify-end pr-2" style={{ width: `${width}%` }}>
+          {r.conversionFromStart >= 18 && <span className="text-[10px] font-medium text-primary-foreground">{r.conversionFromStart.toFixed(0)}%</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FunnelCard = ({ webId, funnel, timeRange, fetcher, canQuery, readOnly, onEdit, onDelete }: any) => {
+  const [isMaximized, setIsMaximized] = useState(false);
   const { data, error } = useSWR(
     canQuery ? `/web/${webId}/funnels/${funnel._id}/analyze?${buildTimeRangeQuery(timeRange)}` : null,
     fetcher,
@@ -140,66 +174,37 @@ const FunnelCard = ({ webId, funnel, timeRange, fetcher, canQuery, readOnly, onE
 
   const results = data?.results || [];
   const overall = data?.overallConversion ?? 0;
+  const visible = isMaximized ? results : results.slice(0, FUNNEL_STEP_LIMIT);
+  const hidden = results.length - visible.length;
 
-  return (
-    <Card className="flex flex-col">
+  const card = (
+    <Card className={`flex flex-col overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : ''}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 py-4 border-b border-border/40 h-16 shrink-0">
         <CardTitle className="text-sm font-medium text-muted-foreground truncate">{funnel.name}</CardTitle>
-        <div className="flex items-center gap-2 shrink-0">
-          {data && (
-            <Badge variant="outline" className="text-[10px] font-mono">{overall.toFixed(1)}% conversion</Badge>
-          )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {data && <Badge variant="outline" className="text-[10px] font-mono">{overall.toFixed(1)}% conversion</Badge>}
           {!readOnly && (
             <>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(funnel)}>
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(funnel)}>
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(funnel)}><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(funnel)}><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
             </>
           )}
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMaximized((m) => !m)}>
+            {isMaximized ? <X className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
+          </Button>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 p-5">
+      <CardContent className="flex-1 overflow-auto p-5">
         {!data && !error && <div className="flex items-center justify-center py-10"><Spinner className="h-5 w-5" /></div>}
         {error && <div className="py-6"><DataError /></div>}
         {data && (
           <div className="space-y-4">
-            {results.map((r: any, i: number) => {
-              const width = Math.max(r.conversionFromStart, r.visitors > 0 ? 4 : 0);
-              return (
-                <div key={i}>
-                  {i > 0 && r.dropOff > 0 && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5 pl-7">
-                      <ArrowDown className="h-3 w-3 text-destructive/70" />
-                      {formatNumber(r.dropOff)} dropped off · {(100 - r.conversionFromPrev).toFixed(0)}%
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between mb-1.5 text-xs gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground shrink-0">{i + 1}</span>
-                      <span className="truncate font-medium text-foreground" title={r.label || r.value}>{r.label || r.value}</span>
-                      <Badge variant="outline" className="text-[9px] py-0 px-1.5 shrink-0">{r.type}</Badge>
-                    </div>
-                    <span className="font-mono whitespace-nowrap text-foreground">
-                      {formatNumber(r.visitors)}
-                      <span className="text-muted-foreground/70 ml-1.5">{r.conversionFromStart.toFixed(0)}%</span>
-                    </span>
-                  </div>
-                  <div className="h-7 rounded-md bg-muted/40 overflow-hidden">
-                    <div
-                      className="h-full bg-primary/80 rounded-md transition-all duration-700 flex items-center justify-end pr-2"
-                      style={{ width: `${width}%` }}
-                    >
-                      {r.conversionFromStart >= 18 && (
-                        <span className="text-[10px] font-medium text-primary-foreground">{r.conversionFromStart.toFixed(0)}%</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {visible.map((r: any, i: number) => <FunnelStep key={i} r={r} i={i} />)}
+            {!isMaximized && hidden > 0 && (
+              <button onClick={() => setIsMaximized(true)} className="w-full py-2 text-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
+                Show {hidden} more {hidden === 1 ? 'step' : 'steps'}...
+              </button>
+            )}
             {results.length > 0 && (
               <div className="flex items-center justify-between pt-3 border-t border-border/40 text-xs">
                 <span className="text-muted-foreground">Entered → Converted</span>
@@ -210,6 +215,13 @@ const FunnelCard = ({ webId, funnel, timeRange, fetcher, canQuery, readOnly, onE
         )}
       </CardContent>
     </Card>
+  );
+
+  return (
+    <>
+      {isMaximized && createPortal(<div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setIsMaximized(false)} />, document.body)}
+      {isMaximized ? createPortal(card, document.body) : card}
+    </>
   );
 };
 

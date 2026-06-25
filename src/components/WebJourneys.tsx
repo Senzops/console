@@ -101,13 +101,13 @@ const RetentionCard = ({ webId, timeRange }: { webId: string; timeRange: any }) 
                     <td className="px-2 py-2 text-right font-mono text-muted-foreground">{formatNumber(c.size)}</td>
                     {columns.map((o) => {
                       const cell = byOffset.get(o);
-                      if (!cell) return <td key={o} className="px-1.5 py-1.5" />;
-                      const alpha = cell.percent > 0 ? 0.1 + (cell.percent / 100) * 0.85 : 0;
+                      if (!cell) return <td key={o} className="px-1 py-1" />;
+                      const alpha = cell.percent > 0 ? 0.12 + (cell.percent / 100) * 0.78 : 0;
                       return (
                         <td key={o} className="px-1 py-1">
                           <div
-                            className="rounded px-1.5 py-1.5 text-center text-[10px] font-medium tabular-nums"
-                            style={{ backgroundColor: `hsl(var(--chart-1) / ${alpha})`, color: cell.percent > 55 ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))' }}
+                            className="rounded px-1.5 py-1.5 text-center text-[10px] font-semibold tabular-nums"
+                            style={{ backgroundColor: `rgba(16, 185, 129, ${alpha})`, color: alpha > 0.5 ? '#ffffff' : 'hsl(var(--foreground))' }}
                             title={`${formatNumber(cell.visitors)} returning visitors`}
                           >
                             {Math.round(cell.percent)}%
@@ -155,32 +155,38 @@ const PathsCard = ({ webId, timeRange }: { webId: string; timeRange: any }) => {
         const hidden = paths.length - limit;
 
         return (
-          <div>
-            {visible.map((p: any, i: number) => (
-              <div key={i} className="relative border-b border-border/40 px-4 py-2.5 overflow-hidden">
-                <div className="absolute inset-y-0 left-0 bg-muted/40" style={{ width: `${p.percent}%` }} />
-                <div className="relative z-10 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-1 flex-wrap min-w-0">
-                    {p.path.map((step: string, si: number) => (
-                      <React.Fragment key={si}>
-                        {si > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
-                        <span className="font-mono text-[11px] bg-background/80 border border-border/50 rounded px-1.5 py-0.5 truncate max-w-[150px]" title={step}>{step}</span>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                  <div className="text-right whitespace-nowrap shrink-0">
-                    <span className="font-mono text-xs">{formatNumber(p.count)}</span>
-                    <span className="text-[10px] text-muted-foreground/70 ml-1.5">{Math.round(p.percent)}%</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {!isMaximized && hidden > 0 && (
-              <div onClick={maximize} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground hover:text-primary hover:bg-accent/50 cursor-pointer transition-colors">
-                Show {hidden} more...
-              </div>
-            )}
-          </div>
+          <table className="w-full text-sm text-left border-collapse">
+            <tbody>
+              {visible.map((p: any, i: number) => (
+                <tr key={i} className="group relative border-b border-border/40 hover:bg-muted/20 transition-colors">
+                  {/* Background bar — matches the Top Pages table */}
+                  <td colSpan={2} className="p-0 h-full absolute inset-0 pointer-events-none">
+                    <div className="h-[calc(100%-2px)] my-[1px] bg-muted/40 transition-all duration-[1500ms] origin-left rounded-r-md" style={{ width: `${p.percent}%` }} />
+                  </td>
+                  <td className="px-4 py-2.5 relative z-10">
+                    <div className="flex items-center gap-1 flex-wrap min-w-0">
+                      {p.path.map((step: string, si: number) => (
+                        <React.Fragment key={si}>
+                          {si > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
+                          <span className="font-mono text-[11px] bg-background/80 border border-border/50 rounded px-1.5 py-0.5 truncate max-w-[150px]" title={step}>{step}</span>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 relative z-10 text-right font-mono text-xs whitespace-nowrap align-middle">
+                    {formatNumber(p.count)}
+                    <span className="text-[10px] text-muted-foreground/70 ml-1">|</span>
+                    <span className="text-[10px] text-muted-foreground/70 ml-1">{Math.round(p.percent)}%</span>
+                  </td>
+                </tr>
+              ))}
+              {!isMaximized && hidden > 0 && (
+                <tr className="border-b border-border hover:bg-accent/50 transition-colors cursor-pointer group" onClick={maximize}>
+                  <td colSpan={2} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hidden} more...</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         );
       }}
     </MaximizableCard>

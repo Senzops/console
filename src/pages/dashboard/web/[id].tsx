@@ -632,13 +632,17 @@ export default function WebDetail() {
               </div>
             }
           >
-            {hasCampaigns ? (
-              <DistributionTable data={campaignData} total={campaignTotal} type="pages" valueLabel="Visits" onRowClick={(v) => addFilter(campaignMode === 'sources' ? 'utm_source' : campaignMode === 'mediums' ? 'utm_medium' : 'utm_campaign', v)} />
-            ) : (
+            {!hasCampaigns ? (
               <div className="h-full flex flex-col items-center justify-center gap-2 p-6 text-center">
                 <Megaphone className="h-6 w-6 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">No campaign traffic</p>
                 <p className="text-xs text-muted-foreground/70 max-w-xs">Tag inbound links with <code className="px-1 py-0.5 rounded bg-muted font-mono text-[10px]">utm_source</code>, <code className="px-1 py-0.5 rounded bg-muted font-mono text-[10px]">utm_medium</code> &amp; <code className="px-1 py-0.5 rounded bg-muted font-mono text-[10px]">utm_campaign</code>.</p>
+              </div>
+            ) : campaignData.length > 0 ? (
+              <DistributionTable data={campaignData} total={campaignTotal} type="pages" valueLabel="Visits" onRowClick={(v) => addFilter(campaignMode === 'sources' ? 'utm_source' : campaignMode === 'mediums' ? 'utm_medium' : 'utm_campaign', v)} />
+            ) : (
+              <div className="h-full flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                No {campaignMode === 'sources' ? 'source' : campaignMode === 'mediums' ? 'medium' : 'campaign'} data in this period
               </div>
             )}
           </DistributionCard>
