@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useTheme } from "../../lib/theme";
+import { trackEvent, AnalyticsEvent } from "@/lib/analytics";
 import { shareApi, DashboardShareLink, ShareScopeType } from "../../lib/share";
 
 // ---------------------------------------------------------------------------
@@ -254,6 +255,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       });
       setLinks((prev) => [share, ...(prev || [])]);
       setLabel("");
+      trackEvent(AnalyticsEvent.ShareLinkCreated, { scope: scopeType });
       toast.success("Share link created");
     } catch (e: any) {
       const data = e?.response?.data;

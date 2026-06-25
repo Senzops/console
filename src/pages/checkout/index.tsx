@@ -16,6 +16,7 @@ import { ShieldCheck, Lock, Loader2, ArrowLeft, Building2, User } from "lucide-r
 import { toast } from "sonner";
 import { NetworkBackground } from "../../components/NetworkBackground";
 import { useTheme } from "@/lib/theme";
+import { trackEvent, AnalyticsEvent } from "@/lib/analytics";
 
 // Types matching the backend response
 interface BackendPlan {
@@ -141,6 +142,7 @@ export default function PaymentPage() {
         if (!checkoutUrl) {
           throw new Error("No checkout URL returned from session creation.");
         }
+        trackEvent(AnalyticsEvent.CheckoutStarted, { plan: selectedPlanId, cycle: billingCycle });
         window.location.href = checkoutUrl;
       })
       .catch((err) => {

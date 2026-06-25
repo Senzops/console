@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import md5 from "md5";
 import { useAuth } from "../../lib/auth";
 import { useOrg } from "../../lib/org";
+import { trackEvent, AnalyticsEvent } from "@/lib/analytics";
 import { Card, CardContent, Button, cn, Avatar } from "../../components/Core";
 import { NetworkBackground } from "../../components/NetworkBackground";
 import {
@@ -109,6 +110,17 @@ export default function CheckoutOutcomePage() {
     if (!isMounted || status !== "unknown") return;
     router.replace(dashboardPath);
   }, [isMounted, status, router]);
+
+  // Fire the conversion event once when the success screen resolves (i.e. the
+  // provider didn't report failed/pending/unknown). Guarded so a page refresh
+  // on the success URL doesn't double-emit.
+  const activationTracked = useRef(false);
+  useEffect(() => {
+    if (!isMounted || activationTracked.current) return;
+    if (!status || status === "failed" || status === "pending" || status === "unknown") return;
+    activationTracked.current = true;
+    trackEvent(AnalyticsEvent.SubscriptionActivated, { status });
+  }, [isMounted, status]);
 
   if (!isMounted) {
     return (

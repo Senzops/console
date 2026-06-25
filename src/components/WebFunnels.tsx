@@ -10,6 +10,7 @@ import { Plus, Trash2, Pencil, ArrowDown, Maximize, X } from 'lucide-react';
 const FUNNEL_STEP_LIMIT = 3;
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics';
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
@@ -52,7 +53,10 @@ const FunnelBuilder = ({ webId, existing, onClose, onSaved }: { webId: string; e
     };
     try {
       if (existing) await api.put(`/web/${webId}/funnels/${existing._id}`, payload);
-      else await api.post(`/web/${webId}/funnels`, payload);
+      else {
+        await api.post(`/web/${webId}/funnels`, payload);
+        trackEvent(AnalyticsEvent.FunnelCreated, { steps: payload.steps.length });
+      }
       toast.success(existing ? 'Funnel updated' : 'Funnel created');
       onSaved();
       onClose();

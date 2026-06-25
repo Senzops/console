@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/utils/axiosError";
 import { useServiceModal } from "./context";
+import { trackEvent, AnalyticsEvent } from "@/lib/analytics";
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -188,6 +189,15 @@ export const ServiceModals: React.FC = () => {
   const [aiSampleRate, setAiSampleRate] = useState("1");
   const [aiMaskingRules, setAiMaskingRules] = useState("");
   const [aiManagementUrl, setAiManagementUrl] = useState("");
+
+  // Track successful service creation once, when credentials are first issued
+  // during a register flow. Covers every service type from a single point.
+  React.useEffect(() => {
+    if (creds && mode === "register" && activeModal) {
+      trackEvent(AnalyticsEvent.ServiceCreated, { type: activeModal });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creds]);
 
   // Sync AI settings into the form whenever the AI modal opens in edit mode.
   React.useEffect(() => {

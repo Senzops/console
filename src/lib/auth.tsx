@@ -11,10 +11,12 @@ import {
   sendEmailVerification,
   User as FirebaseUser,
   onAuthStateChanged,
+  getAdditionalUserInfo,
   signOut
 } from 'firebase/auth';
 import axios from 'axios';
 import { useRouter } from 'next/router';
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -152,7 +154,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const loginGoogle = async () => {
-    await signInWithPopup(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
+    trackEvent(isNewUser ? AnalyticsEvent.SignUp : AnalyticsEvent.LogIn, { method: 'google' });
     try {
       await api.post('/auth/otp/send');
     } catch {}
@@ -161,6 +165,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loginEmail = async (email: string, pass: string) => {
     await signInWithEmailAndPassword(auth, email, pass);
+    trackEvent(AnalyticsEvent.LogIn, { method: 'email' });
 
     const currentUser = auth.currentUser;
     if (currentUser && !currentUser.emailVerified) {
@@ -176,6 +181,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signupEmail = async (email: string, pass: string, name: string) => {
     const creds = await createUserWithEmailAndPassword(auth, email, pass);
+    trackEvent(AnalyticsEvent.SignUp, { method: 'email' });
 
     // 1. Update Profile Name
     if (auth.currentUser) {
