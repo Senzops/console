@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
@@ -11,11 +11,18 @@ import { formatDistanceToNow } from 'date-fns';
 import { RumSourceMaps } from '@/components/RumSourceMaps';
 
 const fmtMs = (v?: number | null) => (v === null || v === undefined ? '—' : v >= 1000 ? `${(v / 1000).toFixed(2)}s` : `${Math.round(v)}ms`);
+// Human duration, rolling up to days and showing the two most-significant units
+// (e.g. 11s · 5m 11s · 1h 49m · 2d 3h).
 const fmtDuration = (ms: number) => {
-  if (!ms || ms < 1000) return `${Math.max(0, Math.round(ms / 1000))}s`;
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}m ${s % 60}s`;
+  const total = Math.max(0, Math.floor((ms || 0) / 1000));
+  if (total < 60) return `${total}s`;
+  const d = Math.floor(total / 86400);
+  const h = Math.floor((total % 86400) / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m ${s}s`;
 };
 
 // ===========================================================================
@@ -76,14 +83,17 @@ const SessionsCard = ({ serviceId, timeRange, fetcher, canQuery }: any) => {
   const [page, setPage] = useState(0);
   const [openSession, setOpenSession] = useState<string | null>(null);
 
+  const trKey = buildTimeRangeQuery(timeRange);
+  // Reset to the first page whenever the time window changes.
+  useEffect(() => { setPage(0); }, [trKey]);
+
   const { data, error } = useSWR(
-    canQuery ? `/rum/${serviceId}/sessions?${buildTimeRangeQuery(timeRange)}&page=${page}` : null,
+    canQuery ? `/rum/${serviceId}/sessions?${trKey}&page=${page}` : null,
     fetcher
   );
   const sessions = data?.sessions || [];
-  const limit = isMaximized ? sessions.length : 10;
-  const visible = sessions.slice(0, limit);
-  const hidden = sessions.length - limit;
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   const Content = (
     <Card className={`flex flex-col transition-all duration-300 overflow-hidden ${isMaximized ? 'fixed inset-4 z-50 animate-in zoom-in-95 shadow-2xl' : 'h-auto min-h-[300px]'}`}>
@@ -108,7 +118,7 @@ const SessionsCard = ({ serviceId, timeRange, fetcher, canQuery }: any) => {
               </tr>
             </thead>
             <tbody>
-              {visible.map((s: any) => (
+              {sessions.map((s: any) => (
                 <tr key={s._id} onClick={() => setOpenSession(s._id)} className="border-b border-border/40 hover:bg-muted/20 cursor-pointer transition-colors">
                   <td className="px-6 py-3 font-mono text-xs text-foreground truncate max-w-[220px]" title={s.entryPath}>{s.entryPath}</td>
                   <td className="px-4 py-3 text-right font-mono text-xs">{s.pageViews}</td>
@@ -119,11 +129,6 @@ const SessionsCard = ({ serviceId, timeRange, fetcher, canQuery }: any) => {
                   <td className="px-6 py-3 text-right text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(s.end), { addSuffix: true })}</td>
                 </tr>
               ))}
-              {!isMaximized && hidden > 0 && (
-                <tr className="border-b border-border hover:bg-accent/50 transition-colors cursor-pointer group" onClick={() => setIsMaximized(true)}>
-                  <td colSpan={5} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hidden} more...</td>
-                </tr>
-              )}
               {sessions.length === 0 && (
                 <tr><td colSpan={5} className="py-12 text-center text-muted-foreground text-xs">No sessions in this period.</td></tr>
               )}
@@ -131,11 +136,16 @@ const SessionsCard = ({ serviceId, timeRange, fetcher, canQuery }: any) => {
           </table>
         )}
       </CardContent>
-      {isMaximized && (page > 0 || data?.hasMore) && (
+      {data && total > 0 && (
         <div className="flex items-center justify-between border-t border-border/40 px-4 py-2.5 shrink-0">
-          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Previous</Button>
-          <span className="text-[11px] text-muted-foreground">Page {page + 1}</span>
-          <Button variant="outline" size="sm" disabled={!data?.hasMore} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{total.toLocaleString()} session{total !== 1 ? 's' : ''}</span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Previous</Button>
+              <span className="text-[11px] text-muted-foreground tabular-nums">Page {page + 1} of {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+            </div>
+          )}
         </div>
       )}
     </Card>
