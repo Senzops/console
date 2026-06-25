@@ -104,7 +104,6 @@ const SessionsCard = ({ serviceId, timeRange, fetcher, canQuery }: any) => {
                 <th className="px-4 py-3 text-right font-medium">Pages</th>
                 <th className="px-4 py-3 text-right font-medium">Duration</th>
                 <th className="px-4 py-3 text-right font-medium">Errors</th>
-                <th className="px-4 py-3 font-medium hidden md:table-cell">Device</th>
                 <th className="px-6 py-3 text-right font-medium">Time</th>
               </tr>
             </thead>
@@ -117,17 +116,16 @@ const SessionsCard = ({ serviceId, timeRange, fetcher, canQuery }: any) => {
                   <td className="px-4 py-3 text-right font-mono text-xs">
                     {s.errors > 0 ? <span className="inline-flex items-center gap-1 text-red-500"><AlertOctagon className="h-3 w-3" />{s.errors}</span> : <span className="text-muted-foreground/40">0</span>}
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell truncate max-w-[160px]">{s.browser} · {s.os}</td>
                   <td className="px-6 py-3 text-right text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(s.end), { addSuffix: true })}</td>
                 </tr>
               ))}
               {!isMaximized && hidden > 0 && (
                 <tr className="border-b border-border hover:bg-accent/50 transition-colors cursor-pointer group" onClick={() => setIsMaximized(true)}>
-                  <td colSpan={6} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hidden} more...</td>
+                  <td colSpan={5} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hidden} more...</td>
                 </tr>
               )}
               {sessions.length === 0 && (
-                <tr><td colSpan={6} className="py-12 text-center text-muted-foreground text-xs">No sessions in this period.</td></tr>
+                <tr><td colSpan={5} className="py-12 text-center text-muted-foreground text-xs">No sessions in this period.</td></tr>
               )}
             </tbody>
           </table>

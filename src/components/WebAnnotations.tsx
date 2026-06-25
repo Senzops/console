@@ -1,13 +1,37 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { api } from '@/lib/auth';
-import { Dialog, Button, Input, Spinner } from '@/components/Core';
-import { Flag, Trash2, Plus } from 'lucide-react';
+import { useTheme } from '@/lib/theme';
+import { Dialog, Button, Input, Spinner, cn } from '@/components/Core';
+import { Flag, Trash2, Plus, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '@/utils/axiosError';
 
 export interface Annotation { _id: string; date: string; text: string; color?: string }
 
 const SWATCHES = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#64748b'];
+
+// Mirror the TimeRangePicker's themed datetime input + calendar affordance.
+const isDarkTheme = (theme: string) => theme === 'dark' || theme === 'nord';
+const dateInputCls = cn(
+  'flex h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm transition-colors',
+  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+  'disabled:cursor-not-allowed disabled:opacity-50',
+  'sm:[&::-webkit-calendar-picker-indicator]:hidden',
+);
+
+const CalendarPickerButton = ({ inputRef }: { inputRef: React.RefObject<HTMLInputElement | null> }) => (
+  <button
+    type="button"
+    tabIndex={-1}
+    onClick={() => { try { inputRef.current?.showPicker(); } catch { inputRef.current?.focus(); } }}
+    className={cn(
+      'hidden sm:flex items-center justify-center h-8 w-8 shrink-0 rounded-md border border-input bg-transparent transition-colors',
+      'hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+    )}
+  >
+    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+  </button>
+);
 
 // datetime-local value (local time, no zone) for an <input type="datetime-local">.
 const toLocalInput = (d: Date) => {
@@ -23,6 +47,10 @@ export const WebAnnotationsDialog = ({ open, onClose, webId, annotations, onChan
   onChanged: () => void;
   readOnly: boolean;
 }) => {
+  const { theme } = useTheme();
+  const colorScheme: 'dark' | 'light' = isDarkTheme(theme) ? 'dark' : 'light';
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   const [date, setDate] = useState(() => toLocalInput(new Date()));
   const [text, setText] = useState('');
   const [color, setColor] = useState(SWATCHES[0]);
@@ -66,34 +94,45 @@ export const WebAnnotationsDialog = ({ open, onClose, webId, annotations, onChan
     <Dialog open={open} onClose={onClose} title="Annotations" className="max-w-lg">
       <div className="space-y-5">
         {!readOnly && (
-          <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="flex-1 space-y-1">
-                <label className="text-[10px] uppercase font-medium text-muted-foreground">When</label>
-                <input
-                  type="datetime-local"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-              <div className="flex items-center gap-1.5 pb-1.5">
-                {SWATCHES.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setColor(c)}
-                    className={`h-5 w-5 rounded-full border-2 transition-transform ${color === c ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: c }}
-                    aria-label={`Color ${c}`}
+          <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Date &amp; time</label>
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={dateInputRef}
+                    type="datetime-local"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={{ colorScheme }}
+                    className={dateInputCls}
                   />
-                ))}
+                  <CalendarPickerButton inputRef={dateInputRef} />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Color</label>
+                <div className="flex items-center gap-2 h-8">
+                  {SWATCHES.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setColor(c)}
+                      className={`h-6 w-6 rounded-full border-2 transition-transform ${color === c ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'}`}
+                      style={{ backgroundColor: c }}
+                      aria-label={`Color ${c}`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Deployed v2.0" maxLength={200} className="h-9 text-sm" />
-              <Button onClick={add} disabled={saving || !text.trim()}>
-                {saving ? <Spinner className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              </Button>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Note</label>
+              <div className="flex gap-2">
+                <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Deployed v2.0" maxLength={200} />
+                <Button onClick={add} disabled={saving || !text.trim()} className="shrink-0">
+                  {saving ? <Spinner className="h-4 w-4 mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />} Add
+                </Button>
+              </div>
             </div>
           </div>
         )}

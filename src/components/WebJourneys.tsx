@@ -3,9 +3,28 @@ import useSWR from 'swr';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/lib/auth';
 import { useShareApi, useShareMode } from '@/lib/share';
+import { useTheme } from '@/lib/theme';
 import { buildTimeRangeQuery } from '@/components/TimeRangePicker';
+
+const MIN_OFFSET_COLS = 6; // columns shown before maximizing (prevents overflow)
 import { Card, CardContent, CardHeader, CardTitle, Button, Spinner, DataError } from '@/components/Core';
 import { Maximize, X, ChevronRight } from 'lucide-react';
+
+// Industry-standard middle truncation for a journey: keep the entry and exit
+// (the most meaningful steps) and collapse the middle into a "+N" pill. The full
+// ordered path is always available via the row tooltip.
+type PathSegment = { value: string; collapsed?: false } | { collapsed: true; count: number; title: string };
+const collapsePath = (path: string[], expanded = false): PathSegment[] => {
+  const MAX = 4;
+  if (expanded || path.length <= MAX) return path.map((value) => ({ value }));
+  const hidden = path.slice(2, -1);
+  return [
+    { value: path[0] },
+    { value: path[1] },
+    { collapsed: true, count: hidden.length, title: hidden.join('  →  ') },
+    { value: path[path.length - 1] },
+  ];
+};
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
@@ -39,14 +58,6 @@ const MaximizableCard = ({ title, children }: { title: string; children: (isMaxi
   );
 };
 
-const ShowMoreRow = ({ span, count, onClick }: { span: number; count: number; onClick: () => void }) => (
-  <tr className="border-b border-border hover:bg-accent/50 transition-colors cursor-pointer group" onClick={onClick}>
-    <td colSpan={span} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
-      Show {count} more...
-    </td>
-  </tr>
-);
-
 const EmptyRow = ({ span, label }: { span: number; label: string }) => (
   <tr><td colSpan={span} className="py-10 text-center text-muted-foreground text-xs">{label}</td></tr>
 );
@@ -58,6 +69,7 @@ const RetentionCard = ({ webId, timeRange }: { webId: string; timeRange: any }) 
   const { token } = useAuth();
   const { fetcher } = useShareApi();
   const { readOnly } = useShareMode();
+  const { isMono } = useTheme();
   const canQuery = Boolean(token || readOnly);
 
   const { data, error } = useSWR(
@@ -68,24 +80,31 @@ const RetentionCard = ({ webId, timeRange }: { webId: string; timeRange: any }) 
   const unitLabel = data?.unit === 'week' ? 'W' : 'D';
   const cohorts = data?.cohorts || [];
   const maxOffset = data?.maxOffset ?? 11;
-  const columns = useMemo(() => Array.from({ length: maxOffset + 1 }, (_, i) => i), [maxOffset]);
+  const allColumns = useMemo(() => Array.from({ length: maxOffset + 1 }, (_, i) => i), [maxOffset]);
+
+  // Theme-aware heatmap: monochrome theme uses the chart-mono token, otherwise
+  // the brand emerald — both as an alpha ramp so intensity reads cleanly.
+  const cellBg = (alpha: number) => (isMono ? `hsl(var(--chart-mono) / ${alpha})` : `rgba(16, 185, 129, ${alpha})`);
+  const cellFg = (alpha: number) => (alpha > 0.5 ? (isMono ? 'hsl(var(--background))' : '#ffffff') : 'hsl(var(--foreground))');
 
   return (
     <MaximizableCard title="Visitor Retention">
-      {(isMaximized, maximize) => {
+      {(isMaximized) => {
         if (!data && !error) return <div className="flex items-center justify-center py-16"><Spinner className="h-5 w-5" /></div>;
         if (error) return <div className="p-6"><DataError /></div>;
         if (cohorts.length === 0) return <div className="py-16 text-center text-sm text-muted-foreground">Not enough data for retention analysis.</div>;
 
+        // Bound both axes when minimized so the card never scrolls; the header's
+        // maximize control reveals the full grid.
+        const columns = isMaximized ? allColumns : allColumns.slice(0, MIN_OFFSET_COLS);
         const limit = isMaximized ? cohorts.length : 6;
         const visible = cohorts.slice(0, limit);
-        const hidden = cohorts.length - limit;
 
         return (
           <table className="w-full text-xs border-collapse">
-            <thead className="bg-muted/30 text-[10px] uppercase text-muted-foreground sticky top-0 backdrop-blur z-10">
+            <thead className="bg-muted/30 text-[10px] uppercase text-muted-foreground">
               <tr>
-                <th className="px-4 py-2.5 text-left font-medium sticky left-0 bg-muted/30 backdrop-blur">Cohort</th>
+                <th className="px-4 py-2.5 text-left font-medium">Cohort</th>
                 <th className="px-2 py-2.5 text-right font-medium">Visitors</th>
                 {columns.map((o) => <th key={o} className="px-2 py-2.5 text-center font-medium whitespace-nowrap">{unitLabel}{o}</th>)}
               </tr>
@@ -95,7 +114,7 @@ const RetentionCard = ({ webId, timeRange }: { webId: string; timeRange: any }) 
                 const byOffset = new Map<number, any>(c.cells.map((x: any) => [x.offset, x]));
                 return (
                   <tr key={c.cohort} className="border-b border-border/40">
-                    <td className="px-4 py-2 whitespace-nowrap sticky left-0 bg-card font-medium text-foreground">
+                    <td className="px-4 py-2 whitespace-nowrap font-medium text-foreground">
                       {new Date(c.cohort).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </td>
                     <td className="px-2 py-2 text-right font-mono text-muted-foreground">{formatNumber(c.size)}</td>
@@ -107,7 +126,7 @@ const RetentionCard = ({ webId, timeRange }: { webId: string; timeRange: any }) 
                         <td key={o} className="px-1 py-1">
                           <div
                             className="rounded px-1.5 py-1.5 text-center text-[10px] font-semibold tabular-nums"
-                            style={{ backgroundColor: `rgba(16, 185, 129, ${alpha})`, color: alpha > 0.5 ? '#ffffff' : 'hsl(var(--foreground))' }}
+                            style={{ backgroundColor: cellBg(alpha), color: cellFg(alpha) }}
                             title={`${formatNumber(cell.visitors)} returning visitors`}
                           >
                             {Math.round(cell.percent)}%
@@ -118,7 +137,6 @@ const RetentionCard = ({ webId, timeRange }: { webId: string; timeRange: any }) 
                   </tr>
                 );
               })}
-              {!isMaximized && hidden > 0 && <ShowMoreRow span={columns.length + 2} count={hidden} onClick={maximize} />}
             </tbody>
           </table>
         );
@@ -155,38 +173,43 @@ const PathsCard = ({ webId, timeRange }: { webId: string; timeRange: any }) => {
         const hidden = paths.length - limit;
 
         return (
-          <table className="w-full text-sm text-left border-collapse">
-            <tbody>
-              {visible.map((p: any, i: number) => (
-                <tr key={i} className="group relative border-b border-border/40 hover:bg-muted/20 transition-colors">
-                  {/* Background bar — matches the Top Pages table */}
-                  <td colSpan={2} className="p-0 h-full absolute inset-0 pointer-events-none">
-                    <div className="h-[calc(100%-2px)] my-[1px] bg-muted/40 transition-all duration-[1500ms] origin-left rounded-r-md" style={{ width: `${p.percent}%` }} />
-                  </td>
-                  <td className="px-4 py-2.5 relative z-10">
-                    <div className="flex items-center gap-1 flex-wrap min-w-0">
-                      {p.path.map((step: string, si: number) => (
-                        <React.Fragment key={si}>
-                          {si > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
-                          <span className="font-mono text-[11px] bg-background/80 border border-border/50 rounded px-1.5 py-0.5 truncate max-w-[150px]" title={step}>{step}</span>
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5 relative z-10 text-right font-mono text-xs whitespace-nowrap align-middle">
-                    {formatNumber(p.count)}
-                    <span className="text-[10px] text-muted-foreground/70 ml-1">|</span>
-                    <span className="text-[10px] text-muted-foreground/70 ml-1">{Math.round(p.percent)}%</span>
-                  </td>
-                </tr>
-              ))}
-              {!isMaximized && hidden > 0 && (
-                <tr className="border-b border-border hover:bg-accent/50 transition-colors cursor-pointer group" onClick={maximize}>
-                  <td colSpan={2} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Show {hidden} more...</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <div className="w-full text-sm">
+            {/* Header */}
+            <div className="flex items-stretch bg-muted/30 text-[11px] uppercase tracking-wide text-muted-foreground font-medium border-b border-border/40">
+              <span className="flex-1 px-4 py-2.5 min-w-0">User Path</span>
+              <span className="w-24 shrink-0 px-4 py-2.5 text-right">Sessions</span>
+            </div>
+            {/* Rows */}
+            {visible.map((p: any, i: number) => (
+              <div key={i} className="group relative flex items-stretch border-b border-border/40 hover:bg-muted/20 transition-colors overflow-hidden">
+                {/* Background bar */}
+                <div className="absolute inset-y-0 left-0 my-[1px] bg-muted/40 origin-left rounded-r-md transition-all duration-[1500ms] pointer-events-none" style={{ width: `${p.percent}%` }} />
+                {/* Single-line path with middle-collapse + tooltip of the full journey */}
+                <div className="relative z-10 flex-1 min-w-0 flex items-center gap-1 px-4 py-2.5 overflow-hidden" title={p.path.join('  →  ')}>
+                  {collapsePath(p.path).map((seg, si) => (
+                    <React.Fragment key={si}>
+                      {si > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
+                      {seg.collapsed ? (
+                        <span className="text-[11px] text-muted-foreground/70 shrink-0 px-0.5" title={seg.title}>+{seg.count}</span>
+                      ) : (
+                        <span className="font-mono text-[11px] bg-background/80 border border-border/50 rounded px-1.5 py-0.5 shrink min-w-0 truncate" title={seg.value}>{seg.value}</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+                <div className="relative z-10 w-24 shrink-0 px-4 py-2.5 text-right font-mono text-xs whitespace-nowrap self-center">
+                  {formatNumber(p.count)}
+                  <span className="text-[10px] text-muted-foreground/70 ml-1">|</span>
+                  <span className="text-[10px] text-muted-foreground/70 ml-1">{Math.round(p.percent)}%</span>
+                </div>
+              </div>
+            ))}
+            {!isMaximized && hidden > 0 && (
+              <div onClick={maximize} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground hover:text-primary hover:bg-accent/50 cursor-pointer transition-colors">
+                Show {hidden} more...
+              </div>
+            )}
+          </div>
         );
       }}
     </MaximizableCard>
