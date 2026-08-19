@@ -129,7 +129,6 @@ interface AuthContextType {
   token: string | null;
   getIdToken: () => Promise<string | null>;
   completeOtpVerification: () => Promise<void>;
-  sendLoginOtp: () => Promise<void>;
   refreshOtpSession: () => Promise<void>;
 }
 
@@ -240,9 +239,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try { await globalMutate(() => true, undefined, { revalidate: true }); } catch {}
   }, []);
 
-  const sendLoginOtp = useCallback(async () => {
-    await api.post('/auth/otp/send');
-  }, []);
 
   // Sign-in no longer requests the code. The verification page owns that, for
   // two reasons: it is the only component that knows whether a live code
@@ -340,7 +336,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, otpVerified, otpResolved, loginGoogle, loginEmail, signupEmail, resetPassword, resendVerification, loginAsDemo, logout, token, getIdToken, completeOtpVerification, sendLoginOtp, refreshOtpSession }}>
+    <AuthContext.Provider value={{ user, loading, otpVerified, otpResolved, loginGoogle, loginEmail, signupEmail, resetPassword, resendVerification, loginAsDemo, logout, token, getIdToken, completeOtpVerification, refreshOtpSession }}>
       {children}
     </AuthContext.Provider>
   );

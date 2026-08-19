@@ -194,7 +194,14 @@ export const DatabaseIndexes = ({
           </span>
         </CardHeader>
         <CardContent className="p-0">
-          <AdvisoryList advisories={advisories} />
+          {data.textRedacted ? (
+            <p className="px-5 py-4 text-sm text-muted-foreground">
+              Recommendations are hidden on shared dashboards — they quote index
+              definitions and column names.
+            </p>
+          ) : (
+            <AdvisoryList advisories={advisories} />
+          )}
         </CardContent>
       </Card>
 

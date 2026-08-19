@@ -280,10 +280,17 @@ export default function DatabaseDetail() {
     () => ''
   );
 
-  const tab = hash === 'insights' || hash === 'indexes' || hash === 'topology' ? hash : 'overview';
+  // Live operations are never exposed publicly, so the tab that hosts them
+  // does not exist on a shared dashboard — and a hash pointing at it must
+  // fall back rather than render a panel that cannot load.
+  const availableTabs = readOnly
+    ? ['overview', 'insights', 'indexes']
+    : ['overview', 'insights', 'indexes', 'topology'];
+
+  const tab = availableTabs.includes(hash) && hash !== 'overview' ? hash : 'overview';
 
   const selectTab = (next: string) => {
-    window.location.hash = ['insights', 'indexes', 'topology'].includes(next) ? next : 'overview';
+    window.location.hash = availableTabs.includes(next) ? next : 'overview';
   };
 
   const handleDelete = async () => {
@@ -664,7 +671,7 @@ export default function DatabaseDetail() {
             { id: 'overview', label: 'Overview' },
             { id: 'insights', label: 'Query Insights' },
             { id: 'indexes', label: 'Indexes & Advisor' },
-            { id: 'topology', label: 'Topology & Operations' },
+            ...(readOnly ? [] : [{ id: 'topology', label: 'Topology & Operations' }]),
           ]}
         />
 
