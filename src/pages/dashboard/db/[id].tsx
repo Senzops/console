@@ -1,12 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { api, useAuth } from '../../../lib/auth';
 import { useShareApi, useShareMode, useShareScopeId } from '../../../lib/share';
 import { ShareButton } from '../../../components/ShareModal';
 import { useTheme } from '../../../lib/theme';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input } from '../../../components/Core';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, Dialog, DataError, Input, Tabs } from '../../../components/Core';
 import { DbDashboardSkeleton } from '../../../components/Skeletons';
+import { DatabaseHealthPanel, DatabaseCapabilityNotice } from '../../../components/DatabaseHealth';
+import { DatabaseInsights } from '../../../components/DatabaseInsights';
+import { DatabaseIndexes } from '../../../components/DatabaseIndexes';
+import { DatabaseTopology } from '../../../components/DatabaseTopology';
 import { TimeRangePicker, buildTimeRangeQuery, usePersistedTimeRange } from "../../../components/TimeRangePicker";
 import { usePlanRetention } from "@/lib/usePlanRetention";
 import { formatAxisDate, getTimeSpanMs } from "@/lib/formatAxisDate";
@@ -250,6 +254,7 @@ export default function DatabaseDetail() {
   const retentionDays = usePlanRetention();
   const [timeRange, setTimeRange] = usePersistedTimeRange(retentionDays);
   const spanMs = getTimeSpanMs(timeRange);
+
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -258,6 +263,28 @@ export default function DatabaseDetail() {
     fetcher,
     { refreshInterval: 60000 } 
   );
+
+  // The selected tab lives in the URL hash so it survives a reload, can be
+  // linked to, and works with the back button — without touching the query
+  // string, which already carries the time range.
+  //
+  // Read through useSyncExternalStore rather than mirrored into state: the
+  // server has no , and an effect that syncs the hash into state on
+  // mount is exactly the cascading-render pattern React now warns about.
+  const hash = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('hashchange', onChange);
+      return () => window.removeEventListener('hashchange', onChange);
+    },
+    () => window.location.hash.slice(1),
+    () => ''
+  );
+
+  const tab = hash === 'insights' || hash === 'indexes' || hash === 'topology' ? hash : 'overview';
+
+  const selectTab = (next: string) => {
+    window.location.hash = ['insights', 'indexes', 'topology'].includes(next) ? next : 'overview';
+  };
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -433,10 +460,11 @@ export default function DatabaseDetail() {
         ]
     },
     {
-        title: "Database Scans", tooltipSuffix: " scans/sec",
+        title: "Query Examination Rate (per sec)", tooltipSuffix: "/sec",
         series: [
-            { key: 'scansCollection', name: 'Collection Scans', color: '#ef4444', style: 'gradient' },
-            { key: 'scansIndex', name: 'Index Scans', color: '#10b981', style: 'gradient' }
+            { key: 'mongoDocsExamined', name: 'Documents Examined', color: '#ef4444', style: 'gradient' },
+            { key: 'mongoKeysExamined', name: 'Index Keys Examined', color: '#10b981', style: 'gradient' },
+            { key: 'mongoDocsReturned', name: 'Documents Returned', color: '#3b82f6', style: 'gradient' }
         ]
     },
     {
@@ -470,6 +498,108 @@ export default function DatabaseDetail() {
           ]
       }
   );
+
+  const isPg = database.type === 'postgresql';
+  const isMysql = database.type === 'mysql';
+
+  // Enrichment series added in the P1 depth pass. Kept in their own list so
+  // the per-engine blocks above remain the single place each engine's core
+  // charts are declared.
+  const enrichmentCharts: any[] = isRedis ? [
+    {
+        title: "Memory Breakdown (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'redisMemDataset', name: 'Dataset', color: '#10b981', style: 'gradient', stackId: 1 },
+            { key: 'redisMemOverhead', name: 'Overhead', color: '#f59e0b', style: 'gradient', stackId: 1 },
+            { key: 'redisMemClients', name: 'Client Buffers', color: '#8b5cf6', style: 'gradient', stackId: 1 }
+        ]
+    },
+    {
+        title: "Memory Used vs Limit (%)", tooltipSuffix: "%",
+        series: [{ key: 'redisMemoryUsedPercent', name: 'Of maxmemory', color: '#ec4899', style: 'gradient' }]
+    },
+    {
+        title: "Command Errors (per sec)", tooltipSuffix: "/sec",
+        series: [
+            { key: 'redisCommandsFailed', name: 'Failed Replies', color: '#ef4444', style: 'gradient' },
+            { key: 'redisCommandsRejected', name: 'Rejected Connections', color: '#f59e0b', style: 'gradient' }
+        ]
+    }
+  ] : isPg ? [
+    {
+        title: "Checkpoints (per sec)", tooltipSuffix: "/sec",
+        series: [
+            { key: 'pgCheckpointsTimed', name: 'Scheduled', color: '#10b981', style: 'gradient' },
+            { key: 'pgCheckpointsRequested', name: 'Forced', color: '#ef4444', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Tuple Health", tooltipSuffix: " rows",
+        series: [
+            { key: 'pgLiveTuples', name: 'Live Tuples', color: '#10b981', style: 'gradient' },
+            { key: 'pgDeadTuples', name: 'Dead Tuples', color: '#ef4444', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Transaction ID Budget Used (%)", tooltipSuffix: "%",
+        series: [{ key: 'pgXidAgePercent', name: 'Wraparound Headroom Consumed', color: '#f59e0b', style: 'gradient' }]
+    },
+    {
+        title: "Long-Running Transactions", tooltipSuffix: "",
+        series: [
+            { key: 'pgIdleInTransaction', name: 'Idle In Transaction', color: '#f59e0b', style: 'gradient' },
+            { key: 'pgLongestTransaction', name: 'Oldest Transaction (s)', color: '#ef4444', style: 'gradient' }
+        ]
+    }
+  ] : isMysql ? [
+    {
+        title: "InnoDB History List Length", tooltipSuffix: "",
+        series: [{ key: 'mysqlHistoryList', name: 'Undo Records Awaiting Purge', color: '#f59e0b', style: 'gradient' }]
+    },
+    {
+        title: "Row Lock Contention", tooltipSuffix: "",
+        series: [
+            { key: 'mysqlRowLockWaits', name: 'Lock Waits/sec', color: '#ef4444', style: 'gradient' },
+            { key: 'mysqlRowLockTimeAvg', name: 'Avg Wait (ms)', color: '#f59e0b', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Cache Efficiency (%)", tooltipSuffix: "%",
+        series: [
+            { key: 'mysqlThreadCacheHitRate', name: 'Thread Cache', color: '#3b82f6', style: 'gradient' },
+            { key: 'mysqlTableCacheHitRate', name: 'Table Open Cache', color: '#10b981', style: 'gradient' }
+        ]
+    }
+  ] : [
+    {
+        title: "WiredTiger Cache (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'mongoCacheMax', name: 'Configured Max', color: '#64748b', style: 'gradient', dashed: true },
+            { key: 'mongoCacheUsed', name: 'In Cache', color: '#06b6d4', style: 'gradient' },
+            { key: 'mongoCacheDirty', name: 'Dirty', color: '#f59e0b', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Concurrency Tickets Available", tooltipSuffix: "",
+        series: [
+            { key: 'mongoTicketsRead', name: 'Read Slots Free', color: '#3b82f6', style: 'gradient' },
+            { key: 'mongoTicketsWrite', name: 'Write Slots Free', color: '#8b5cf6', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Scan Ratio (docs examined per doc returned)", tooltipSuffix: "x",
+        series: [{ key: 'mongoScanRatio', name: 'Examined : Returned', color: '#ef4444', style: 'gradient' }]
+    },
+    {
+        title: "Cursors & Evictions", tooltipSuffix: "",
+        series: [
+            { key: 'mongoCursorsOpen', name: 'Cursors Open', color: '#3b82f6', style: 'gradient' },
+            { key: 'mongoCacheEvictions', name: 'Cache Evictions/sec', color: '#f59e0b', style: 'gradient' }
+        ]
+    }
+  ];
+
+  const allCharts: any[] = [...gridCharts, ...enrichmentCharts];
 
   return (
     <>
@@ -526,6 +656,41 @@ export default function DatabaseDetail() {
           </div>
         )}
 
+        <Tabs
+          label="Database sections"
+          value={tab}
+          onChange={selectTab}
+          items={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'insights', label: 'Query Insights' },
+            { id: 'indexes', label: 'Indexes & Advisor' },
+            { id: 'topology', label: 'Topology & Operations' },
+          ]}
+        />
+
+        {tab === 'insights' ? (
+          <DatabaseInsights
+            dbId={id as string}
+            timeQuery={buildTimeRangeQuery(timeRange)}
+            fetcher={fetcher}
+            capabilities={data.capabilities}
+          />
+        ) : tab === 'indexes' ? (
+          <DatabaseIndexes
+            dbId={id as string}
+            timeQuery={buildTimeRangeQuery(timeRange)}
+            fetcher={fetcher}
+            capabilities={data.capabilities}
+          />
+        ) : tab === 'topology' ? (
+          <DatabaseTopology
+            dbId={id as string}
+            topology={database.topology}
+            topologyCheckedAt={database.topologyCheckedAt}
+            fetcher={fetcher}
+          />
+        ) : (
+        <>
         {/* --- 2. Top-level Stats Cards --- */}
        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <StatCard 
@@ -576,6 +741,13 @@ export default function DatabaseDetail() {
            />
         </div>
 
+        {/* --- 2b. Health, advisories, and any blocked data sources --- */}
+        <DatabaseCapabilityNotice
+          capabilities={data.capabilities}
+          checkedAt={data.capabilitiesCheckedAt}
+        />
+        <DatabaseHealthPanel health={data.health} />
+
         {/* --- 3. Full Width Throughput --- */}
         <DynamicChart 
             title="Throughput (Operations / sec)"
@@ -592,8 +764,8 @@ export default function DatabaseDetail() {
 
         {/* --- 4. Detailed Charts Grid (Configuration Driven) --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           {gridCharts.map((chart, i) => (
-               <div key={i} className={i === gridCharts.length - 1 && gridCharts.length % 2 !== 0 ? 'md:col-span-2' : ''}>
+           {allCharts.map((chart, i) => (
+               <div key={i} className={i === allCharts.length - 1 && allCharts.length % 2 !== 0 ? 'md:col-span-2' : ''}>
                  <DynamicChart
                      title={chart.title}
                      data={chartData}
@@ -608,6 +780,8 @@ export default function DatabaseDetail() {
 
         {/* --- 5. Collections Table --- */}
         <CollectionsTable collections={collections}  type={database.type} />
+        </>
+        )}
       </div>
 
       <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="Remove Database?">

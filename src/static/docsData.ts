@@ -172,21 +172,35 @@ export const DOCS_DATA: DocsConfig = {
       id: "database",
       title: "Database Observability",
       iconName: "Database",
-      shortDescription: "Agentless query latency and connection pool profiling.",
-      overview: "Uncover slow queries, monitor connection pools, and track operations per second. Senzor connects directly to your database cluster in a read-only, agentless capacity to aggregate deep storage layer insights.",
+      shortDescription: "Agentless query insights, index advisor, and replication health for MongoDB, PostgreSQL, MySQL & Redis.",
+      overview: "Full-depth observability for MongoDB, PostgreSQL, MySQL and Redis. Senzor connects read-only and agentless, then reports engine-specific internals (WiredTiger cache and concurrency tickets, PostgreSQL checkpoints, dead tuples and transaction-ID headroom, InnoDB history list and lock contention, Redis memory breakdown and persistence status), ranks your most expensive query shapes, catalogues every index with its usage and redundancy, and surfaces replication topology. Everything is read-only by design: Senzor never enables a profiler, terminates an operation, or creates an index — index and tuning recommendations are shown as copyable statements for you to review and run yourself.",
       prerequisites: [
-        "A supported database engine (MongoDB or Redis).",
-        "A connection URI with a read-only user provisioned."
+        "A supported engine: MongoDB, PostgreSQL, MySQL, or Redis.",
+        "A connection URI with a read-only user provisioned.",
+        "For query insights (Pro and above): pg_stat_statements installed on PostgreSQL, performance_schema enabled on MySQL, MongoDB 7.0+ for $queryStats (or the database profiler already enabled), and SLOWLOG access on Redis. Senzor probes what your credentials can read and tells you exactly what is missing — it never changes these settings for you."
       ],
       registrationSteps: [
         { title: "Select Engine", description: "Click '+' next to Databases and select your engine." },
         { title: "Provide Credentials", description: "Enter a read-only connection URI. Senzor AES-256 encrypts these credentials at rest inside our secure vault." },
-        { title: "Set Interval", description: "Choose the polling frequency (1m, 5m, or 15m) based on your ingestion budget." }
+        { title: "Set Interval", description: "Choose the polling frequency (1m, 5m, or 15m) based on your ingestion budget." },
+        { title: "Review Capabilities", description: "On connect, Senzor probes what your monitoring user can read and lists anything it cannot, with the exact GRANT or setting that would unlock it. A panel left empty by a missing privilege says so rather than showing zeros." }
       ],
       troubleshooting: [
         {
           issue: "Connection Timeout / Refused",
           solution: "Ensure you have whitelisted Senzor's static IP addresses in your Database Firewall or AWS Security Group."
+        },
+        {
+          issue: "Query Insights tab is empty",
+          solution: "Check the capability panel on the Overview tab. The usual causes are pg_stat_statements not installed on PostgreSQL, performance_schema disabled on MySQL, or the MongoDB profiler switched off. Each one is reported with the statement that enables it. Insights are also a Pro-and-above capability, and the first window appears within five minutes of connecting."
+        },
+        {
+          issue: "An index is marked unused but I know it is needed",
+          solution: "Usage counters reset when the database restarts, so a recent restart makes everything look unused. Senzor withholds the flag until the server has been up seven days, and shows the uptime the judgement is based on beneath the table. Always confirm against your own workload before dropping anything."
+        },
+        {
+          issue: "Is my query text stored or shared?",
+          solution: "Query values never leave your database. PostgreSQL and MySQL supply pre-normalized text; MongoDB and Redis statements are normalized by Senzor before anything is written, so field names and operators are kept and literal values are replaced. Query text is withheld entirely from public share links, and live operations are never stored at all."
         }
       ]
     },

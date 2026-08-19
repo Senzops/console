@@ -72,7 +72,7 @@ const DEFAULT_ALERT_QUERIES: Record<string, string> = {
   logs: '[\n  { "$match": {\n    "level": { "$in": ["error", "fatal"] }\n  } }\n]',
   rum: '[\n  { "$match": {\n    "$or": [\n      { "vitals.lcp": { "$gt": 2500 } },\n      { "vitals.inp": { "$gt": 200 } }\n    ]\n  } }\n]',
   vps: '[\n  { "$match": {\n    "$or": [\n      { "metrics.cpu.usagePercent": { "$gt": 90 } },\n      { "metrics.memory.usagePercent": { "$gt": 90 } },\n      { "metrics.disk.usagePercent": { "$gt": 90 } }\n    ]\n  } }\n]',
-  database: '[\n  { "$match": {\n    "$or": [\n      { "latency.read.avg": { "$gt": 150 } },\n      { "connections.current": { "$gt": 500 } }\n    ]\n  } }\n]',
+  database: '[\n  { "$match": {\n    "$or": [\n      { "latency.read.avg": { "$gt": 150 } },\n      { "connections.current": { "$gt": 500 } },\n      { "mongo.scanRatio": { "$gt": 100 } },\n      { "mongo.ticketsAvailableWrite": { "$lt": 5 } },\n      { "mongo.oplogWindowSeconds": { "$lt": 3600 } },\n      { "pg.xidAgePercent": { "$gt": 75 } },\n      { "pg.deadTuples": { "$gt": 1000000 } },\n      { "mysql.historyListLength": { "$gt": 1000000 } },\n      { "redis.memoryUsedPercent": { "$gt": 90 } },\n      { "redis.evictedKeys": { "$gt": 0 } }\n    ]\n  } }\n]',
   uptime: '[\n  { "$match": {\n    "status": { "$in": ["down", "timeout"] }\n  } }\n]',
   task: '[\n  { "$match": {\n    "$or": [\n      { "status": "failed" },\n      { "isDeadLetter": true }\n    ]\n  } }\n]',
   errors: '[\n  { "$match": {\n    "status": "unresolved",\n    "totalCount": { "$gte": 5 }\n  } }\n]',

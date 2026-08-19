@@ -667,3 +667,115 @@ export const DataError = ({ onRetry, message }: { onRetry?: () => Promise<any> |
     </div>
   );
 };
+// --- Tabs ---
+// Codifies the two tab treatments already in use rather than introducing a
+// third: the underline style from the log detail drawer (page and panel level
+// navigation) and the segmented pill from the web analytics distribution cards
+// (in-card view switching). Adds the keyboard and ARIA semantics those inline
+// implementations lack — arrow keys move between tabs, Home/End jump to the
+// ends, and the active tab is announced.
+export interface TabItem {
+  id: string;
+  label: string;
+  /** Optional trailing count/status, e.g. a Badge. */
+  badge?: React.ReactNode;
+  disabled?: boolean;
+}
+
+export interface TabsProps {
+  items: TabItem[];
+  value: string;
+  onChange: (id: string) => void;
+  variant?: "underline" | "segmented";
+  className?: string;
+  /** Accessible name for the tab list. */
+  label?: string;
+}
+
+export const Tabs = ({
+  items,
+  value,
+  onChange,
+  variant = "underline",
+  className,
+  label = "Sections",
+}: TabsProps) => {
+  const refs = React.useRef<(HTMLButtonElement | null)[]>([]);
+
+  const move = (from: number, delta: number) => {
+    const enabled = items
+      .map((item, i) => ({ item, i }))
+      .filter(({ item }) => !item.disabled);
+    if (enabled.length === 0) return;
+    const position = enabled.findIndex(({ i }) => i === from);
+    const next = enabled[(position + delta + enabled.length) % enabled.length];
+    refs.current[next.i]?.focus();
+    onChange(next.item.id);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); move(index, 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); move(index, -1); }
+    if (e.key === "Home") {
+      e.preventDefault();
+      const first = items.findIndex((i) => !i.disabled);
+      if (first >= 0) { refs.current[first]?.focus(); onChange(items[first].id); }
+    }
+    if (e.key === "End") {
+      e.preventDefault();
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (!items[i].disabled) { refs.current[i]?.focus(); onChange(items[i].id); break; }
+      }
+    }
+  };
+
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className={cn(
+        variant === "underline"
+          ? "flex items-center gap-1 border-b border-border/60"
+          : "inline-flex bg-muted/50 rounded-lg p-0.5",
+        className
+      )}
+    >
+      {items.map((item, index) => {
+        const active = item.id === value;
+        return (
+          <button
+            key={item.id}
+            ref={(el) => { refs.current[index] = el; }}
+            role="tab"
+            type="button"
+            aria-selected={active}
+            aria-disabled={item.disabled || undefined}
+            disabled={item.disabled}
+            tabIndex={active ? 0 : -1}
+            onClick={() => !item.disabled && onChange(item.id)}
+            onKeyDown={(e) => onKeyDown(e, index)}
+            className={cn(
+              "flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              variant === "underline"
+                ? cn(
+                    "px-3 py-2 text-sm font-medium rounded-t-md border-b-2 -mb-px",
+                    active
+                      ? "border-blue-500 text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )
+                : cn(
+                    "px-2 py-0.5 text-[10px] uppercase font-bold rounded-md",
+                    active
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )
+            )}
+          >
+            {item.label}
+            {item.badge}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
