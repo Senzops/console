@@ -172,19 +172,53 @@ const rippleWithOverlay = (
     });
 };
 
-/** View Transitions path: clip the live incoming snapshot in over the old one. */
+/** The transition in flight, so a rapid second switch can retire the first. */
+let activeTransition: any = null;
+
+/**
+ * View Transitions path: clip the live incoming snapshot in over the old one.
+ *
+ * The origin is published as custom properties BEFORE the transition starts,
+ * because `transition.ready` resolves a microtask late — one frame after the
+ * transition begins painting. Attaching the clip only in that callback left
+ * the incoming snapshot unclipped and fully opaque for that first frame, so
+ * the theme appeared to switch instantly and the circle that followed looked
+ * disconnected from the control that was pressed. The CSS rule keyed on
+ * `--ripple-x/y` clips frame zero; the animation below takes it from there.
+ */
 const rippleWithViewTransition = (
   point: { x: number; y: number },
   commit: () => void
 ) => {
   const root = document.documentElement;
+
+  // A second switch mid-flight would otherwise animate against a stale
+  // snapshot; retiring the first lets the new one capture current state.
+  if (activeTransition?.skipTransition) {
+    try { activeTransition.skipTransition(); } catch { /* already finished */ }
+  }
+
+  root.style.setProperty("--ripple-x", `${point.x}px`);
+  root.style.setProperty("--ripple-y", `${point.y}px`);
   root.setAttribute(TRANSITION_ATTR, "active");
+
+  const cleanUp = () => {
+    root.removeAttribute(TRANSITION_ATTR);
+    root.style.removeProperty("--ripple-x");
+    root.style.removeProperty("--ripple-y");
+  };
+
+  // `ready` and `finished` never settle while the document is not
+  // compositing (a backgrounded tab, for one). Without this the attribute
+  // would strand the page holding a zero-radius clip over the new theme.
+  const safety = window.setTimeout(cleanUp, RIPPLE_DURATION_MS + 1000);
 
   const transition = (document as any).startViewTransition(() => {
     // The snapshot is taken the moment this callback returns, so React's
     // theme-dependent output has to be on screen by then, not a tick later.
     flushSync(commit);
   });
+  activeTransition = transition;
 
   transition.ready
     .then(() => {
@@ -199,6 +233,9 @@ const rippleWithViewTransition = (
           duration: RIPPLE_DURATION_MS,
           easing: RIPPLE_EASING,
           pseudoElement: "::view-transition-new(root)",
+          // Without this the animation is removed on its last frame and the
+          // zero-radius CSS clip reapplies, blanking the new theme briefly.
+          fill: "forwards",
         }
       );
     })
@@ -208,7 +245,11 @@ const rippleWithViewTransition = (
 
   transition.finished
     .catch(() => {})
-    .finally(() => root.removeAttribute(TRANSITION_ATTR));
+    .finally(() => {
+      window.clearTimeout(safety);
+      cleanUp();
+      if (activeTransition === transition) activeTransition = null;
+    });
 };
 
 interface SettingsContextType {

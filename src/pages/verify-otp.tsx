@@ -296,7 +296,7 @@ export default function VerifyOtp() {
               type="button"
               onClick={() => setConfirmSignOut(true)}
               aria-label="Sign out and return to login"
-              className="p-2 -ml-2 rounded-full hover:bg-secondary/50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+              className="p-2 -ml-2 rounded-full hover:bg-secondary/50 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -371,7 +371,7 @@ export default function VerifyOtp() {
                           onKeyDown={(e) => handleKeyDown(i, e)}
                           onPaste={(e) => handlePaste(e, i)}
                           onFocus={(e) => e.target.select()}
-                          className="w-11 h-12 text-center text-xl font-semibold rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-11 h-12 text-center text-xl font-semibold rounded-md border border-input bg-background shadow-sm focus:outline-none focus:ring-1 focus:ring-ring transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       ))}
                     </div>
@@ -416,7 +416,7 @@ export default function VerifyOtp() {
                   <button
                     type="button"
                     onClick={() => setConfirmSignOut(true)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center focus:outline-none focus:ring-2 focus:ring-ring rounded"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-md"
                   >
                     Sign in with a different account
                   </button>

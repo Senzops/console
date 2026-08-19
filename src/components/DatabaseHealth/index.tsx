@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '../Core';
+import { useTheme } from '../../lib/theme';
 import {
   ShieldCheck,
   AlertTriangle,
@@ -62,6 +63,10 @@ const scoreTone = (score: number) => {
 };
 
 const ScoreRing = ({ score }: { score: number }) => {
+  // The ring is a chart mark, and chart marks follow monochromatic mode
+  // across the product. The severity icons and badges below it are status
+  // indicators rather than chart marks, so they keep their semantic colour.
+  const { isMono } = useTheme();
   const tone = scoreTone(score);
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
@@ -78,7 +83,7 @@ const ScoreRing = ({ score }: { score: number }) => {
           fill="none"
           strokeWidth="7"
           strokeLinecap="round"
-          className={`${tone.ring} transition-all duration-700`}
+          className={`${isMono ? "stroke-[hsl(var(--chart-mono))]" : tone.ring} transition-all duration-700`}
           strokeDasharray={`${filled} ${circumference}`}
         />
       </svg>
@@ -105,7 +110,7 @@ export const AdvisoryRow = ({ advisory }: { advisory: Advisory }) => {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ring"
+        className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${style.className}`} aria-hidden="true" />
         <span className="min-w-0 flex-1">

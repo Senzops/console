@@ -391,10 +391,36 @@
    one by the circle animated in lib/theme.tsx.
    ========================================================================== */
 
+/* The group animation is suppressed alongside the snapshots: with identical
+   old and new geometry it is a no-op, but any transform it applies would
+   shift the coordinate frame the clip-path below is measured against. */
+::view-transition-group(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+}
+
+/* Pin both snapshots to exactly the viewport.
+
+   The UA default sizes them with `block-size: auto`, i.e. the snapshot's
+   intrinsic height. Where that differs from the viewport height at all, the
+   percentage-free clip-path coordinates below stop being viewport
+   coordinates and the ripple lands somewhere other than the pointer. Fixing
+   the box makes the mapping true by construction rather than by assumption. */
+::view-transition-image-pair(root) {
+  position: absolute;
+  inset: 0;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
 }
 
 /* Outgoing theme stays fully painted underneath; incoming is revealed on top. */
@@ -404,6 +430,15 @@
 
 ::view-transition-new(root) {
   z-index: 2;
+}
+
+/* Frame zero. `transition.ready` resolves a microtask after the transition
+   starts painting, so an animation attached there misses the first frame and
+   the incoming theme flashes in at full size before the circle appears. The
+   origin is published by lib/theme.tsx as --ripple-x/y before the transition
+   begins, so this rule clips that first frame correctly. */
+html[data-theme-transition="active"]::view-transition-new(root) {
+  clip-path: circle(0px at var(--ripple-x, 50%) var(--ripple-y, 50%));
 }
 
 /* While the ripple runs, the blanket `transition-colors` on body (and any other

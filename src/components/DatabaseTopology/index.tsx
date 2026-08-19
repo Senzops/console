@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
 import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, cn,
+  Card, CardContent, CardHeader, CardTitle, Badge, Button, cn,
 } from '../Core';
+import { SkeletonTitledTableCard } from '../Skeletons';
 import {
   Network, RefreshCw, Activity, Lock, ShieldAlert, Server, CircleDot, Radio,
 } from 'lucide-react';
@@ -200,8 +201,8 @@ export const DatabaseTopology = ({
               )}
             </div>
           ) : !data ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner className="h-6 w-6 text-primary" />
+            <div className="p-4" aria-busy="true" aria-label="Loading operations">
+              <SkeletonTitledTableCard columns={3} rows={5} rightBadge={false} twoLineFirstCol />
             </div>
           ) : operations.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">

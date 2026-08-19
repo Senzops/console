@@ -2171,10 +2171,13 @@ const DashboardLayoutInner = ({
                     aria-label={`${option.label} theme`}
                     onClick={(e) => setTheme(option.id, e)}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg border p-2.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring",
+                      // Mirrors the Core Button idiom (rounded-md, border-input,
+                      // shadow-sm, focus-visible:ring-1) so the picker sits
+                      // consistently beside the plain Buttons in this dialog.
+                      "flex items-center gap-3 rounded-md border p-2.5 text-left shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                       isActive
-                        ? "border-primary bg-secondary/60"
-                        : "border-border hover:bg-secondary/30"
+                        ? "border-primary bg-accent"
+                        : "border-input bg-background hover:bg-accent hover:text-accent-foreground"
                     )}
                   >
                     {/* data-theme scopes this subtree to that palette, so the

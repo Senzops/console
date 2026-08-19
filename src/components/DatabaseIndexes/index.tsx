@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Input, Spinner, Tabs, cn,
+  Card, CardContent, CardHeader, CardTitle, Badge, Input, Tabs, cn,
 } from '../Core';
+import { SkeletonStatGrid, SkeletonWideCard, SkeletonTitledTableCard } from '../Skeletons';
+import { DbStatCard, DbPlaceholder } from '../database/shared';
 import { AdvisoryList, type Advisory } from '../DatabaseHealth';
 import {
   Search, Lock, Sparkles, ShieldAlert, Database, Layers, HardDrive, Trash2, Lightbulb,
@@ -61,32 +63,6 @@ const formatUptime = (seconds: number) => {
   return `${Math.floor(seconds / 3600)} hours`;
 };
 
-const Placeholder = ({
-  icon: Icon,
-  title,
-  children,
-  tone = 'muted',
-}: {
-  icon: typeof Lock;
-  title: string;
-  children?: React.ReactNode;
-  tone?: 'muted' | 'warning';
-}) => (
-  <Card className={tone === 'warning' ? 'border-yellow-500/25 bg-yellow-500/[0.03]' : undefined}>
-    <CardContent className="flex flex-col items-center justify-center py-14 text-center">
-      <div
-        className={cn(
-          'mb-4 flex h-12 w-12 items-center justify-center rounded-full',
-          tone === 'warning' ? 'bg-yellow-500/10' : 'bg-muted/50'
-        )}
-      >
-        <Icon className={cn('h-6 w-6', tone === 'warning' ? 'text-yellow-500' : 'text-muted-foreground')} />
-      </div>
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
-      <div className="mt-2 max-w-md text-sm text-muted-foreground">{children}</div>
-    </CardContent>
-  </Card>
-);
 
 export const DatabaseIndexes = ({
   dbId,
@@ -131,56 +107,55 @@ export const DatabaseIndexes = ({
 
   if (planBlocked) {
     return (
-      <Placeholder icon={Sparkles} title="The index advisor is available on Pro and above">
+      <DbPlaceholder
+        icon={Sparkles}
+        title="The index advisor is available on Pro and above"
+        action={{ label: 'View plans', onClick: () => window.open('/pricing', '_blank') }}
+      >
         {error.response.data.message ||
           'Upgrade to see index usage, redundancy analysis, and index recommendations.'}
-        <div className="mt-4">
-          <Button variant="default" onClick={() => window.open('/pricing', '_blank')}>
-            View plans
-          </Button>
-        </div>
-      </Placeholder>
+      </DbPlaceholder>
     );
   }
 
   if (error) {
     return (
-      <Placeholder icon={ShieldAlert} title="Could not load index data">
+      <DbPlaceholder icon={ShieldAlert} title="Could not load index data">
         {error?.response?.data?.error || 'The request failed. Try again in a moment.'}
-      </Placeholder>
+      </DbPlaceholder>
     );
   }
 
   const indexCap = capabilities?.indexStats;
   if (indexCap && !indexCap.available) {
     return (
-      <Placeholder icon={Lock} title="Index statistics are not readable" tone="warning">
+      <DbPlaceholder icon={Lock} title="Index statistics are not readable" tone="warning">
         {indexCap.reason}
         {indexCap.remediation && (
           <p className="mt-3 rounded-md border border-border/60 bg-muted/30 p-3 text-left font-mono text-[11px] leading-relaxed text-foreground-secondary">
             {indexCap.remediation}
           </p>
         )}
-      </Placeholder>
+      </DbPlaceholder>
     );
   }
 
   if (isLoading && !data) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-20">
-          <Spinner className="h-8 w-8 text-primary" />
-        </CardContent>
-      </Card>
+      <div className="space-y-6" aria-busy="true" aria-label="Loading index census">
+        <SkeletonStatGrid count={4} />
+        <SkeletonWideCard />
+        <SkeletonTitledTableCard columns={4} rows={6} twoLineFirstCol />
+      </div>
     );
   }
 
   if (!data?.collectedAt) {
     return (
-      <Placeholder icon={Layers} title="No index census yet">
+      <DbPlaceholder icon={Layers} title="No index census yet">
         Indexes are catalogued hourly. If this database was connected recently, the first census
         will appear within the hour.
-      </Placeholder>
+      </DbPlaceholder>
     );
   }
 
@@ -205,15 +180,7 @@ export const DatabaseIndexes = ({
             tone: advisories.length > 0 ? 'text-emerald-500' : 'text-muted-foreground',
           },
         ].map((s) => (
-          <Card key={s.title}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between space-y-0 pb-2">
-                <p className="text-sm font-medium text-muted-foreground">{s.title}</p>
-                <s.icon className={cn('h-4 w-4', s.tone)} />
-              </div>
-              <div className="text-2xl font-bold text-foreground">{s.value}</div>
-            </CardContent>
-          </Card>
+          <DbStatCard key={s.title} title={s.title} value={s.value} icon={s.icon} color={s.tone} />
         ))}
       </div>
 

@@ -7,6 +7,8 @@ import {
 import {
   Card, CardContent, CardHeader, CardTitle, Badge, Button, Input, Spinner, Tabs, DataError, cn,
 } from '../Core';
+import { SkeletonStatGrid, SkeletonChartCard, SkeletonTitledTableCard } from '../Skeletons';
+import { DbStatCard, DbPlaceholder, useChartColor } from '../database/shared';
 import { ChartTooltip } from '../ChartTooltip';
 import {
   Search, X, Clock, Lock, Gauge, ArrowUpDown, ScanLine, Database, Sparkles, ShieldAlert,
@@ -96,35 +98,6 @@ const ratioTone = (n?: number | null) => {
   if (n >= 10) return 'text-yellow-500';
   return 'text-emerald-500';
 };
-
-// --- Shared empty / blocked states -------------------------------------------
-
-const Placeholder = ({
-  icon: Icon,
-  title,
-  children,
-  tone = 'muted',
-}: {
-  icon: typeof Lock;
-  title: string;
-  children?: React.ReactNode;
-  tone?: 'muted' | 'warning';
-}) => (
-  <Card className={tone === 'warning' ? 'border-yellow-500/25 bg-yellow-500/[0.03]' : undefined}>
-    <CardContent className="flex flex-col items-center justify-center py-14 text-center">
-      <div
-        className={cn(
-          'mb-4 flex h-12 w-12 items-center justify-center rounded-full',
-          tone === 'warning' ? 'bg-yellow-500/10' : 'bg-muted/50'
-        )}
-      >
-        <Icon className={cn('h-6 w-6', tone === 'warning' ? 'text-yellow-500' : 'text-muted-foreground')} />
-      </div>
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
-      <div className="mt-2 max-w-md text-sm text-muted-foreground">{children}</div>
-    </CardContent>
-  </Card>
-);
 
 // --- Detail drawer ------------------------------------------------------------
 
@@ -313,6 +286,7 @@ export const DatabaseInsights = ({
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const chartColor = useChartColor();
 
   // Debounced so a keystroke does not become a database aggregation.
   useEffect(() => {
@@ -339,23 +313,22 @@ export const DatabaseInsights = ({
 
   if (planBlocked) {
     return (
-      <Placeholder icon={Sparkles} title="Query Insights is available on Pro and above">
+      <DbPlaceholder
+        icon={Sparkles}
+        title="Query Insights is available on Pro and above"
+        action={{ label: 'View plans', onClick: () => window.open('/pricing', '_blank') }}
+      >
         {error.response.data.message ||
           'Upgrade to capture query shapes, latency distributions, and slow operations from your database.'}
-        <div className="mt-4">
-          <Button variant="default" onClick={() => window.open('/pricing', '_blank')}>
-            View plans
-          </Button>
-        </div>
-      </Placeholder>
+      </DbPlaceholder>
     );
   }
 
   if (error) {
     return (
-      <Placeholder icon={ShieldAlert} title="Could not load query insights">
+      <DbPlaceholder icon={ShieldAlert} title="Could not load query insights">
         {error?.response?.data?.error || 'The request failed. Try again in a moment.'}
-      </Placeholder>
+      </DbPlaceholder>
     );
   }
 
@@ -365,24 +338,24 @@ export const DatabaseInsights = ({
 
   if (noSource) {
     return (
-      <Placeholder icon={Lock} title="No query statistics source is available" tone="warning">
+      <DbPlaceholder icon={Lock} title="No query statistics source is available" tone="warning">
         {queryStatsCap?.reason}
         {queryStatsCap?.remediation && (
           <p className="mt-3 rounded-md border border-border/60 bg-muted/30 p-3 text-left font-mono text-[11px] leading-relaxed text-foreground-secondary">
             {queryStatsCap.remediation}
           </p>
         )}
-      </Placeholder>
+      </DbPlaceholder>
     );
   }
 
   if (isLoading && !data) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-20">
-          <Spinner className="h-8 w-8 text-primary" />
-        </CardContent>
-      </Card>
+      <div className="space-y-6" aria-busy="true" aria-label="Loading query insights">
+        <SkeletonStatGrid count={4} />
+        <SkeletonChartCard className="h-[300px]" />
+        <SkeletonTitledTableCard columns={5} rows={6} twoLineFirstCol />
+      </div>
     );
   }
 
@@ -407,23 +380,15 @@ export const DatabaseInsights = ({
             tone: slowOps.length > 0 ? 'text-yellow-500' : 'text-muted-foreground',
           },
         ].map((s) => (
-          <Card key={s.title}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between space-y-0 pb-2">
-                <p className="text-sm font-medium text-muted-foreground">{s.title}</p>
-                <s.icon className={cn('h-4 w-4', s.tone)} />
-              </div>
-              <div className="text-2xl font-bold text-foreground">{s.value}</div>
-            </CardContent>
-          </Card>
+          <DbStatCard key={s.title} title={s.title} value={s.value} icon={s.icon} color={s.tone} />
         ))}
       </div>
 
       {isEmpty ? (
-        <Placeholder icon={ScanLine} title="No query activity captured yet">
+        <DbPlaceholder icon={ScanLine} title="No query activity captured yet">
           Insights are collected every five minutes. If this database was just connected, the first
           window will appear shortly.
-        </Placeholder>
+        </DbPlaceholder>
       ) : (
         <>
           {/* Latency scatter — the profiler view: each point is one slow operation. */}
@@ -473,7 +438,7 @@ export const DatabaseInsights = ({
                         );
                       }}
                     />
-                    <Scatter data={scatter} fill="#8b5cf6" fillOpacity={0.7} />
+                    <Scatter data={scatter} fill={chartColor('#8b5cf6')} fillOpacity={0.7} />
                   </ScatterChart>
                 </ResponsiveContainer>
               </CardContent>
