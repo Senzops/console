@@ -42,6 +42,7 @@ import {
   BellRing,
   LayoutTemplate,
   ShieldCheck,
+  Check,
   Cookie,
   Shield,
   Scale,
@@ -2160,16 +2161,45 @@ const DashboardLayoutInner = ({
               <Palette className="h-4 w-4" /> Interface Theme
             </h4>
             <div className="grid grid-cols-2 gap-2">
-              {["dark", "light", "nord", "latte"].map((t) => (
-                <Button
-                  key={t}
-                  variant={theme === t ? "default" : "outline"}
-                  onClick={() => setTheme(t as any)}
-                  className="justify-start capitalize"
-                >
-                  {t}
-                </Button>
-              ))}
+              {THEME_OPTIONS.map((option) => {
+                const isActive = theme === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={isActive}
+                    aria-label={`${option.label} theme`}
+                    onClick={(e) => setTheme(option.id, e)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border p-2.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring",
+                      isActive
+                        ? "border-primary bg-secondary/60"
+                        : "border-border hover:bg-secondary/30"
+                    )}
+                  >
+                    {/* data-theme scopes this subtree to that palette, so the
+                        swatch is the real thing rather than duplicated hexes. */}
+                    <span
+                      data-theme={option.id}
+                      aria-hidden="true"
+                      className="flex h-8 w-8 shrink-0 overflow-hidden rounded-md border border-border"
+                    >
+                      <span className="w-1/2 bg-background" />
+                      <span className="flex w-1/2 flex-col">
+                        <span className="h-1/2 bg-card" />
+                        <span className="h-1/2 bg-primary" />
+                      </span>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">{option.label}</span>
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {option.hint}
+                      </span>
+                    </span>
+                    {isActive && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -2252,6 +2282,13 @@ const DashboardLayoutInner = ({
     </div>
   );
 };
+
+const THEME_OPTIONS: { id: "dark" | "light" | "nord" | "latte"; label: string; hint: string }[] = [
+  { id: "dark", label: "Dark", hint: "Zinc • default" },
+  { id: "light", label: "Light", hint: "Clean & bright" },
+  { id: "nord", label: "Nord", hint: "Cool arctic" },
+  { id: "latte", label: "Latte", hint: "Warm paper" },
+];
 
 // Helper for 'cn'
 function cn(...classes: (string | undefined | null | false)[]) {

@@ -382,3 +382,48 @@
     display: none;
   }
 }
+/* ==========================================================================
+   Theme ripple
+   --------------------------------------------------------------------------
+   The default root view transition is a cross-fade, which reads as the whole
+   surface dissolving. For a positional reveal the two snapshots must instead
+   sit still and stacked, with the incoming one clipped in over the outgoing
+   one by the circle animated in lib/theme.tsx.
+   ========================================================================== */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Outgoing theme stays fully painted underneath; incoming is revealed on top. */
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+/* While the ripple runs, the blanket `transition-colors` on body (and any other
+   in-flight transition) would animate a second time underneath the wipe, so
+   every surface would appear to change twice. Stand them all down for the
+   duration; the attribute is removed as soon as the transition settles. */
+html[data-theme-transition="active"],
+html[data-theme-transition="active"] *,
+html[data-theme-transition="active"] *::before,
+html[data-theme-transition="active"] *::after {
+  transition: none !important;
+}
+
+/* Reduced motion never starts a transition in the first place (see
+   lib/theme.tsx); this is the belt-and-braces for a preference that flips
+   mid-animation. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
