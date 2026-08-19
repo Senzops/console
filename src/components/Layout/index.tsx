@@ -871,7 +871,7 @@ const DashboardLayoutInner = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const { user, loading, logout, token, resendVerification, otpVerified } = useAuth();
+  const { user, loading, logout, token, resendVerification, otpVerified, otpResolved } = useAuth();
   const {
     theme,
     setTheme,
@@ -1219,6 +1219,20 @@ const DashboardLayoutInner = ({
   }
 
   if (!user.isDemo && !otpVerified) {
+    // Verification state is seeded optimistically from local storage, so a
+    // "not verified" reading before the server has answered may simply be a
+    // cold cache. Hold on the spinner rather than bouncing a verified user
+    // out to the code screen and straight back again.
+    if (!otpResolved) {
+      return (
+        <div className="h-screen flex flex-col items-center justify-center bg-background text-foreground gap-4">
+          <Spinner className="h-8 w-8 text-emerald-500" />
+          <p className="text-sm text-muted-foreground animate-pulse">
+            Authenticating...
+          </p>
+        </div>
+      );
+    }
     router.push("/verify-otp");
     return null;
   }

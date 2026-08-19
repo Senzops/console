@@ -105,15 +105,20 @@ export function hasStoredActiveOrg(): boolean {
 const _initialOrgId = getStoredOrgId();
 
 export const OrgProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
+  const { user, otpVerified } = useAuth();
   const [activeOrg, setActiveOrgState] = useState<Organization | null>(null);
   const [isReady, setIsReady] = useState(false);
   const initializedRef = useRef(false);
 
   // Fetch org list for all authenticated users (including demo).
   // Demo users will see any orgs they're a member of (e.g. seeded demo orgs).
+  //
+  // Held until the second factor clears: the API refuses this endpoint while
+  // verification is outstanding, and firing it early would only bank an error
+  // for SWR to back off on. completeOtpVerification revalidates every key, so
+  // this fetches the moment the code is accepted.
   const { data, isLoading, mutate } = useSWR(
-    user ? '/org' : null,
+    user && otpVerified ? '/org' : null,
     fetcher,
     { revalidateOnFocus: false }
   );
@@ -130,6 +135,15 @@ export const OrgProvider = ({ children }: { children: React.ReactNode }) => {
       setIsReady(true);
       return;
     }
+    // The org list is withheld until the second factor clears. Returning here
+    // — rather than falling through — matters twice over: it stops the one-shot
+    // initialization being consumed on an empty list, and it stops the stored
+    // workspace being cleared as "stale" before it was ever fetchable.
+    if (!otpVerified) {
+      setIsReady(true);
+      return;
+    }
+
     if (isLoading) return;
 
     // Only run initialization once per org list load
@@ -158,7 +172,7 @@ export const OrgProvider = ({ children }: { children: React.ReactNode }) => {
     try { sessionStorage.removeItem(ORG_STORAGE_KEY); } catch {}
     setActiveOrgState(null);
     setIsReady(true);
-  }, [organizations, isLoading, user]);
+  }, [organizations, isLoading, user, otpVerified]);
 
   // Reset initialization ref when user changes (login/logout)
   useEffect(() => {
