@@ -383,10 +383,10 @@ export default function DatabaseDetail() {
         ]
     },
     {
-        title: "Storage Size (MB)", formatter: (val: number) => formatSize(val),
+        title: "Disk Usage (MB)", formatter: (val: number) => formatSize(val),
         series: [
-            { key: 'storageData', name: 'Data Size', color: '#14b8a6', style: 'gradient' },
-            { key: 'storageIndex', name: 'Index Size', color: '#6366f1', style: 'gradient' }
+            { key: 'storageData', name: 'Data (on disk)', color: '#14b8a6', style: 'gradient', stackId: 1 },
+            { key: 'storageIndex', name: 'Indexes (on disk)', color: '#6366f1', style: 'gradient', stackId: 1 }
         ]
     },
     {
@@ -460,10 +460,10 @@ export default function DatabaseDetail() {
         ]
     },
     {
-        title: "Storage Size (MB)", formatter: (val: number) => formatSize(val),
+        title: "Disk Usage (MB)", formatter: (val: number) => formatSize(val),
         series: [
-            { key: 'storageData', name: 'Data Size', color: '#14b8a6', style: 'gradient' },
-            { key: 'storageIndex', name: 'Index Size', color: '#6366f1', style: 'gradient' }
+            { key: 'storageData', name: 'Data (on disk)', color: '#14b8a6', style: 'gradient', stackId: 1 },
+            { key: 'storageIndex', name: 'Indexes (on disk)', color: '#6366f1', style: 'gradient', stackId: 1 }
         ]
     },
     {
@@ -598,6 +598,17 @@ export default function DatabaseDetail() {
         series: [{ key: 'mongoScanRatio', name: 'Examined : Returned', color: '#ef4444', style: 'gradient' }]
     },
     {
+        title: "Logical vs On-Disk Size (MB)", formatter: (val: number) => formatSize(val),
+        series: [
+            { key: 'mongoLogicalDataSize', name: 'Logical (uncompressed)', color: '#64748b', style: 'gradient', dashed: true },
+            { key: 'storageTotal', name: 'On Disk', color: '#14b8a6', style: 'gradient' }
+        ]
+    },
+    {
+        title: "Data Volume Used (%)", tooltipSuffix: "%",
+        series: [{ key: 'mongoDiskUsedPercent', name: 'Filesystem Used', color: '#f59e0b', style: 'gradient' }]
+    },
+    {
         title: "Cursors & Evictions", tooltipSuffix: "",
         series: [
             { key: 'mongoCursorsOpen', name: 'Cursors Open', color: '#3b82f6', style: 'gradient' },
@@ -625,10 +636,10 @@ export default function DatabaseDetail() {
                <span className="capitalize">{database.type}{database.version ? ` ${database.version}` : ''}</span>
                <span>•</span>
                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Polling {database.interval}m</span>
-               {!isRedis && latest.storage?.dataSize > 0 && (
+               {!isRedis && latest.storage?.storageSize > 0 && (
                  <>
                    <span>•</span>
-                   <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> {formatSize(latest.storage?.dataSize)} Data</span>
+                   <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> {formatSize(latest.storage?.storageSize)} on disk</span>
                  </>
                )}
             </div>
